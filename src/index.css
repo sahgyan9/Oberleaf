@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-primary: #2F39A9;
+  --brand-secondary: #2E6FA0;
+  --brand-cyan: #49A4BB;
+  --brand-mint: #15D8B3;
+
+  --bg-app: #F8FAFC;
+  --bg-panel: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --border-color: #E2E8F0;
+  --text-main: #0F172A;
+  --text-sub: #475569;
+}
+
+.dark {
+  --bg-app: #0B0F19;
+  --bg-panel: #111827;
+  --bg-subtle: #1E293B;
+  --border-color: #1E293B;
+  --text-main: #F8FAFC;
+  --text-sub: #94A3B8;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Custom scrollbars matching brand */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2E6FA055;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #15D8B388;
+}
+
+/* SyncTeX Jump Line Highlight Animation */
+.synctex-highlight-line {
+  background: rgba(21, 216, 179, 0.25) !important;
+  border-left: 3px solid #15D8B3 !important;
+  animation: synctex-pulse 2s ease-out forwards;
+}
+
+@keyframes synctex-pulse {
+  0% {
+    background: rgba(21, 216, 179, 0.45);
+  }
+  50% {
+    background: rgba(73, 164, 187, 0.30);
+  }
+  100% {
+    background: rgba(21, 216, 179, 0.05);
+  }
+}

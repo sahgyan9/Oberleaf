@@ -1,0 +1,47 @@
+{
+  "name": "overleaf-copy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local-first LaTeX editor with instant equation preview, side-by-side PDF preview, and zero compute timeouts.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "server": "tsx watch server/index.ts",
+    "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "setup:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-windows.ps1"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "katex": "^0.16.11",
+    "lucide-react": "^0.436.0",
+    "pdfjs-dist": "^4.6.82",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-resizable-panels": "^2.1.1",
+    "simple-git": "^3.36.0",
+    "tailwind-merge": "^2.5.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/katex": "^0.16.7",
+    "@types/node": "^22.5.4",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
+    "postcss": "^8.4.45",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.3"
+  }
+}

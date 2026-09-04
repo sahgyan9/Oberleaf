@@ -1,0 +1,461 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  History,
+  GitCommit,
+  RotateCcw,
+  Plus,
+  RefreshCw,
+  X,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  FileCode,
+  Tag,
+  Loader2,
+} from 'lucide-react';
+import { DiffEditor } from '@monaco-editor/react';
+import { useTheme } from '../../context/ThemeContext';
+
+export interface HistoryCommit {
+  hash: string;
+  shortHash: string;
+  message: string;
+  date: string;
+  author_name: string;
+}
+
+export interface HistoryDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectId: string;
+  activeFilePath: string;
+  onRevertSuccess: () => void;
+}
+
+export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
+  isOpen,
+  onClose,
+  projectId,
+  activeFilePath,
+  onRevertSuccess,
+}) => {
+  const { theme } = useTheme();
+  const [commits, setCommits] = useState<HistoryCommit[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [selectedCommit, setSelectedCommit] = useState<HistoryCommit | null>(null);
+  const [diffData, setDiffData] = useState<{
+    filePath: string;
+    oldContent: string;
+    newContent: string;
+    diff: string;
+  } | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState<boolean>(false);
+
+  // Checkpoint creation state
+  const [checkpointName, setCheckpointName] = useState<string>('');
+  const [isCreatingCheckpoint, setIsCreatingCheckpoint] = useState<boolean>(false);
+  const [checkpointStatus, setCheckpointStatus] = useState<string | null>(null);
+
+  // Revert confirmation state
+  const [showConfirmRevert, setShowConfirmRevert] = useState<boolean>(false);
+  const [isReverting, setIsReverting] = useState<boolean>(false);
+
+  // Load Git History Commits
+  const fetchHistory = useCallback(async () => {
+    if (!projectId) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history`);
+      if (res.ok) {
+        const data: HistoryCommit[] = await res.json();
+        setCommits(data);
+        if (data.length > 0 && !selectedCommit) {
+          // Select first commit or previous commit by default
+          setSelectedCommit(data[0]);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, selectedCommit]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistory();
+    }
+  }, [isOpen, fetchHistory]);
+
+  // Load Diff for Selected Commit
+  const fetchDiff = useCallback(
+    async (commit: HistoryCommit) => {
+      if (!projectId || !commit) return;
+      setIsLoadingDiff(true);
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/history/${commit.hash}/diff?file=${encodeURIComponent(
+            activeFilePath
+          )}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setDiffData(data);
+        }
+      } catch {
+        setDiffData(null);
+      } finally {
+        setIsLoadingDiff(false);
+      }
+    },
+    [projectId, activeFilePath]
+  );
+
+  useEffect(() => {
+    if (selectedCommit && isOpen) {
+      fetchDiff(selectedCommit);
+    }
+  }, [selectedCommit, isOpen, fetchDiff]);
+
+  // Create Checkpoint Handler
+  const handleCreateCheckpoint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkpointName.trim() || isCreatingCheckpoint) return;
+
+    setIsCreatingCheckpoint(true);
+    setCheckpointStatus(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history/checkpoint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: checkpointName.trim() }),
+      });
+
+      if (res.ok) {
+        setCheckpointName('');
+        setCheckpointStatus('Checkpoint created!');
+        await fetchHistory();
+        setTimeout(() => setCheckpointStatus(null), 3000);
+      } else {
+        const err = await res.json();
+        setCheckpointStatus(`Failed: ${err.error || 'Error'}`);
+      }
+    } catch (err: any) {
+      setCheckpointStatus(`Error: ${err.message}`);
+    } finally {
+      setIsCreatingCheckpoint(false);
+    }
+  };
+
+  // Revert / Restore Project Handler
+  const handleRevert = async () => {
+    if (!selectedCommit || isReverting) return;
+    setIsReverting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commitHash: selectedCommit.hash }),
+      });
+
+      if (res.ok) {
+        setShowConfirmRevert(false);
+        onRevertSuccess();
+        await fetchHistory();
+      } else {
+        const err = await res.json();
+        alert(`Restore failed: ${err.error}`);
+      }
+    } catch (e: any) {
+      alert(`Restore error: ${e.message}`);
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
+  const formatCommitDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+      if (diffSec < 60) return 'Just now';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-5xl h-full bg-surface-lightPanel dark:bg-surface-darkPanel border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
+        {/* Top Header */}
+        <div className="h-14 px-4 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between bg-surface-light dark:bg-surface-dark flex-shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-brand-indigo/20 dark:bg-brand-indigo/40 flex items-center justify-center text-brand-mint">
+              <History className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <span>Version History & Checkpoints</span>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-brand-mint/10 text-brand-mint border border-brand-mint/20">
+                  Git-backed
+                </span>
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Visual side-by-side diff comparison and 1-click version restore
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={fetchHistory}
+              disabled={isLoading}
+              title="Refresh Timeline"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-brand-mint' : ''}`} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Checkpoint Creation Bar */}
+        <div className="px-4 py-3 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex-shrink-0">
+          <form onSubmit={handleCreateCheckpoint} className="flex items-center space-x-2">
+            <div className="relative flex-1">
+              <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={checkpointName}
+                onChange={(e) => setCheckpointName(e.target.value)}
+                placeholder="Name a checkpoint (e.g., Before rewriting abstract, Submitted draft v1)..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-brand-mint text-slate-900 dark:text-white placeholder:text-slate-400"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!checkpointName.trim() || isCreatingCheckpoint}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-brand-mint hover:brightness-110 active:scale-95 text-slate-950 font-semibold text-xs transition disabled:opacity-50 flex-shrink-0"
+            >
+              {isCreatingCheckpoint ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              <span>Save Checkpoint</span>
+            </button>
+          </form>
+
+          {checkpointStatus && (
+            <p className="text-[11px] text-brand-mint mt-1.5 flex items-center space-x-1">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>{checkpointStatus}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Main Content Area: 2 Columns (Timeline List + Diff Viewer) */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Column: Timeline Commits */}
+          <div className="w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-surface-light dark:bg-surface-dark flex-shrink-0">
+            <div className="px-3 py-2 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between text-xs text-slate-500">
+              <span className="font-semibold uppercase tracking-wider text-[10px]">
+                Snapshots ({commits.length})
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">click to diff</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              {commits.length === 0 && !isLoading && (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  <GitCommit className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-500" />
+                  <p>No commits recorded yet.</p>
+                  <p className="text-[10px] mt-1 text-slate-500">
+                    Snapshots are created automatically before every compile.
+                  </p>
+                </div>
+              )}
+
+              {commits.map((commit) => {
+                const isSelected = selectedCommit?.hash === commit.hash;
+                const isCheckpoint = commit.message.toLowerCase().includes('checkpoint');
+                const isAutoCompile = commit.message.toLowerCase().includes('snapshot');
+
+                return (
+                  <button
+                    key={commit.hash}
+                    onClick={() => setSelectedCommit(commit)}
+                    className={`w-full text-left p-2.5 rounded-lg border transition text-xs flex flex-col space-y-1 relative group ${
+                      isSelected
+                        ? 'bg-brand-indigo/15 dark:bg-brand-indigo/35 border-brand-mint/60 shadow-sm'
+                        : 'bg-surface-lightPanel dark:bg-surface-darkPanel border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+                        {commit.shortHash}
+                      </span>
+                      <span className="text-[10px] text-slate-400 flex items-center space-x-1">
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{formatCommitDate(commit.date)}</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-start space-x-1.5">
+                      {isCheckpoint ? (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-brand-mint/20 text-brand-mint uppercase tracking-wider flex-shrink-0 mt-0.5">
+                          Checkpoint
+                        </span>
+                      ) : isAutoCompile ? (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-brand-ocean/20 text-brand-ocean uppercase tracking-wider flex-shrink-0 mt-0.5">
+                          Auto
+                        </span>
+                      ) : null}
+                      <p className="text-xs text-slate-800 dark:text-slate-200 font-medium line-clamp-2 leading-relaxed">
+                        {commit.message}
+                      </p>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 truncate">
+                      by {commit.author_name || 'Author'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Column: Visual Side-by-Side Diff Editor */}
+          <div className="flex-1 flex flex-col bg-surface-lightPanel dark:bg-surface-darkPanel overflow-hidden">
+            {/* Diff Header */}
+            <div className="h-11 px-4 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between text-xs bg-surface-lightSubtle dark:bg-surface-darkSubtle flex-shrink-0">
+              <div className="flex items-center space-x-2">
+                <FileCode className="w-4 h-4 text-brand-cyan" />
+                <span className="font-mono font-medium text-slate-900 dark:text-white">
+                  {activeFilePath}
+                </span>
+                {selectedCommit && (
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    (Comparing commit <span className="text-brand-mint">{selectedCommit.shortHash}</span> with current)
+                  </span>
+                )}
+              </div>
+
+              {selectedCommit && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setShowConfirmRevert(true)}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition text-xs font-semibold"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore this version</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Monaco DiffEditor Viewport */}
+            <div className="flex-1 relative overflow-hidden">
+              {isLoadingDiff ? (
+                <div className="h-full flex items-center justify-center space-x-2 text-xs text-slate-400">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-mint" />
+                  <span>Loading diff comparison...</span>
+                </div>
+              ) : diffData ? (
+                <DiffEditor
+                  height="100%"
+                  language="latex"
+                  theme={theme === 'dark' ? 'brandDark' : 'vs'}
+                  original={diffData.oldContent}
+                  modified={diffData.newContent}
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "'Fira Code', Consolas, monospace",
+                    readOnly: true,
+                    renderSideBySide: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    originalEditable: false,
+                  }}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-2">
+                  <GitCommit className="w-8 h-8 opacity-40 text-slate-500" />
+                  <p>Select a snapshot from the timeline on the left to view diff changes.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Confirmation Modal for Reverting */}
+        {showConfirmRevert && selectedCommit && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/40 rounded-xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3 text-rose-500">
+                <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                    Restore Project to Checkpoint?
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Commit: <span className="font-mono text-rose-400">{selectedCommit.shortHash}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-600 dark:text-slate-300 bg-surface-light dark:bg-surface-dark p-3 rounded-lg space-y-2 border border-slate-200 dark:border-slate-800">
+                <p>
+                  This will restore all files in the project to match snapshot{' '}
+                  <strong className="text-slate-900 dark:text-white">"{selectedCommit.message}"</strong>.
+                </p>
+                <p className="text-slate-400 text-[11px]">
+                  ✓ A safety checkpoint of your current state will be automatically created before restoring,
+                  so nothing will ever be permanently lost.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmRevert(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRevert}
+                  disabled={isReverting}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center space-x-1.5 shadow-md shadow-rose-600/30 disabled:opacity-50"
+                >
+                  {isReverting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Confirm Restore</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

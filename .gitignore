@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.build/
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+texput.log
+launch_test.log
