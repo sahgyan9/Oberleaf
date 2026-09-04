@@ -274,7 +274,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                         <span className="font-mono text-xs px-2 py-0.5 rounded bg-brand-indigo/15 dark:bg-brand-indigo/35 text-brand-indigo dark:text-brand-mint font-bold">
                           {item.key}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold">
                           {item.type || 'article'}
                         </span>
                         {item.year && (

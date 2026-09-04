@@ -81,9 +81,12 @@ function getProjectDir(rawId: string, createIfMissing: boolean = false): string 
   return projectDir;
 }
 
-// Helper: Safely resolve a path inside a project to prevent directory traversal
+// Helper: Safely resolve a path inside a project to prevent directory traversal.
+// Deliberately does not create the project directory: a plain read for a
+// project that no longer exists used to recreate it, so deleted projects came
+// back as empty phantoms in the switcher. Write paths mkdir their own parents.
 function resolveProjectPath(projectId: string, targetPath: string = ''): string {
-  const projectDir = getProjectDir(projectId, true);
+  const projectDir = getProjectDir(projectId, false);
   const cleanTarget = targetPath.trim();
   const resolved = path.resolve(projectDir, cleanTarget);
 

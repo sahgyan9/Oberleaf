@@ -89,7 +89,12 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
     const line = lines[i];
 
     // File-line-error format: ./main.tex:24: Undefined control sequence.
-    const fileLineMatch = line.match(/^(\.[\\/][^:]+|[^:]+\.tex):(\d+):\s*(.*)$/);
+    // The optional leading drive letter matters on Windows, where the engine
+    // reports absolute paths like C:\project\main.tex:24: and a naive
+    // [^:]+ pattern stops dead at the drive colon.
+    const fileLineMatch = line.match(
+      /^((?:[A-Za-z]:)?[^:]*?\.(?:tex|sty|cls|bib)):(\d+):\s*(.*)$/
+    );
     if (fileLineMatch) {
       const [, file, lineStr, message] = fileLineMatch;
       // Combine with next lines in case TeX wrapped the message
@@ -132,7 +137,10 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
     }
 
     // pdfTeX fatal error format: !pdfTeX error: pdflatex (file ...): ...
-    if (line.startsWith('!pdfTeX error:') || line.startsWith('! LaTeX Error:')) {
+    // "! LaTeX Error:" is deliberately NOT handled here: it already starts with
+    // "! " and was captured above. Matching it twice reported every such error
+    // as two separate cards in the UI.
+    if (line.startsWith('!pdfTeX error:')) {
       const combined = lines.slice(i, i + 4).join(' ');
       errors.push({
         file: 'main.tex',
@@ -149,14 +157,49 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
     }
   }
 
-  return { errors, warnings };
+  return { errors: dedupeErrors(errors), warnings: [...new Set(warnings)] };
 }
+
+// TeX repeats itself: the same fault appears in the on-disk log and again in
+// stdout, and a multi-pass build reports it once per pass. Collapse by the
+// identity the user actually cares about.
+function dedupeErrors(errors: CompileError[]): CompileError[] {
+  const seen = new Set<string>();
+  const unique: CompileError[] = [];
+
+  for (const err of errors) {
+    const key = `${err.message.trim()}`;
+    if (seen.has(key)) {
+      // Keep the entry that carries a usable line number
+      const existing = unique.find((e) => e.message.trim() === key);
+      if (existing && existing.line <= 0 && err.line > 0) {
+        existing.line = err.line;
+        existing.file = err.file;
+      }
+      continue;
+    }
+    seen.add(key);
+    unique.push(err);
+  }
+
+  return unique;
+}
+
+// The whole point of compiling locally is not hitting a compute wall, so the
+// default ceiling is generous and exists only to reap a genuinely runaway
+// process. Set OVERLEAF_COPY_COMPILE_TIMEOUT_MS=0 to disable it entirely.
+const DEFAULT_COMPILE_TIMEOUT_MS = (() => {
+  const raw = process.env.OVERLEAF_COPY_COMPILE_TIMEOUT_MS;
+  if (raw === undefined) return 600000; // 10 minutes
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 600000;
+})();
 
 function executeCommand(
   cmd: string,
   args: string[],
   cwd: string,
-  timeoutMs: number = 20000,
+  timeoutMs: number = DEFAULT_COMPILE_TIMEOUT_MS,
   extraEnv?: NodeJS.ProcessEnv
 ): Promise<{ code: number | null; stdout: string; stderr: string; error?: Error }> {
   return new Promise((resolve) => {
@@ -170,21 +213,28 @@ function executeCommand(
       env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
     });
 
-    const timer = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          // Ignore
-        }
-        resolve({
-          code: -1,
-          stdout,
-          stderr: stderr + '\nCompilation timed out after 20 seconds.',
-        });
-      }
-    }, timeoutMs);
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              try {
+                child.kill('SIGKILL');
+              } catch {
+                // Ignore
+              }
+              resolve({
+                code: -1,
+                stdout,
+                stderr:
+                  stderr +
+                  `\nCompilation exceeded ${Math.round(
+                    timeoutMs / 1000
+                  )}s and was stopped. Raise or disable this with OVERLEAF_COPY_COMPILE_TIMEOUT_MS.`,
+              });
+            }
+          }, timeoutMs)
+        : null;
 
     child.stdout.on('data', (d) => (stdout += d.toString()));
     child.stderr.on('data', (d) => (stderr += d.toString()));
@@ -192,7 +242,7 @@ function executeCommand(
     child.on('close', (code) => {
       if (!resolved) {
         resolved = true;
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         resolve({ code, stdout, stderr });
       }
     });
@@ -200,7 +250,7 @@ function executeCommand(
     child.on('error', (error) => {
       if (!resolved) {
         resolved = true;
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         resolve({ code: -1, stdout, stderr, error });
       }
     });
@@ -231,19 +281,6 @@ export async function compileDocument(
     }
   }
 
-  // Find all subdirectories in the project for comprehensive file resolution
-  const subdirs: string[] = [];
-  try {
-    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith('.')) {
-        subdirs.push(path.join(projectDir, entry.name));
-      }
-    }
-  } catch {
-    // Ignore
-  }
-
   // Set TEXINPUTS so LaTeX searches the project directory and all subdirectories recursively (//)
   // Exactly matching Overleaf's automatic file and figure resolution
   const sep = path.delimiter;
@@ -251,12 +288,28 @@ export async function compileDocument(
   const normBuildDir = buildDir.replace(/\\/g, '/');
   const texInputs = `.${sep}${projectDir}//${sep}${normProjectDir}//${sep}${buildDir}${sep}${normBuildDir}${sep}${process.env.TEXINPUTS ? process.env.TEXINPUTS + sep : ''}`;
 
+  // bibtex resolves .bib files through BIBINPUTS, not TEXINPUTS, and it runs
+  // with the build directory as its working directory. Without this it opens
+  // whatever "references.bib" it can find on the default path and silently
+  // emits an empty bibliography, leaving every \cite rendered as [?].
+  const bibInputs = `.${sep}${projectDir}//${sep}${normProjectDir}//${sep}${
+    process.env.BIBINPUTS ? process.env.BIBINPUTS + sep : ''
+  }`;
+
   const compileEnv: NodeJS.ProcessEnv = {
     ...process.env,
     TEXINPUTS: texInputs,
+    BIBINPUTS: bibInputs,
+    BSTINPUTS: bibInputs,
   };
 
-  // Try latexmk first if available
+  const relMainFile = path.isAbsolute(mainFile) ? path.relative(projectDir, mainFile) : mainFile;
+  const auxFile = path.join(buildDir, `${baseName}.aux`);
+
+  // latexmk is preferred: it decides how many passes are needed and runs
+  // bibtex/biber on its own. Only fall back when it is genuinely unavailable,
+  // rather than on any non-zero exit -- a LaTeX error also exits non-zero, and
+  // re-running the engine there produced a second copy of every log message.
   const latexmkArgs = [
     '-pdf',
     `-pdflatex=${engine}`,
@@ -267,48 +320,82 @@ export async function compileDocument(
     path.join(projectDir, mainFile),
   ];
 
-  let res = await executeCommand('latexmk', latexmkArgs, projectDir, 20000, compileEnv);
+  let res = await executeCommand('latexmk', latexmkArgs, projectDir, undefined, compileEnv);
 
-  // If latexmk was not found, failed due to missing Perl, or didn't produce the PDF:
-  const perlMissing = res.stdout.includes('perl') || res.stderr.includes('perl');
-  if (res.error || res.code !== 0 || perlMissing || !fs.existsSync(generatedPdf)) {
-    const relMainFile = path.isAbsolute(mainFile)
-      ? path.relative(projectDir, mainFile)
-      : mainFile;
+  // ENOENT means no latexmk on PATH; latexmk also aborts when Perl is absent.
+  const latexmkUnavailable =
+    !!res.error ||
+    /is not recognized|command not found|ENOENT/i.test(res.stderr) ||
+    /can't (find|locate).*perl|perl.*not (found|installed)/i.test(res.stdout + res.stderr);
+
+  if (latexmkUnavailable) {
+    // Portable flags only. -c-style-errors, -disable-installer and
+    // -include-directory are MiKTeX extensions that make this path fail
+    // outright on TeX Live; TEXINPUTS already covers file resolution.
     const directArgs = [
       '-interaction=nonstopmode',
-      '-halt-on-error',
-      '-disable-installer',
+      '-file-line-error',
       '-synctex=1',
-      '-c-style-errors',
-      `-include-directory=${projectDir}`,
-      ...subdirs.map((d) => `-include-directory=${d}`),
-      `--output-directory=${buildDir}`,
+      `-output-directory=${buildDir}`,
       relMainFile,
     ];
-    res = await executeCommand(engine, directArgs, projectDir, 20000, compileEnv);
+
+    res = await executeCommand(engine, directArgs, projectDir, undefined, compileEnv);
+
+    // Without latexmk nothing resolves citations or cross-references, so drive
+    // the passes by hand: bibtex when the aux file actually records citations,
+    // then reruns until the labels settle.
+    const needsBibtex = fs.existsSync(auxFile) && /^\\citation\{/m.test(readSafe(auxFile));
+    if (needsBibtex) {
+      await executeCommand('bibtex', [baseName], buildDir, undefined, compileEnv);
+      res = await executeCommand(engine, directArgs, projectDir, undefined, compileEnv);
+    }
+
+    const needsRerun =
+      needsBibtex ||
+      /Rerun to get|may have changed|Label\(s\) may have changed/i.test(res.stdout + readSafe(path.join(buildDir, `${baseName}.log`)));
+    if (needsRerun) {
+      res = await executeCommand(engine, directArgs, projectDir, undefined, compileEnv);
+    }
   }
 
   const durationMs = Date.now() - startTime;
   const buildLogFile = path.join(buildDir, `${baseName}.log`);
-  const diskLog = fs.existsSync(buildLogFile) ? fs.readFileSync(buildLogFile, 'utf-8') : '';
-  const fullLog = (diskLog ? diskLog + '\n' : '') + res.stdout + '\n' + res.stderr;
+  const diskLog = readSafe(buildLogFile);
+
+  // The on-disk log is the authoritative record and already contains anything
+  // the engine printed. Only fall back to stdout/stderr when it is missing,
+  // otherwise every error gets parsed twice.
+  const fullLog = diskLog || `${res.stdout}\n${res.stderr}`;
   const { errors, warnings } = parseLatexLog(fullLog);
   const pdfGenerated = fs.existsSync(generatedPdf);
-  const success = pdfGenerated && (res.code === 0 || errors.length === 0);
 
-  // Copy compiled PDF to active project directory for direct consumption
+  // A PDF that exists is worth showing even when the log carries errors, which
+  // is how Overleaf behaves: the diagnostics panel reports the problems while
+  // the preview still updates.
   const outputPdf = path.join(projectDir, `${baseName}.pdf`);
-  if (success && pdfGenerated) {
-    fs.copyFileSync(generatedPdf, outputPdf);
+  if (pdfGenerated) {
+    try {
+      fs.copyFileSync(generatedPdf, outputPdf);
+    } catch {
+      // Ignore if the target is locked by a viewer
+    }
   }
 
   return {
-    success,
-    pdfUrl: success ? `/api/pdf?file=${encodeURIComponent(outputPdf)}` : undefined,
+    success: pdfGenerated,
+    pdfUrl: pdfGenerated ? `/api/pdf?file=${encodeURIComponent(outputPdf)}` : undefined,
     durationMs,
     errors,
     warnings,
-    rawLog: fullLog,
+    rawLog: fullLog + (res.stderr ? `\n${res.stderr}` : ''),
   };
+}
+
+function readSafe(filePath: string): string {
+  try {
+    return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
+  } catch {
+    return '';
+  }
 }

@@ -114,7 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <span className="font-bold text-sm tracking-tight text-slate-900 dark:text-white">
                   Overleaf <span className="text-brand-mint">Copy</span>
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-brand-indigo/10 dark:bg-brand-indigo/30 text-brand-indigo dark:text-brand-cyan font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-indigo/10 dark:bg-brand-indigo/30 text-brand-indigo dark:text-brand-cyan font-mono">
                   local
                 </span>
               </div>

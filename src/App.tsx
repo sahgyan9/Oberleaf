@@ -392,16 +392,19 @@ export const App: React.FC = () => {
       if (res.ok) {
         const result = await res.json();
         setCompileDuration(result.durationMs);
-        if (result.success && result.pdfUrl) {
+
+        // A PDF that was produced is always worth showing, even when the log
+        // still carries errors -- the diagnostics panel reports those
+        // alongside the updated preview rather than hiding the output.
+        const errors = result.errors || [];
+        setCompileErrors(errors);
+
+        if (result.pdfUrl) {
           const freshPdfUrl = `${result.pdfUrl}&t=${Date.now()}`;
           setPdfUrl(freshPdfUrl);
           setLastValidPdfUrl(freshPdfUrl);
-          setCompileStatus('success');
-          setCompileErrors([]);
-        } else {
-          setCompileStatus('failed');
-          setCompileErrors(result.errors || []);
         }
+        setCompileStatus(errors.length > 0 ? 'failed' : 'success');
       } else {
         setCompileStatus('failed');
         setCompileErrors([
@@ -460,6 +463,38 @@ export const App: React.FC = () => {
     } else {
       setEditorContent((prev) => prev + '\n' + snippet);
     }
+  };
+
+  // Wrap the current selection in a LaTeX command rather than replacing it.
+  // Selecting a word and clicking Bold used to overwrite it with the literal
+  // snippet "\textbf{text}", destroying what the user had selected.
+  const handleWrapSelection = (prefix: string, suffix: string, placeholder: string) => {
+    const editor = monacoEditorRef.current;
+    if (!editor) {
+      setEditorContent((prev) => `${prev}\n${prefix}${placeholder}${suffix}`);
+      return;
+    }
+
+    const selection = editor.getSelection();
+    const model = editor.getModel();
+    const selected = selection && model ? model.getValueInRange(selection) : '';
+    const inner = selected && selected.length > 0 ? selected : placeholder;
+
+    editor.executeEdits('wrap-selection', [
+      { range: selection, text: `${prefix}${inner}${suffix}`, forceMoveMarkers: true },
+    ]);
+
+    // With no selection, leave the placeholder highlighted so it can be typed over
+    if (!selected && selection) {
+      const start = selection.getStartPosition();
+      editor.setSelection({
+        startLineNumber: start.lineNumber,
+        startColumn: start.column + prefix.length,
+        endLineNumber: start.lineNumber,
+        endColumn: start.column + prefix.length + inner.length,
+      });
+    }
+    editor.focus();
   };
 
   // Multi-File Upload Pipeline
@@ -780,6 +815,7 @@ export const App: React.FC = () => {
             >
               <EditorToolbar
                 onInsertSnippet={handleInsertSnippet}
+                onWrapSelection={handleWrapSelection}
                 onOpenImageModal={() => setIsImageModalOpen(true)}
                 onOpenTableModal={() => setIsTableModalOpen(true)}
                 onOpenCitationModal={() => setIsCitationModalOpen(true)}

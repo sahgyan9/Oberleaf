@@ -107,7 +107,7 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
                   )}
                   <span className="font-semibold text-slate-900 dark:text-white">{dep.name}</span>
                   {dep.required && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-500">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-500">
                       Required
                     </span>
                   )}

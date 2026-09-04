@@ -3,6 +3,7 @@ import MonacoEditor, { OnMount, OnChange } from '@monaco-editor/react';
 import { useTheme } from '../../context/ThemeContext';
 import { extractMathAtPosition } from '../../utils/mathDetector';
 import { registerLatexCompletions, ProjectContext } from '../../utils/latexCompletions';
+import { registerLatexLanguage } from '../../utils/latexLanguage';
 
 interface EditorProps {
   content: string;
@@ -39,19 +40,14 @@ export const Editor: React.FC<EditorProps> = ({
   const onCompileRef = useRef(onCompile);
   const onJumpToPdfRef = useRef(onJumpToPdf);
   const onEquationChangeRef = useRef(onEquationChange);
+  const getProjectContextRef = useRef(getProjectContext);
 
   useEffect(() => {
     onCompileRef.current = onCompile;
     onJumpToPdfRef.current = onJumpToPdf;
     onEquationChangeRef.current = onEquationChange;
+    getProjectContextRef.current = getProjectContext;
   });
-
-  // Keep completion provider updated when context changes
-  useEffect(() => {
-    if (monacoInstance.current && getProjectContext) {
-      registerLatexCompletions(monacoInstance.current, getProjectContext);
-    }
-  }, [getProjectContext]);
 
   // SyncTeX Jump Target: Smooth scroll and pulse line highlight
   useEffect(() => {
@@ -92,10 +88,17 @@ export const Editor: React.FC<EditorProps> = ({
     monacoInstance.current = monaco;
     if (editorRefOut) editorRefOut.current = editor;
 
-    // Register LaTeX snippets and autocomplete provider
-    if (getProjectContext) {
-      registerLatexCompletions(monaco, getProjectContext);
-    }
+    // The language must exist before anything else: Monaco only applies
+    // tokenizer rules and completion providers to registered languages.
+    registerLatexLanguage(monaco);
+
+    // Register once, reading the project context through a ref. Registering
+    // with the prop directly captured the context as it stood at mount time,
+    // and because Monaco loads from a CDN it mounts several seconds after
+    // citations have already arrived -- so \cite{ offered nothing, for good.
+    registerLatexCompletions(monaco, () =>
+      getProjectContextRef.current?.() ?? { citations: [], files: [] }
+    );
 
     // Define custom LaTeX theme highlighting with our brand colors
     monaco.editor.defineTheme('brandDark', {
@@ -103,7 +106,12 @@ export const Editor: React.FC<EditorProps> = ({
       inherit: true,
       rules: [
         { token: 'keyword', foreground: '49A4BB', fontStyle: 'bold' },
-        { token: 'delimiter', foreground: '15D8B3' },
+        { token: 'keyword.control', foreground: '2E6FA0', fontStyle: 'bold' },
+        { token: 'tag', foreground: '49A4BB' },
+        { token: 'type', foreground: '15D8B3', fontStyle: 'bold' },
+        { token: 'string.escape', foreground: 'F59E0B' },
+        { token: 'delimiter', foreground: '94A3B8' },
+        { token: 'operator', foreground: '15D8B3' },
         { token: 'number', foreground: '15D8B3' },
         { token: 'comment', foreground: '64748B', fontStyle: 'italic' },
       ],
@@ -181,6 +189,11 @@ export const Editor: React.FC<EditorProps> = ({
           tabSize: 2,
           padding: { top: 12, bottom: 12 },
           smoothScrolling: true,
+          // Monaco otherwise offers every word already in the document as a
+          // completion. In prose-heavy LaTeX that buries the real \cite and
+          // \ref suggestions -- typing "\cite{smith:2020-" would surface
+          // "article" (scraped from \documentclass) ahead of the actual key.
+          wordBasedSuggestions: 'off',
         }}
       />
     </div>

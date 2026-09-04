@@ -155,7 +155,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
       const res = await fetch(`/api/projects/${projectId}/history/revert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commitHash: selectedCommit.hash }),
+        body: JSON.stringify({ hash: selectedCommit.hash }),
       });
 
       if (res.ok) {
@@ -319,11 +319,11 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
 
                     <div className="flex items-start space-x-1.5">
                       {isCheckpoint ? (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-brand-mint/20 text-brand-mint uppercase tracking-wider flex-shrink-0 mt-0.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-brand-mint/20 text-brand-mint uppercase tracking-wider flex-shrink-0 mt-0.5">
                           Checkpoint
                         </span>
                       ) : isAutoCompile ? (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-brand-ocean/20 text-brand-ocean uppercase tracking-wider flex-shrink-0 mt-0.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-brand-ocean/20 text-brand-ocean uppercase tracking-wider flex-shrink-0 mt-0.5">
                           Auto
                         </span>
                       ) : null}

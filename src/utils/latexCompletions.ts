@@ -45,12 +45,25 @@ export function registerLatexCompletions(
         endColumn: wordInfo.endColumn,
       };
 
+      // Monaco's word pattern breaks on ':' and '-', which is exactly what
+      // BibTeX keys and labels like "fig:setup" are made of. Replacing only the
+      // trailing word turns "\ref{fig:" into "\ref{fig:fig:setup}", so brace
+      // arguments compute their own range from the raw typed prefix instead.
+      const rangeForPrefix = (rawPrefix: string): Monaco.IRange => ({
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: position.column - rawPrefix.length,
+        endColumn: position.column,
+      });
+
       const context = getContext();
 
       // 1. Dynamic Citation Completion: \cite{..., \citep{..., \citet{...
       const citeMatch = lineUntilPosition.match(/\\(?:cite[pt]?|nocite)\{([^}]*)$/i);
       if (citeMatch) {
-        const queryPrefix = citeMatch[1].split(',').pop()?.trim().toLowerCase() || '';
+        const rawPrefix = citeMatch[1].split(',').pop() ?? '';
+        const citeRange = rangeForPrefix(rawPrefix);
+        const queryPrefix = rawPrefix.trim().toLowerCase();
         const citeItems: Monaco.languages.CompletionItem[] = context.citations
           .filter((c) => !queryPrefix || c.key.toLowerCase().includes(queryPrefix))
           .map((c) => ({
@@ -61,7 +74,7 @@ export function registerLatexCompletions(
             documentation: {
               value: `**${c.title || c.key}**\n\n*Author(s):* ${c.author || 'Unknown'}\n\n*Year:* ${c.year || 'N/A'}\n\n*Key:* \`${c.key}\``,
             },
-            range,
+            range: citeRange,
           }));
 
         return { suggestions: citeItems };
@@ -70,7 +83,9 @@ export function registerLatexCompletions(
       // 2. Dynamic Label/Ref Completion: \ref{..., \eqref{..., \pageref{...
       const refMatch = lineUntilPosition.match(/\\(?:eq|page|auto|c)?ref\{([^}]*)$/i);
       if (refMatch) {
-        const queryPrefix = refMatch[1].trim().toLowerCase();
+        const rawPrefix = refMatch[1];
+        const refRange = rangeForPrefix(rawPrefix);
+        const queryPrefix = rawPrefix.trim().toLowerCase();
         // Scan current document for all \label{...} tags
         const fullDoc = model.getValue();
         const labelRegex = /\\label\{([^}]+)\}/g;
@@ -92,7 +107,7 @@ export function registerLatexCompletions(
             documentation: {
               value: `Cross-reference to \`\\label{${lbl}}\``,
             },
-            range,
+            range: refRange,
           }));
 
         return { suggestions: labelItems };
@@ -101,7 +116,9 @@ export function registerLatexCompletions(
       // 3. Dynamic Image/Graphic Completion: \includegraphics[...]{... or \includegraphics{...
       const graphicMatch = lineUntilPosition.match(/\\includegraphics(?:\[[^\]]*\])?\{([^}]*)$/i);
       if (graphicMatch) {
-        const queryPrefix = graphicMatch[1].trim().toLowerCase();
+        const rawPrefix = graphicMatch[1];
+        const graphicRange = rangeForPrefix(rawPrefix);
+        const queryPrefix = rawPrefix.trim().toLowerCase();
         const imageExtensions = ['.png', '.jpg', '.jpeg', '.pdf', '.svg', '.webp'];
 
         // Helper to collect all files recursively
@@ -127,7 +144,7 @@ export function registerLatexCompletions(
             documentation: {
               value: `Include graphic file \`${p}\``,
             },
-            range,
+            range: graphicRange,
           }));
 
         return { suggestions: imageItems };

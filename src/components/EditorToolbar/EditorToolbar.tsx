@@ -14,6 +14,7 @@ import {
 
 interface EditorToolbarProps {
   onInsertSnippet: (snippet: string) => void;
+  onWrapSelection: (prefix: string, suffix: string, placeholder: string) => void;
   onOpenImageModal: () => void;
   onOpenTableModal: () => void;
   onOpenCitationModal?: () => void;
@@ -25,6 +26,7 @@ interface EditorToolbarProps {
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onInsertSnippet,
+  onWrapSelection,
   onOpenImageModal,
   onOpenTableModal,
   onOpenCitationModal,
@@ -37,7 +39,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     <div className="h-9 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightSubtle dark:border-surface-darkSubtle px-3 flex items-center space-x-1 select-none text-slate-600 dark:text-slate-300">
       {/* Formatting buttons */}
       <button
-        onClick={() => onInsertSnippet('\\textbf{text}')}
+        onClick={() => onWrapSelection('\\textbf{', '}', 'text')}
         title="Bold (\\textbf)"
         className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
       >
@@ -45,7 +47,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </button>
 
       <button
-        onClick={() => onInsertSnippet('\\textit{text}')}
+        onClick={() => onWrapSelection('\\textit{', '}', 'text')}
         title="Italic (\\textit)"
         className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
       >
@@ -64,7 +66,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </button>
 
       <button
-        onClick={() => onInsertSnippet('$x$')}
+        onClick={() => onWrapSelection('$', '$', 'x')}
         title="Inline Math ($...$)"
         className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition font-mono text-xs font-semibold"
       >
@@ -147,7 +149,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <Target className="w-3 h-3 text-brand-mint" />
           )}
           <span className="hidden md:inline">Jump to PDF</span>
-          <kbd className="hidden lg:inline text-[9px] px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 font-mono font-normal">
+          <kbd className="hidden lg:inline text-[9px] px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono font-normal">
             Ctrl+Alt+J
           </kbd>
         </button>
