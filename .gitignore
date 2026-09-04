@@ -7,3 +7,4 @@ dist/
 *.synctex.gz
 texput.log
 launch_test.log
+projects/

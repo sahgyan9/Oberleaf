@@ -30,6 +30,22 @@ export const Editor: React.FC<EditorProps> = ({
   const monacoInstance = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
 
+  // @monaco-editor/react captures `onMount` from the FIRST render and never
+  // refreshes it, so anything registered inside onMount closes over that
+  // render's props forever. Reading the callbacks through refs that are
+  // updated every render keeps the editor commands pointed at current state.
+  // Without this, Ctrl+Enter saved the editor's mount-time content (an empty
+  // string) over the real file before compiling it.
+  const onCompileRef = useRef(onCompile);
+  const onJumpToPdfRef = useRef(onJumpToPdf);
+  const onEquationChangeRef = useRef(onEquationChange);
+
+  useEffect(() => {
+    onCompileRef.current = onCompile;
+    onJumpToPdfRef.current = onJumpToPdf;
+    onEquationChangeRef.current = onEquationChange;
+  });
+
   // Keep completion provider updated when context changes
   useEffect(() => {
     if (monacoInstance.current && getProjectContext) {
@@ -101,12 +117,12 @@ export const Editor: React.FC<EditorProps> = ({
 
     // Add Keybinding: Ctrl+Enter / Cmd+Enter to compile
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      onCompile();
+      onCompileRef.current();
     });
 
     // Add Keybinding: Ctrl+Alt+J to Jump to PDF location (SyncTeX Forward)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyJ, () => {
-      onJumpToPdf?.();
+      onJumpToPdfRef.current?.();
     });
 
     // Detect cursor math context accurately
@@ -123,7 +139,7 @@ export const Editor: React.FC<EditorProps> = ({
       if (mathCtx) {
         const coords = editor.getScrolledVisiblePosition(position);
         if (coords) {
-          onEquationChange(
+          onEquationChangeRef.current(
             mathCtx.math,
             {
               top: coords.top + 70,
@@ -136,7 +152,7 @@ export const Editor: React.FC<EditorProps> = ({
       }
 
       // If no math around cursor, dismiss preview
-      onEquationChange(null);
+      onEquationChangeRef.current(null);
     });
   };
 

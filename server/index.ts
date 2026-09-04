@@ -23,20 +23,71 @@ import { getProjectCitations, addProjectCitation } from './bibtex.js';
 const app = express();
 const PORT = 3001;
 
-app.use(cors());
+// Only the local dev server may talk to this daemon. Browsers always attach an
+// Origin header on cross-site requests, so rejecting unknown origins stops a
+// random web page from driving the filesystem API while the app is running.
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+];
+
+app.use(cors({ origin: ALLOWED_ORIGINS }));
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return res.status(403).json({ error: 'Cross-origin requests are not permitted' });
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Helper: Safely resolve a project path to prevent directory traversal
-function resolveProjectPath(projectId: string, targetPath: string = ''): string {
+// Helper: Contain a resolved path inside a root directory.
+// `startsWith(root)` alone is not enough: "<root>/proj" also prefixes
+// "<root>/proj-evil", so the separator has to be part of the comparison.
+function isInside(root: string, candidate: string): boolean {
+  const normalizedRoot = path.resolve(root);
+  const normalized = path.resolve(candidate);
+  return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
+}
+
+// Helper: A project id is a single directory name, never a path.
+// Express decodes route params, so "..%2F..%2Ffoo" arrives here as "../../foo".
+function sanitizeProjectId(rawId: string): string {
+  const id = (rawId || '').trim();
+  if (!id || id === '.' || id === '..') {
+    throw new Error('Invalid project id');
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) {
+    throw new Error('Invalid project id');
+  }
+  return id;
+}
+
+// Helper: Resolve a project directory from an untrusted id.
+function getProjectDir(rawId: string, createIfMissing: boolean = false): string {
+  const projectId = sanitizeProjectId(rawId);
   const projectDir = path.resolve(getProjectsRoot(), projectId);
-  if (!fs.existsSync(projectDir)) {
+  if (!isInside(getProjectsRoot(), projectDir)) {
+    throw new Error('Access outside project boundary is forbidden');
+  }
+  if (createIfMissing && !fs.existsSync(projectDir)) {
     fs.mkdirSync(projectDir, { recursive: true });
   }
+  return projectDir;
+}
+
+// Helper: Safely resolve a path inside a project to prevent directory traversal
+function resolveProjectPath(projectId: string, targetPath: string = ''): string {
+  const projectDir = getProjectDir(projectId, true);
   const cleanTarget = targetPath.trim();
   const resolved = path.resolve(projectDir, cleanTarget);
 
-  if (!resolved.startsWith(projectDir)) {
+  if (!isInside(projectDir, resolved)) {
     throw new Error('Access outside project boundary is forbidden');
   }
   return resolved;
@@ -75,7 +126,7 @@ app.post('/api/projects', (req, res) => {
 
 app.get('/api/projects/:id/files', (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     if (!fs.existsSync(projectDir)) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -153,7 +204,7 @@ app.post('/api/projects/:id/upload', (req, res) => {
       return res.status(400).json({ error: 'fileName and base64Data required' });
     }
 
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const ext = path.extname(fileName).toLowerCase();
     const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.eps'].includes(ext);
     const defaultFolder = isImage ? path.join(projectDir, 'figures') : projectDir;
@@ -164,7 +215,7 @@ app.post('/api/projects/:id/upload', (req, res) => {
     }
 
     // Auto-rename if duplicate exists (e.g. image.png -> image_1.png)
-    const uniqueFileName = getUniqueFilename(targetFolder, fileName);
+    const uniqueFileName = getUniqueFilename(targetFolder, path.basename(String(fileName)));
     const filePath = path.join(targetFolder, uniqueFileName);
 
     const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
@@ -186,7 +237,7 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
       return res.status(400).json({ error: 'Files array required' });
     }
 
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
 
     const results = files.map((fileObj: { fileName: string; base64Data: string }) => {
       try {
@@ -200,7 +251,7 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
           fs.mkdirSync(targetFolder, { recursive: true });
         }
 
-        const uniqueFileName = getUniqueFilename(targetFolder, fileName);
+        const uniqueFileName = getUniqueFilename(targetFolder, path.basename(String(fileName)));
         const filePath = path.join(targetFolder, uniqueFileName);
 
         const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
@@ -267,21 +318,27 @@ app.post('/api/projects/:id/rename', (req, res) => {
     const { oldPath, newName } = req.body;
     if (!oldPath || !newName) return res.status(400).json({ error: 'oldPath and newName required' });
 
+    // newName is a bare filename, never a path: "../../evil.tex" must not escape
+    const safeName = path.basename(String(newName).trim());
+    if (!safeName || safeName === '.' || safeName === '..') {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
+
     const sourcePath = resolveProjectPath(req.params.id, oldPath);
     const parentDir = path.dirname(sourcePath);
-    const destPath = path.join(parentDir, newName);
+    const destPath = path.join(parentDir, safeName);
 
     // Prevent renaming project root or main.tex to a non-tex name
-    if (path.basename(sourcePath) === 'main.tex' && !newName.endsWith('.tex')) {
+    if (path.basename(sourcePath) === 'main.tex' && !safeName.endsWith('.tex')) {
       return res.status(400).json({ error: 'main.tex must remain a .tex file' });
     }
 
     if (fs.existsSync(destPath)) {
-      return res.status(400).json({ error: `An item named "${newName}" already exists` });
+      return res.status(400).json({ error: `An item named "${safeName}" already exists` });
     }
 
     fs.renameSync(sourcePath, destPath);
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     res.json({
       success: true,
       newRelativePath: path.relative(projectDir, destPath).replace(/\\/g, '/'),
@@ -336,7 +393,7 @@ app.post('/api/projects/:id/duplicate', (req, res) => {
     const destPath = path.join(dir, targetName);
 
     fs.copyFileSync(sourcePath, destPath);
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     res.json({
       success: true,
       newRelativePath: path.relative(projectDir, destPath).replace(/\\/g, '/'),
@@ -363,7 +420,7 @@ app.post('/api/projects/:id/create-file', (req, res) => {
       fs.writeFileSync(resolved, '', 'utf-8');
     }
 
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     res.json({
       success: true,
       relativePath: path.relative(projectDir, resolved).replace(/\\/g, '/'),
@@ -376,7 +433,7 @@ app.post('/api/projects/:id/create-file', (req, res) => {
 // 7. Compilation Endpoint
 app.post('/api/projects/:id/compile', async (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const mainFile = req.body.mainFile || 'main.tex';
     const engine = req.body.engine || 'pdflatex';
 
@@ -400,7 +457,7 @@ app.post('/api/projects/:id/compile', async (req, res) => {
 // 8. Version History Endpoints
 app.get('/api/projects/:id/history', async (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const limit = parseInt(req.query.limit as string, 10) || 50;
     const history = await getProjectHistory(projectDir, limit);
     res.json(history);
@@ -411,7 +468,7 @@ app.get('/api/projects/:id/history', async (req, res) => {
 
 app.post('/api/projects/:id/history/checkpoint', async (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const message = req.body.message || `Manual checkpoint (${new Date().toLocaleTimeString()})`;
     const result = await createProjectCommit(projectDir, message);
     res.json(result);
@@ -422,7 +479,7 @@ app.post('/api/projects/:id/history/checkpoint', async (req, res) => {
 
 app.get('/api/projects/:id/history/:hash/diff', async (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const filePath = (req.query.file as string) || 'main.tex';
     const diff = await getCommitDiff(projectDir, req.params.hash, filePath);
     res.json(diff);
@@ -433,7 +490,7 @@ app.get('/api/projects/:id/history/:hash/diff', async (req, res) => {
 
 app.post('/api/projects/:id/history/revert', async (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const { hash } = req.body;
     if (!hash) return res.status(400).json({ error: 'Commit hash required' });
     const result = await revertToCommit(projectDir, hash);
@@ -446,7 +503,7 @@ app.post('/api/projects/:id/history/revert', async (req, res) => {
 // 9. SyncTeX Navigation Endpoints
 app.get('/api/projects/:id/synctex/forward', (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const file = (req.query.file as string) || 'main.tex';
     const line = parseInt(req.query.line as string, 10) || 1;
     const parser = getProjectSyncTex(projectDir);
@@ -467,7 +524,7 @@ app.get('/api/projects/:id/synctex/forward', (req, res) => {
 
 app.all('/api/projects/:id/synctex/backward', (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const query = req.method === 'POST' ? req.body : req.query;
     const page = parseInt(query.page as string, 10) || 1;
     const x = parseFloat(query.x as string) || 100;
@@ -522,7 +579,7 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
 // 10. BibTeX Citation Endpoints
 app.get('/api/projects/:id/citations', (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const citations = getProjectCitations(projectDir);
     res.json(citations);
   } catch (error: any) {
@@ -532,10 +589,18 @@ app.get('/api/projects/:id/citations', (req, res) => {
 
 app.post('/api/projects/:id/citations', (req, res) => {
   try {
-    const projectDir = path.resolve(getProjectsRoot(), req.params.id);
+    const projectDir = getProjectDir(req.params.id);
     const { rawBibtex, bibFile } = req.body;
     if (!rawBibtex) return res.status(400).json({ error: 'rawBibtex required' });
-    const result = addProjectCitation(projectDir, rawBibtex, bibFile || 'references.bib');
+
+    // Keep the .bib target inside the project and force a .bib extension
+    const requestedBib = String(bibFile || 'references.bib');
+    const safeBib = path.basename(requestedBib.trim()) || 'references.bib';
+    if (path.extname(safeBib).toLowerCase() !== '.bib') {
+      return res.status(400).json({ error: 'Bibliography target must be a .bib file' });
+    }
+
+    const result = addProjectCitation(projectDir, rawBibtex, safeBib);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -543,11 +608,25 @@ app.post('/api/projects/:id/citations', (req, res) => {
 });
 
 // 8. PDF Serving
+// Only serves .pdf files that live inside the projects root. Without these two
+// checks this endpoint hands out any file on disk that the user can read.
 app.get('/api/pdf', (req, res) => {
-  const filePath = req.query.file as string;
-  if (!filePath || !fs.existsSync(filePath)) {
+  const requested = req.query.file as string;
+  if (!requested) {
+    return res.status(400).send('File parameter required');
+  }
+
+  const filePath = path.resolve(requested);
+  if (!isInside(getProjectsRoot(), filePath)) {
+    return res.status(403).send('Access outside project boundary is forbidden');
+  }
+  if (path.extname(filePath).toLowerCase() !== '.pdf') {
+    return res.status(403).send('Only PDF files may be served');
+  }
+  if (!fs.existsSync(filePath)) {
     return res.status(404).send('PDF not found');
   }
+
   res.setHeader('Content-Type', 'application/pdf');
   fs.createReadStream(filePath).pipe(res);
 });

@@ -344,6 +344,14 @@ export const App: React.FC = () => {
     }
   }, [projectId, activeFilePath]);
 
+  // The Monaco model is the source of truth for what the user actually sees.
+  // React state can trail it by a render, so anything that persists to disk
+  // reads the live buffer first and only falls back to state.
+  const getLiveContent = useCallback((): string => {
+    const live = monacoEditorRef.current?.getValue?.();
+    return typeof live === 'string' ? live : editorContent;
+  }, [editorContent]);
+
   // Debounced auto-save on editor change (800ms)
   const handleEditorChange = (newVal: string) => {
     setEditorContent(newVal);
@@ -365,11 +373,15 @@ export const App: React.FC = () => {
     setCompileErrors([]);
 
     try {
-      // Flush any pending save first
+      // Flush any pending save first, using the editor's live buffer
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
-      await saveActiveFile(editorContent);
+      const contentToCompile = getLiveContent();
+      if (contentToCompile !== editorContent) {
+        setEditorContent(contentToCompile);
+      }
+      await saveActiveFile(contentToCompile);
 
       const res = await fetch(`/api/projects/${projectId}/compile`, {
         method: 'POST',
@@ -646,7 +658,7 @@ export const App: React.FC = () => {
       // Ctrl+S / Cmd+S: Save
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        saveActiveFile(editorContent);
+        saveActiveFile(getLiveContent());
       }
 
       // Ctrl+B: Toggle Sidebar
@@ -671,7 +683,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorContent, saveActiveFile]);
+  }, [getLiveContent, saveActiveFile]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-surface-light dark:bg-surface-dark text-slate-900 dark:text-white">
