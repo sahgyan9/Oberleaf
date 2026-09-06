@@ -610,6 +610,33 @@ overleaf-copy/
   - MODIFIED: `server/compiler.ts`, `src/App.tsx`, `src/components/PDFViewer/PDFViewer.tsx`, `projects/test/main.tex`, `PROJECT_LOG.md`
 - **Status at end**: Complete, tested, and verified.
 
+---
 
-
-
+### Session 013 — 2026-09-06 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "help me build a mental modal for collaboration. Imagine my friend has created a project and there he wants to collaborate so that I can also make changes and I should also be able to see what is inside the project and so on. is it feasible or do we have already implmented this??" -> "what is the best option??" -> "lets go ahead and implement it"
+- **Observations / Problems**:
+  1. The existing real-time collaboration implementation was only a bare skeleton: it used naive string wiping (`ytext.delete / insert`) which caused text wipes and cursor jumps under concurrent typing.
+  2. The application is local-first, meaning project files (`projects/<id>/...`) and compiler binaries live on the host's machine. Collaborators on other devices on LAN or over the internet could not access the project files or compile output.
+  3. Vite was bound to `127.0.0.1` and Express blocked all cross-origin requests, preventing LAN or tunnel access.
+- **What was done**:
+  - **Host-Share Architecture & Network Discovery**:
+    - Created `server/tunnel.ts`: enumerates local IPv4 network interfaces for zero-latency LAN sharing, detects `cloudflared` availability, and manages child processes for Cloudflare Quick Tunnels.
+    - Updated `server/index.ts`: added `/api/collab/network`, `/api/collab/tunnel/start`, and `/api/collab/tunnel/stop` endpoints. Updated CORS to dynamically accept LAN and `*.trycloudflare.com` origins.
+    - Configured `vite.config.ts`: bound server to `0.0.0.0` with aliased `monaco-editor` path to support remote access and production bundling.
+  - **CRDT Delta Engine & Awareness (`src/utils/yjsCollab.ts`)**:
+    - Replaced destructive text replacement with `MonacoBinding` from `y-monaco`, enabling true character-level delta CRDTs and remote multi-cursor decorations.
+    - Implemented multi-file channels: keyed collaborative text by `file:${filePath}` so co-authors can work in different files or collaborate within the same file without collision.
+    - Implemented synchronized PDF compilation broadcasting: when either user recompiles, a timestamp is published over Yjs metadata, triggering an automatic PDF viewer reload on connected peers.
+  - **Project Auto-Mounting & URL Parameters (`src/App.tsx`)**:
+    - Added support for `?project=<id>` and `?room=<code>` query parameters to auto-select the host's project and immediately enter the collaboration session.
+  - **Collaboration Modal Redesign (`src/components/Collaboration/CollabModal.tsx`)**:
+    - Implemented dual-mode sharing hub: **Local Wi-Fi / LAN** (instant, zero external dependencies) and **Internet Tunnel** (Cloudflare Quick Tunnel with diagnostics if `cloudflared` is uninstalled).
+    - Added 1-click URL copying, participant counter, and room management.
+- **Verification**:
+  - `scripts/test_collab.ts`: Verified local IP address detection, network status endpoint structure, and RFC 1918 + Cloudflare origin validation regexes (all passed).
+  - `npm run typecheck`: Passed with 0 TypeScript errors (`tsc --noEmit`).
+  - `npm run build`: Production bundle built cleanly in 18.61s (`✓ built in 18.61s`).
+- **Files changed**:
+  - CREATED: `server/tunnel.ts`, `scripts/test_collab.ts`
+  - MODIFIED: `server/index.ts`, `vite.config.ts`, `src/utils/yjsCollab.ts`, `src/components/Collaboration/CollabModal.tsx`, `src/components/Editor/Editor.tsx`, `src/App.tsx`, `ARCHITECTURE.md`, `PROJECT_LOG.md`
+- **Status at end**: Complete, tested, and verified.

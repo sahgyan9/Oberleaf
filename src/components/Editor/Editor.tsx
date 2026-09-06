@@ -95,7 +95,7 @@ export const Editor: React.FC<EditorProps> = ({
     if (!collabSession || !editorInstance.current || !monacoInstance.current) return;
     const cleanup = setupMonacoCollab(editorInstance.current, monacoInstance.current, collabSession);
     return cleanup;
-  }, [collabSession]);
+  }, [collabSession, collabSession?.filePath]);
 
   // SyncTeX Jump Target: Smooth scroll and pulse line highlight
   useEffect(() => {

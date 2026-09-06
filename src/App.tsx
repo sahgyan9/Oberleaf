@@ -16,7 +16,7 @@ import { HistoryDrawer } from './components/History/HistoryDrawer';
 import { GitSyncModal } from './components/GitSync/GitSyncModal';
 import { CommentsDrawer, CommentThread } from './components/Comments/CommentsDrawer';
 import { CollabModal } from './components/Collaboration/CollabModal';
-import { CollabSessionConfig } from './utils/yjsCollab';
+import { CollabSessionConfig, broadcastRemoteCompile, leaveCollabSession } from './utils/yjsCollab';
 import { InsertCitationModal, CitationItem } from './components/Modals/InsertCitationModal';
 import { ProjectContext } from './utils/latexCompletions';
 import { PanelLeftOpen, FolderClosed, ChevronRight, Loader2 } from 'lucide-react';
@@ -101,6 +101,9 @@ export const App: React.FC = () => {
     return [];
   });
   const [projectId, setProjectId] = useState<string>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryProj = urlParams.get('project');
+    if (queryProj) return queryProj;
     return localStorage.getItem('overleaf-copy:active-project-id') || '';
   });
   const [projectName, setProjectName] = useState<string>('');
@@ -267,7 +270,18 @@ export const App: React.FC = () => {
         setProjects(data);
         localStorage.setItem('overleaf-copy:cached-projects', JSON.stringify(data));
 
-        // Check if URL hash specifies an existing project
+        // Check if URL query parameter or hash specifies an existing project
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryProjId = urlParams.get('project');
+        if (queryProjId) {
+          const match = data.find((p) => p.id === queryProjId);
+          if (match) {
+            setProjectId(match.id);
+            setProjectName(match.name);
+            return;
+          }
+        }
+
         const hash = window.location.hash;
         if (hash.startsWith('#/project/')) {
           const hashId = hash.replace('#/project/', '').trim();
@@ -462,11 +476,20 @@ export const App: React.FC = () => {
         room,
         name: authorName,
         color: '#15D8B3',
+        filePath: activeFilePath,
         onPeersChange: (count) => setCollabPeersCount(count),
+        onRemoteCompile: (timestamp) => {
+          if (projectId) {
+            const freshUrl = `/api/projects/${projectId}/pdf?t=${timestamp}`;
+            setPdfUrl(freshUrl);
+            setLastValidPdfUrl(freshUrl);
+            addToast('Document recompiled by collaborator. Preview updated.', 'info');
+          }
+        },
       });
       addToast(`Joined live collaboration session: ${room}`, 'success');
     }
-  }, [addToast, collabSession]);
+  }, [addToast, collabSession, activeFilePath, projectId]);
 
   // SyncTeX Forward (Cursor Position / Visible Line -> PDF Page & Coordinates)
   const handleJumpToPdf = useCallback(
@@ -718,6 +741,7 @@ export const App: React.FC = () => {
           const freshPdfUrl = `${result.pdfUrl}&t=${Date.now()}`;
           setPdfUrl(freshPdfUrl);
           setLastValidPdfUrl(freshPdfUrl);
+          broadcastRemoteCompile(Date.now());
         }
         if (result.documentTitle) {
           setDocTitle(result.documentTitle);
@@ -1507,7 +1531,7 @@ export const App: React.FC = () => {
                     setCommentSelectedText(selectedText);
                     setIsCommentsDrawerOpen(true);
                   }}
-                  collabSession={collabSession}
+                  collabSession={collabSession ? { ...collabSession, filePath: activeFilePath } : null}
                 />
               </div>
             </Panel>
@@ -1730,6 +1754,8 @@ export const App: React.FC = () => {
       <CollabModal
         isOpen={isCollabModalOpen}
         onClose={() => setIsCollabModalOpen(false)}
+        projectId={projectId}
+        projectName={projectName}
         roomCode={collabSession?.room || ''}
         isCollabActive={!!collabSession}
         onStartCollab={(room, name, color) => {
@@ -1737,12 +1763,22 @@ export const App: React.FC = () => {
             room,
             name,
             color,
+            filePath: activeFilePath,
             onPeersChange: (count) => setCollabPeersCount(count),
+            onRemoteCompile: (timestamp) => {
+              if (projectId) {
+                const freshUrl = `/api/projects/${projectId}/pdf?t=${timestamp}`;
+                setPdfUrl(freshUrl);
+                setLastValidPdfUrl(freshUrl);
+                addToast('Document recompiled by collaborator. Preview updated.', 'info');
+              }
+            },
           });
           setIsCollabModalOpen(false);
           addToast(`Live collaboration started in room: ${room}`, 'success');
         }}
         onStopCollab={() => {
+          leaveCollabSession();
           setCollabSession(null);
           setCollabPeersCount(0);
           setIsCollabModalOpen(false);

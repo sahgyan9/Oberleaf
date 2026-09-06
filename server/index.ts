@@ -43,13 +43,16 @@ import { getProjectSyncTex } from './synctex.js';
 import { getProjectCitations, addProjectCitation } from './bibtex.js';
 import { getProjectPdfFilename, sanitizeFilename } from './latexTitle.js';
 import { checkSoftwareUpdate, applySoftwareUpdate } from './updater.js';
+import {
+  getCollabNetworkStatus,
+  startCloudflareTunnel,
+  stopCloudflareTunnel,
+} from './tunnel.js';
 
 const app = express();
 const PORT = 3001;
 
-// Only the local dev server may talk to this daemon. Browsers always attach an
-// Origin header on cross-site requests, so rejecting unknown origins stops a
-// random web page from driving the filesystem API while the app is running.
+// Allowed origins for local dev, LAN sharing, and secure Cloudflare tunnels
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -57,11 +60,36 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3001',
 ];
 
-app.use(cors({ origin: ALLOWED_ORIGINS }));
+function isAllowedOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  // Allow local LAN IPs (RFC 1918)
+  if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:(5173|3001))?$/.test(origin)) {
+    return true;
+  }
+  // Allow Cloudflare quick tunnels
+  if (/^https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com$/.test(origin)) {
+    return true;
+  }
+  return false;
+}
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Cross-origin requests are not permitted'));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && !isAllowedOrigin(origin)) {
     return res.status(403).json({ error: 'Cross-origin requests are not permitted' });
   }
   next();
@@ -1105,10 +1133,38 @@ app.post('/api/system/apply-update', async (_req, res) => {
   }
 });
 
+// 14. Real-Time Collaboration & Tunnel Endpoints
+app.get('/api/collab/network', (_req, res) => {
+  try {
+    const status = getCollabNetworkStatus(5173);
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/collab/tunnel/start', async (_req, res) => {
+  try {
+    const url = await startCloudflareTunnel('http://127.0.0.1:5173');
+    res.json({ success: true, url });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/collab/tunnel/stop', (_req, res) => {
+  try {
+    stopCloudflareTunnel();
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Seed initial projects matching Overleaf landing screenshot
 seedScreenshotProjects();
 
-const server = app.listen(PORT, '127.0.0.1', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Oberleaf] Server daemon running at http://127.0.0.1:${PORT}`);
   // Pre-warm the latexmk/perl availability check in background so first compile is instant
   isLatexmkAvailable().catch(() => {});
