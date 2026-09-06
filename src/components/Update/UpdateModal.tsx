@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, CheckCircle2, ArrowUpCircle, Loader2, X, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowDownToLine, CheckCircle2, ArrowUpCircle, Loader2, X, RefreshCw, AlertTriangle } from 'lucide-react';
 
 export interface UpdateInfo {
   hasUpdate: boolean;
@@ -75,7 +75,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
               : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-600 dark:text-stone-300'
           }`}>
-            {hasUpdate ? <Sparkles className="w-5 h-5 animate-pulse" /> : <CheckCircle2 className="w-5 h-5 text-scholarly-green dark:text-scholarly-greenDark" />}
+            {hasUpdate ? <ArrowDownToLine className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5 text-scholarly-green dark:text-scholarly-greenDark" />}
           </div>
           <div>
             <h3 className="font-serif font-bold text-base text-stone-900 dark:text-stone-100">
