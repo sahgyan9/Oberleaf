@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run check:latex-probes && tsc && vite build",
+    "generate:latex-probes": "node scripts/generate-latex-probes.mjs",
+    "check:latex-probes": "node scripts/generate-latex-probes.mjs --check",
     "build:icons": "node ./scripts/generate-icons.cjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
