@@ -308,6 +308,120 @@ if ($repoReady -and $nodeCmd) {
 }
 
 # -------------------------------------------------------------
+# Warm the LaTeX package cache
+# -------------------------------------------------------------
+# AutoInstall stops MiKTeX interrupting a compile, but the download still
+# happens during that compile, so the first document a student opens sits there
+# for a minute or two fetching a dozen packages. Compiling a throwaway file
+# that loads everything the shipped templates and seeded projects use pulls all
+# of it now, while they are already waiting on an installer.
+#
+# The probes mirror server/projects.ts - the three document classes it can
+# create, each loading the packages used with that class. Add to these if you
+# add a package to a template there.
+#
+# Deliberately best-effort and last: by this point Oberleaf is installed and
+# usable, so closing this window only means falling back to on-demand fetching.
+# Set OBERLEAF_SKIP_PACKAGE_WARMUP=1 to skip it.
+function Initialize-LatexPackages {
+    $probes = @{
+        "probe-article.tex" = @(
+            '\documentclass[11pt,a4paper]{article}',
+            '\usepackage[utf8]{inputenc}',
+            '\usepackage{amsmath,amssymb,amsfonts}',
+            '\usepackage{graphicx}',
+            '\usepackage{hyperref}',
+            '\usepackage{geometry}',
+            '\usepackage{titlesec}',
+            '\usepackage{booktabs}',
+            '\usepackage{textcomp}',
+            '\usepackage{xcolor}',
+            '\begin{document}',
+            'Warming the Oberleaf package cache. $E = mc^2$',
+            '\end{document}'
+        )
+        "probe-ieee.tex" = @(
+            '\documentclass[conference]{IEEEtran}',
+            '\usepackage{amsmath,amssymb,amsfonts}',
+            '\usepackage{graphicx}',
+            '\usepackage{textcomp}',
+            '\usepackage{xcolor}',
+            '\begin{document}',
+            '\title{Warmup}\author{Oberleaf}\maketitle',
+            'Conference template packages.',
+            '\end{document}'
+        )
+        "probe-report.tex" = @(
+            '\documentclass[12pt]{report}',
+            '\usepackage[utf8]{inputenc}',
+            '\usepackage{amsmath}',
+            '\usepackage{graphicx}',
+            '\usepackage{hyperref}',
+            '\begin{document}',
+            '\chapter{Warmup}Thesis template packages.',
+            '\end{document}'
+        )
+    }
+
+    $work = Join-Path $env:TEMP ("oberleaf_warmup_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    New-Item -ItemType Directory -Path $work -Force | Out-Null
+
+    $warmupLog = Join-Path $env:TEMP "oberleaf-warmup.log"
+
+    try {
+        foreach ($name in $probes.Keys) {
+            $file = Join-Path $work $name
+            Set-Content -LiteralPath $file -Value $probes[$name] -Encoding ASCII
+
+            Write-Host "      $name..." -ForegroundColor DarkGray
+
+            # pdflatex is extremely chatty and none of it is the user's problem,
+            # so it goes to a log rather than over the setup output.
+            $out = Join-Path $work "$name.out"
+            $err = Join-Path $work "$name.err"
+            $p = Start-Process -FilePath "pdflatex.exe" `
+                -ArgumentList @("-interaction=nonstopmode", "-halt-on-error", $name) `
+                -WorkingDirectory $work -NoNewWindow -PassThru `
+                -RedirectStandardOutput $out -RedirectStandardError $err
+
+            # A bounded wait: a warm-up must never be the reason setup hangs.
+            if (-not $p.WaitForExit(300000)) {
+                try { $p.Kill() } catch {}
+                Copy-Item $out $warmupLog -Force -ErrorAction SilentlyContinue
+                Write-Host "      Timed out on $name. Remaining packages install on" -ForegroundColor Yellow
+                Write-Host "      first use instead. Log: $warmupLog" -ForegroundColor Yellow
+                return
+            }
+
+            # Whether a PDF came out, rather than $p.ExitCode: a process from
+            # Start-Process -PassThru does not reliably carry an exit code once
+            # the timeout overload of WaitForExit has been used, and "did it
+            # actually produce a document" is the thing we care about anyway.
+            $pdf = Join-Path $work ([IO.Path]::ChangeExtension($name, ".pdf"))
+            if (-not (Test-Path $pdf)) {
+                Copy-Item $out $warmupLog -Force -ErrorAction SilentlyContinue
+                Write-Host "      $name did not produce a PDF." -ForegroundColor Yellow
+                Write-Host "      Not fatal - packages install on first use. Log: $warmupLog" -ForegroundColor Yellow
+                return
+            }
+        }
+        Write-Host "      Package cache ready - the first compile will be fast." -ForegroundColor Green
+    } finally {
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($latexCmd -and -not $env:OBERLEAF_SKIP_PACKAGE_WARMUP) {
+    Write-Host ""
+    Write-Host "Pre-downloading the LaTeX packages the templates need..." -ForegroundColor Cyan
+    Write-Host "      This is the last step and takes a few minutes. Oberleaf already" -ForegroundColor Gray
+    Write-Host "      works - closing this window just means packages arrive later." -ForegroundColor Gray
+    try { Initialize-LatexPackages } catch {
+        Write-Host "      Warm-up skipped: $_" -ForegroundColor Yellow
+    }
+}
+
+# -------------------------------------------------------------
 # Desktop and Start Menu shortcuts
 # -------------------------------------------------------------
 $SetupScript = Join-Path $InstallDir "scripts\setup-windows.ps1"
