@@ -70,6 +70,8 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
               placeholder="e.g. Quantum Computing Thesis"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              autoCapitalize="words"
+              spellCheck={false}
               className="w-full bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder rounded-lg p-2.5 text-sm text-stone-900 dark:text-stone-100 focus:border-scholarly dark:focus:border-scholarly-dark outline-none font-sans"
               autoFocus
             />

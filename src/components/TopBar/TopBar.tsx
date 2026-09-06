@@ -23,6 +23,7 @@ import {
   Eraser,
   MonitorUp,
   MoreHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -62,6 +63,9 @@ interface TopBarProps {
   isCollabActive?: boolean;
   collabPeersCount?: number;
   onCleanBuild?: () => void;
+  hasUpdate?: boolean;
+  onOpenUpdateModal?: () => void;
+  onCheckForUpdates?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -91,6 +95,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   isCollabActive = false,
   collabPeersCount = 0,
   onCleanBuild,
+  hasUpdate = false,
+  onOpenUpdateModal,
+  onCheckForUpdates,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
@@ -232,6 +239,23 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   <span>Create New Project</span>
                 </button>
+                {onCheckForUpdates && (
+                  <button
+                    onClick={() => {
+                      setIsProjectsDropdownOpen(false);
+                      onCheckForUpdates();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-600 dark:text-stone-300 font-medium transition text-left text-xs"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Check for Updates</span>
+                    </div>
+                    {hasUpdate && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -377,6 +401,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         )}
 
+        {/* Update Available Badge */}
+        {hasUpdate && onOpenUpdateModal && (
+          <button
+            onClick={onOpenUpdateModal}
+            title="A new Oberleaf update is available! Click to view details and install."
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer mr-0.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden sm:inline">Update Available</span>
+          </button>
+        )}
+
         <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1 hidden sm:block" />
 
         {/* Workspace Tools Dropdown */}
@@ -470,6 +506,23 @@ export const TopBar: React.FC<TopBarProps> = ({
                   )}
                   <span>{shortcutAdded ? 'Shortcut Added!' : 'Add Desktop Shortcut'}</span>
                 </button>
+                {onCheckForUpdates && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onCheckForUpdates();
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Check for Updates</span>
+                    </div>
+                    {hasUpdate && (
+                      <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-white text-[10px] font-bold">New</span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}

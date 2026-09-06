@@ -21,6 +21,7 @@ import {
   MonitorUp,
   Check,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { ProjectInfo } from '../TopBar/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -39,6 +40,9 @@ interface ProjectsDashboardProps {
   onRefreshProjects: () => Promise<void>;
   onOpenDoctor: () => void;
   isDoctorHealthy: boolean | null;
+  hasUpdate?: boolean;
+  onOpenUpdateModal?: () => void;
+  onCheckForUpdates?: () => void;
 }
 
 export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
@@ -48,6 +52,9 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   onRefreshProjects,
   onOpenDoctor,
   isDoctorHealthy,
+  hasUpdate = false,
+  onOpenUpdateModal,
+  onCheckForUpdates,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -306,6 +313,18 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
             <span className="hidden sm:inline">{shortcutMessage || 'Add Shortcut'}</span>
           </button>
 
+          {/* Update Available Badge */}
+          {hasUpdate && onOpenUpdateModal && (
+            <button
+              onClick={onOpenUpdateModal}
+              title="A new Oberleaf update is available! Click to view details and install."
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">Update Available</span>
+            </button>
+          )}
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -347,6 +366,22 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     <span>Add Desktop Shortcut</span>
                     <MonitorUp className="w-3.5 h-3.5 text-stone-400" />
                   </button>
+                  {onCheckForUpdates && (
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onCheckForUpdates();
+                      }}
+                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition flex items-center justify-between"
+                    >
+                      <span>Check for Updates</span>
+                      {hasUpdate ? (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-white text-[10px] font-bold">New</span>
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-stone-400" />
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);

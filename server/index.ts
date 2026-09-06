@@ -42,6 +42,7 @@ import {
 import { getProjectSyncTex } from './synctex.js';
 import { getProjectCitations, addProjectCitation } from './bibtex.js';
 import { getProjectPdfFilename, sanitizeFilename } from './latexTitle.js';
+import { checkSoftwareUpdate, applySoftwareUpdate } from './updater.js';
 
 const app = express();
 const PORT = 3001;
@@ -1075,6 +1076,30 @@ app.post('/api/system/create-shortcut', async (_req, res) => {
         });
       }
     });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 13. In-App Software Update Endpoints (Approach 1 + 3)
+app.get('/api/system/check-update', async (req, res) => {
+  try {
+    const force = req.query.force === 'true' || req.query.force === '1';
+    const status = await checkSoftwareUpdate(force);
+    return res.json(status);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/system/apply-update', async (_req, res) => {
+  try {
+    const result = await applySoftwareUpdate();
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(500).json(result);
+    }
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

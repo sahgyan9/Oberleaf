@@ -21,6 +21,7 @@ import { InsertCitationModal, CitationItem } from './components/Modals/InsertCit
 import { ProjectContext } from './utils/latexCompletions';
 import { PanelLeftOpen, FolderClosed, ChevronRight, Loader2 } from 'lucide-react';
 import { ProjectsDashboard } from './components/Dashboard/ProjectsDashboard';
+import { UpdateModal, UpdateInfo } from './components/Update/UpdateModal';
 import { extractLatexTitle, getLatexPdfFilename } from './utils/latexTitle';
 import { useToast, ToastContainer } from './components/Toast/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -176,6 +177,36 @@ export const App: React.FC = () => {
   const [isCollabModalOpen, setIsCollabModalOpen] = useState<boolean>(false);
   const [collabSession, setCollabSession] = useState<CollabSessionConfig | null>(null);
   const [collabPeersCount, setCollabPeersCount] = useState<number>(0);
+
+  // In-App Software Update State (Approaches 1 + 3)
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
+
+  const handleCheckForUpdates = useCallback(async (force = false, openModal = false) => {
+    setIsCheckingUpdate(true);
+    try {
+      const res = await fetch(`/api/system/check-update${force ? '?force=true' : ''}`);
+      if (res.ok) {
+        const data: UpdateInfo = await res.json();
+        setUpdateInfo(data);
+        if (data.hasUpdate || openModal) {
+          setIsUpdateModalOpen(true);
+        }
+      }
+    } catch (err) {
+      console.warn('[Oberleaf] Failed to check for software updates:', err);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleCheckForUpdates(false, false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [handleCheckForUpdates]);
 
   // Phase 3: Citations State
   const [citations, setCitations] = useState<CitationItem[]>([]);
@@ -1261,6 +1292,9 @@ export const App: React.FC = () => {
             onRefreshProjects={loadProjects}
             onOpenDoctor={() => setIsDoctorOpen(true)}
             isDoctorHealthy={isDoctorHealthy}
+            hasUpdate={!!updateInfo?.hasUpdate}
+            onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+            onCheckForUpdates={() => handleCheckForUpdates(true, true)}
           />
         </div>
       ) : (
@@ -1312,6 +1346,9 @@ export const App: React.FC = () => {
                   isCollabActive={!!collabSession}
                   collabPeersCount={collabPeersCount}
                   onCleanBuild={handleCleanBuild}
+                  hasUpdate={!!updateInfo?.hasUpdate}
+                  onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+                  onCheckForUpdates={() => handleCheckForUpdates(true, true)}
                 />
               </div>
             </div>
@@ -1343,6 +1380,9 @@ export const App: React.FC = () => {
               isCollabActive={!!collabSession}
               collabPeersCount={collabPeersCount}
               onCleanBuild={handleCleanBuild}
+              hasUpdate={!!updateInfo?.hasUpdate}
+              onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+              onCheckForUpdates={() => handleCheckForUpdates(true, true)}
             />
           )}
 
@@ -1727,6 +1767,15 @@ export const App: React.FC = () => {
         parentFolder={newItemModal?.parentFolder}
         onConfirm={handleCreateNewItem}
         onClose={() => setNewItemModal(null)}
+      />
+
+      {/* Software Update Modal (Approaches 1 + 3) */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+        onCheckAgain={() => handleCheckForUpdates(true, true)}
+        isChecking={isCheckingUpdate}
       />
 
       {/* Toast Notifications (replaces window.alert) */}

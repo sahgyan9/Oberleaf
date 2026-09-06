@@ -224,7 +224,7 @@ export function duplicateProject(projectId: string): ProjectSummary {
       meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
     } catch {}
   }
-  meta.name = targetId;
+  meta.name = meta.name ? `${meta.name} (Copy)` : targetId;
   meta.updatedAt = new Date().toISOString();
   meta.relativeTime = 'Just now by You';
   meta.isArchived = false;
@@ -232,7 +232,7 @@ export function duplicateProject(projectId: string): ProjectSummary {
 
   return {
     id: targetId,
-    name: targetId,
+    name: meta.name,
     template: meta.template || 'Standard',
     updatedAt: meta.updatedAt,
     lastModifiedRelative: meta.relativeTime,
@@ -309,11 +309,22 @@ export function createProject(name: string, templateKey: string = 'blank'): Proj
   const template = TEMPLATES[templateKey] || TEMPLATES.blank;
   fs.writeFileSync(path.join(projectDir, 'main.tex'), template.mainTex, 'utf-8');
 
+  const nowIso = new Date().toISOString();
+  const meta = {
+    name,
+    owner: 'You',
+    relativeTime: 'Just now by You',
+    updatedAt: nowIso,
+    template: templateKey,
+    isArchived: false,
+  };
+  fs.writeFileSync(path.join(projectDir, '.meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+
   return {
     id: finalSlug,
     name,
     template: templateKey,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
     path: projectDir,
   };
 }
