@@ -15,6 +15,13 @@ import {
   CheckCircle2,
   History,
   ArrowLeft,
+  Maximize2,
+  Minimize2,
+  Github,
+  MessageSquare,
+  Users,
+  Eraser,
+  MonitorUp,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -44,6 +51,16 @@ interface TopBarProps {
   isDoctorHealthy: boolean | null;
   activeFilePath: string;
   saveStatus: 'saved' | 'saving' | 'unsaved';
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  onOpenSyncModal?: () => void;
+  gitSyncStatus?: { ahead: number; behind: number; remoteUrl: string | null } | null;
+  onOpenComments?: () => void;
+  openCommentsCount?: number;
+  onOpenCollab?: () => void;
+  isCollabActive?: boolean;
+  collabPeersCount?: number;
+  onCleanBuild?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -63,10 +80,41 @@ export const TopBar: React.FC<TopBarProps> = ({
   isDoctorHealthy,
   activeFilePath,
   saveStatus,
+  isFullscreen = false,
+  onToggleFullscreen,
+  onOpenSyncModal,
+  gitSyncStatus,
+  onOpenComments,
+  openCommentsCount = 0,
+  onOpenCollab,
+  isCollabActive = false,
+  collabPeersCount = 0,
+  onCleanBuild,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isAddingShortcut, setIsAddingShortcut] = useState(false);
+  const [shortcutAdded, setShortcutAdded] = useState(false);
+
+  const handleAddShortcut = async () => {
+    setIsAddingShortcut(true);
+    setShortcutAdded(false);
+    try {
+      const res = await fetch('/api/system/create-shortcut', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShortcutAdded(true);
+        setTimeout(() => setShortcutAdded(false), 3500);
+      } else {
+        alert(data.error || 'Could not create shortcut.');
+      }
+    } catch (err: any) {
+      alert(`Error connecting to server: ${err.message}`);
+    } finally {
+      setIsAddingShortcut(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -180,7 +228,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 })}
               </div>
 
-              <div className="pt-1.5 border-t border-surface-lightBorder dark:border-surface-darkBorder">
+              <div className="pt-1.5 border-t border-surface-lightBorder dark:border-surface-darkBorder space-y-1">
                 <button
                   onClick={() => {
                     setIsProjectsDropdownOpen(false);
@@ -190,6 +238,20 @@ export const TopBar: React.FC<TopBarProps> = ({
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Create New Project</span>
+                </button>
+                <button
+                  onClick={handleAddShortcut}
+                  disabled={isAddingShortcut}
+                  className="w-full flex items-center justify-center space-x-1.5 p-2 rounded-lg bg-surface-lightSubtle hover:bg-stone-200/60 dark:bg-surface-darkSubtle dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 font-medium transition border border-surface-lightBorder dark:border-surface-darkBorder btn-tactile disabled:opacity-50"
+                >
+                  {isAddingShortcut ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly" />
+                  ) : shortcutAdded ? (
+                    <Check className="w-3.5 h-3.5 text-scholarly" />
+                  ) : (
+                    <MonitorUp className="w-3.5 h-3.5 text-stone-500" />
+                  )}
+                  <span>{shortcutAdded ? 'Shortcut Added!' : 'Add Desktop Shortcut'}</span>
                 </button>
               </div>
             </div>
@@ -287,6 +349,58 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
+        {/* Comments Button */}
+        {onOpenComments && (
+          <button
+            onClick={onOpenComments}
+            title="Review Comments (Alt+M)"
+            className="relative flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+            <span className="hidden sm:inline">Comments</span>
+            {openCommentsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-scholarly dark:bg-scholarly-dark text-white text-[10px] font-bold">
+                {openCommentsCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Live Collab Button */}
+        {onOpenCollab && (
+          <button
+            onClick={onOpenCollab}
+            title="Live Peer-to-Peer Collaboration"
+            className={`relative flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition border btn-tactile ${
+              isCollabActive
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                : 'text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder'
+            }`}
+          >
+            <Users className={`w-3.5 h-3.5 ${isCollabActive ? 'text-emerald-500 animate-pulse' : ''}`} />
+            <span className="hidden sm:inline">
+              {isCollabActive ? `Live (${collabPeersCount})` : 'Collab'}
+            </span>
+          </button>
+        )}
+
+        {/* GitHub Remote Sync Button */}
+        {onOpenSyncModal && (
+          <button
+            onClick={onOpenSyncModal}
+            title="GitHub Remote Sync (Push/Pull)"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+          >
+            <Github className="w-3.5 h-3.5 text-stone-800 dark:text-stone-200" />
+            <span className="hidden sm:inline">GitHub</span>
+            {gitSyncStatus && gitSyncStatus.ahead > 0 && (
+              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
+                ↑{gitSyncStatus.ahead}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* History & Checkpoints Button */}
         {onOpenHistory && (
           <button
@@ -298,6 +412,37 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="hidden sm:inline">History</span>
           </button>
         )}
+
+        {/* Clean Build Cache Button */}
+        {onCleanBuild && (
+          <button
+            onClick={onCleanBuild}
+            title="Clean Build Cache (.build/)"
+            className="p-2 rounded-md text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
+          >
+            <Eraser className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Add Desktop Shortcut Button */}
+        <button
+          onClick={handleAddShortcut}
+          disabled={isAddingShortcut}
+          title={shortcutAdded ? 'Shortcut added to Desktop & Start Menu!' : 'Add Oberleaf Shortcut to Desktop & Start Menu'}
+          className={`p-2 rounded-md transition btn-tactile ${
+            shortcutAdded
+              ? 'text-scholarly dark:text-scholarly-dark bg-scholarly-subtle dark:bg-scholarly-darkSubtle'
+              : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
+          }`}
+        >
+          {isAddingShortcut ? (
+            <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
+          ) : shortcutAdded ? (
+            <Check className="w-4 h-4 text-scholarly" />
+          ) : (
+            <MonitorUp className="w-4 h-4" />
+          )}
+        </button>
 
         {/* Dependency Doctor Button */}
         <button
@@ -323,6 +468,25 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-stone-700" />}
         </button>
+
+        {/* Full Screen Zen Mode Toggle */}
+        {onToggleFullscreen && (
+          <button
+            onClick={onToggleFullscreen}
+            title={
+              isFullscreen
+                ? 'Exit Full Screen Zen Mode (F11, Ctrl+Shift+F, or Esc)'
+                : 'Enter Full Screen Zen Mode (F11 or Ctrl+Shift+F)'
+            }
+            className={`p-2 rounded-md transition btn-tactile ${
+              isFullscreen
+                ? 'bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark shadow-xs border border-scholarly/20 dark:border-scholarly-dark/30'
+                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
+            }`}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+        )}
       </div>
     </header>
   );

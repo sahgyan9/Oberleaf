@@ -12,3 +12,7 @@ logs/
 .tmp/
 .claude/
 *.lnk
+CV_*
+*.pdf
+*.log
+*.out

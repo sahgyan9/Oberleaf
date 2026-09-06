@@ -22,7 +22,7 @@ function Show-Notification {
         }
 
         $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
-        $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Overleaf Copy")
+        $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Oberleaf")
         $notifier.Show($toast)
     } catch {}
 }
@@ -75,7 +75,7 @@ try {
 } catch {}
 
 # 2. Cold start: Show immediate feedback so the user knows startup has begun
-Show-Notification "Overleaf Copy" "Opening in Google Chrome (Gemini AI enabled)..."
+Show-Notification "Oberleaf" "Opening in Google Chrome (Gemini AI enabled)..."
 
 # 3. Free up ports 3001 and 5173 if any orphaned processes are stuck
 Get-NetTCPConnection -LocalPort 3001, 5173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
@@ -84,7 +84,7 @@ Get-NetTCPConnection -LocalPort 3001, 5173 -State Listen -ErrorAction SilentlyCo
 
 # 4. Launch npm start and stream full output to logs/project.log
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-"`n========================================`n[Overleaf Copy] Session started at $timestamp`n========================================" | Out-File -FilePath $LogFile -Encoding utf8 -Append
+"`n========================================`n[Oberleaf] Session started at $timestamp`n========================================" | Out-File -FilePath $LogFile -Encoding utf8 -Append
 
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm start >> `"$LogFile`" 2>&1" -WorkingDirectory $ProjectRoot -WindowStyle Hidden
 

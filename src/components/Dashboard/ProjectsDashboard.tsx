@@ -18,6 +18,9 @@ import {
   ArrowUp,
   FolderOpen,
   RefreshCw,
+  MonitorUp,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { ProjectInfo } from '../TopBar/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,6 +63,27 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   const [deleteConfirmProject, setDeleteConfirmProject] = useState<ExtendedProjectInfo | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCloning, setIsCloning] = useState<string | null>(null);
+  const [isAddingShortcut, setIsAddingShortcut] = useState(false);
+  const [shortcutMessage, setShortcutMessage] = useState<string | null>(null);
+
+  const handleAddShortcut = async () => {
+    setIsAddingShortcut(true);
+    setShortcutMessage(null);
+    try {
+      const res = await fetch('/api/system/create-shortcut', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShortcutMessage('Shortcut Added!');
+        setTimeout(() => setShortcutMessage(null), 3500);
+      } else {
+        alert(data.error || 'Failed to create shortcut.');
+      }
+    } catch (err: any) {
+      alert(`Could not connect to local server: ${err.message}`);
+    } finally {
+      setIsAddingShortcut(false);
+    }
+  };
 
   // Close menus on outside click
   useEffect(() => {
@@ -208,7 +232,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-surface-light dark:bg-surface-dark text-stone-900 dark:text-stone-100 flex flex-col select-none font-sans transition-colors">
+    <div className="min-h-full bg-surface-light dark:bg-surface-dark text-stone-900 dark:text-stone-100 flex flex-col select-none font-sans transition-colors pb-16">
       {/* 1. Header: Brand Logo & System Controls */}
       <nav className="h-14 bg-surface-lightPanel dark:bg-surface-darkPanel border-b border-surface-lightBorder dark:border-surface-darkBorder px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 transition-colors">
         {/* Left: Official Brand Logo & Name */}
@@ -261,6 +285,27 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
             <span className="hidden sm:inline">Engine</span>
           </button>
 
+          {/* Add Desktop Shortcut Button */}
+          <button
+            onClick={handleAddShortcut}
+            disabled={isAddingShortcut}
+            title="Add Oberleaf shortcut to Desktop & Start Menu"
+            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition btn-tactile ${
+              shortcutMessage
+                ? 'bg-scholarly-green/15 text-scholarly-green dark:text-scholarly-greenDark border-scholarly-green/30'
+                : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-800'
+            }`}
+          >
+            {isAddingShortcut ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly-green dark:text-scholarly-greenDark" />
+            ) : shortcutMessage ? (
+              <Check className="w-3.5 h-3.5 text-scholarly-green dark:text-scholarly-greenDark" />
+            ) : (
+              <MonitorUp className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+            )}
+            <span className="hidden sm:inline">{shortcutMessage || 'Add Shortcut'}</span>
+          </button>
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -292,6 +337,16 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                   <div className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">Offline-First TeX Engine</div>
                 </div>
                 <div className="py-1 space-y-0.5">
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      handleAddShortcut();
+                    }}
+                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition flex items-center justify-between"
+                  >
+                    <span>Add Desktop Shortcut</span>
+                    <MonitorUp className="w-3.5 h-3.5 text-stone-400" />
+                  </button>
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
@@ -411,7 +466,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
         )}
 
         {/* 3. Projects Table */}
-        <div className="border border-surface-lightBorder dark:border-surface-darkBorder rounded-xl overflow-hidden bg-surface-lightPanel dark:bg-surface-darkPanel shadow-xs">
+        <div className="border border-surface-lightBorder dark:border-surface-darkBorder rounded-xl overflow-x-auto bg-surface-lightPanel dark:bg-surface-darkPanel shadow-xs">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs font-semibold text-stone-600 dark:text-stone-400 select-none">

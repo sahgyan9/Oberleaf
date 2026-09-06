@@ -1,4 +1,4 @@
-' Silent Windows Launcher for Overleaf Copy
+' Silent Windows Launcher for Oberleaf
 ' Delegates to launch.ps1 with completely hidden window style
 
 Set WshShell = CreateObject("WScript.Shell")

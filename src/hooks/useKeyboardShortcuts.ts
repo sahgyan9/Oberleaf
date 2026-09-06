@@ -8,6 +8,12 @@ export interface UseKeyboardShortcutsOptions {
   setFileTreeCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
   saveActiveFile: (content: string) => void;
   getLiveContent: () => string;
+  onToggleFitWidth?: () => void;
+  onToggleFullscreen?: () => void;
+  isZenMode?: boolean;
+  onExitZenMode?: () => void;
+  onBold?: () => void;
+  onItalic?: () => void;
 }
 
 const TOGGLE_WINDOW_MS = 700;
@@ -16,11 +22,15 @@ const REPEAT_INTERVAL_MS = 350;
 /**
  * Global application keyboard shortcuts hook:
  * - Ctrl+S / Cmd+S: Save file
- * - Ctrl+B / Cmd+B: Toggle file tree sidebar
+ * - Ctrl+B / Cmd+B: Bold text in editor (\textbf) / Toggle sidebar outside editor
+ * - Ctrl+I / Cmd+I: Italic text in editor (\textit)
  * - Ctrl+7 / Cmd+7: Full Code Mode
  * - Ctrl+8 / Cmd+8: Split Mode
  * - Ctrl+9 / Cmd+9: Full PDF Mode + Double/Triple/Continuous Toggle (PDF -> Split -> Code)
  * - Ctrl+Shift+1/2/3: Legacy backward-compatible view mode shortcuts
+ * - F: Fit to Width (Full PDF Mode)
+ * - F11 or Ctrl+Shift+F: Full Screen Zen Mode (Collapsible Header on hover)
+ * - Esc: Exit Zen Mode
  */
 export function useKeyboardShortcuts({
   viewMode,
@@ -29,11 +39,47 @@ export function useKeyboardShortcuts({
   setFileTreeCollapsed,
   saveActiveFile,
   getLiveContent,
+  onToggleFitWidth,
+  onToggleFullscreen,
+  isZenMode = false,
+  onExitZenMode,
+  onBold,
+  onItalic,
 }: UseKeyboardShortcutsOptions) {
   const viewModeRef = useRef<ViewMode>(viewMode);
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
+
+  const onToggleFitWidthRef = useRef(onToggleFitWidth);
+  useEffect(() => {
+    onToggleFitWidthRef.current = onToggleFitWidth;
+  }, [onToggleFitWidth]);
+
+  const onToggleFullscreenRef = useRef(onToggleFullscreen);
+  useEffect(() => {
+    onToggleFullscreenRef.current = onToggleFullscreen;
+  }, [onToggleFullscreen]);
+
+  const isZenModeRef = useRef(isZenMode);
+  useEffect(() => {
+    isZenModeRef.current = isZenMode;
+  }, [isZenMode]);
+
+  const onExitZenModeRef = useRef(onExitZenMode);
+  useEffect(() => {
+    onExitZenModeRef.current = onExitZenMode;
+  }, [onExitZenMode]);
+
+  const onBoldRef = useRef(onBold);
+  useEffect(() => {
+    onBoldRef.current = onBold;
+  }, [onBold]);
+
+  const onItalicRef = useRef(onItalic);
+  useEffect(() => {
+    onItalicRef.current = onItalic;
+  }, [onItalic]);
 
   const lastCtrl9TimeRef = useRef<number>(0);
   const ctrl9PressCountRef = useRef<number>(0);
@@ -43,6 +89,21 @@ export function useKeyboardShortcuts({
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = (e.ctrlKey || e.metaKey) && !e.altKey;
 
+      const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
+      const isEditorOrInput = Boolean(
+        (target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable ||
+            Boolean(target.closest('.monaco-editor')))) ||
+        (activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.isContentEditable ||
+            Boolean(activeEl.closest('.monaco-editor'))))
+      );
+
       // Ctrl+S / Cmd+S: Save
       if (isMod && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
@@ -50,11 +111,26 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // Ctrl+B: Toggle Sidebar
+      // Ctrl+B / Cmd+B: Bold text in editor, or toggle sidebar outside editor
       if (isMod && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
-        setFileTreeCollapsed((prev) => !prev);
+        e.stopPropagation();
+        if (isEditorOrInput) {
+          onBoldRef.current?.();
+        } else {
+          setFileTreeCollapsed((prev) => !prev);
+        }
         return;
+      }
+
+      // Ctrl+I / Cmd+I: Italic text in editor
+      if (isMod && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        if (isEditorOrInput) {
+          e.preventDefault();
+          e.stopPropagation();
+          onItalicRef.current?.();
+          return;
+        }
       }
 
       // Ctrl+7: Full Code Mode
@@ -136,6 +212,46 @@ export function useKeyboardShortcuts({
           setPdfCollapsed(false);
           ctrl9PressCountRef.current = 1;
         }
+      }
+
+      // F / f: Fit to Width (Full PDF Mode only)
+      if (
+        viewModeRef.current === 'pdf' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'f' || e.key === 'F' || e.code === 'KeyF')
+      ) {
+        if (!isEditorOrInput) {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleFitWidthRef.current?.();
+          return;
+        }
+      }
+
+      // F11: Full Screen Zen Mode Toggle
+      if (e.key === 'F11') {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFullscreenRef.current?.();
+        return;
+      }
+
+      // Ctrl+Shift+F / Cmd+Shift+F: Full Screen Zen Mode Toggle
+      if (isMod && e.shiftKey && (e.key === 'F' || e.key === 'f' || e.code === 'KeyF')) {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFullscreenRef.current?.();
+        return;
+      }
+
+      // Escape: Exit Zen Mode if active
+      if (e.key === 'Escape' && isZenModeRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        onExitZenModeRef.current?.();
+        return;
       }
     };
 

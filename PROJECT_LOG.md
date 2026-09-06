@@ -374,3 +374,242 @@ overleaf-copy/
   - MODIFIED: `scripts/launch.ps1`, `PROJECT_LOG.md`
 - **Status at end**: Complete. Overleaf Copy now opens directly in Google Chrome with full Gemini AI Agent support.
 
+---
+
+### Session 009 — 2026-09-06 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "right now the compilation time is on average 5-6 second. Is it expected or can we improve it further?" -> "yes go ahead"
+- **Observation / User Problem**:
+  - Compilations on typical documents and CVs were taking between 5.0 and 5.7 seconds.
+  - While 4–8 seconds is common on cloud Overleaf (remote Docker instances, container initialization, network transit), a local native TeX engine on an SSD should compile single/double-page documents in under 1 second.
+- **Root Cause Analysis (RCA)**:
+  1. **Recursive `.git` Crawl in `TEXINPUTS` (4+ seconds bottleneck)**:
+     - In `server/compiler.ts`, `TEXINPUTS` included `${projectDir}//`.
+     - In TeX's Kpathsea resolver, `//` directs the engine to recursively scan every subfolder on every package, class, font, or metric lookup (50–100+ searches per build).
+     - Because every project is a Git repository, TeX was repeatedly crawling `.git/objects/`, `.git/refs/`, etc., on Windows NTFS, adding ~4.2 seconds of pure disk traversal overhead.
+  2. **Unignored `main.pdf` Bloating `.git` on Every Compile**:
+     - `GITIGNORE_CONTENT` in `server/git.ts` lacked `*.pdf`.
+     - After every compile, `main.pdf` was copied to the project root and committed into Git history by `createProjectCommit`.
+     - `projects/cv/.git` had grown to 19 MB with 339 loose binary objects, compounding both Git operations and Kpathsea's recursive filesystem scans.
+  3. **Synchronous Git Auto-Checkpointing**:
+     - `server/index.ts` was `await`ing `createProjectCommit()` before starting `compileDocument()`.
+     - Spawning 3 Git CLI commands on Windows (`git status`, `git add`, `git commit`) sequentially blocked compilation by 300–600 ms.
+  4. **Latexmk Probe Delay without Perl**:
+     - `latexmk --version` probe took ~400 ms on first run to detect missing Perl on Windows before falling back to `pdflatex`.
+- **What was done**:
+  - **Targeted Subdirectory Resolution in `server/compiler.ts`**:
+    - Created `getProjectSearchPaths(projectDir, buildDir)`.
+    - Scans top-level user folders (`figures//`, `sections//`, `images//`) while explicitly skipping hidden directories (`.git`, `.build`, `.tmp`, `node_modules`).
+    - Maintains full Overleaf-like automatic figure/subfile discovery while completely isolating Kpathsea from Git metadata.
+  - **Ignored `*.pdf` in Git**:
+    - Added `*.pdf` to `GITIGNORE_CONTENT` in `server/git.ts`.
+    - Updated `.gitignore` across all existing project repositories and untracked `main.pdf` from the Git index (`git rm --cached main.pdf`).
+    - Cleaned up loose objects in `projects/cv/.git` via `git gc`.
+  - **Non-Blocking Git Auto-Checkpoints in `server/index.ts`**:
+    - Made `createProjectCommit()` fire asynchronously in the background (`.catch(...)`), allowing `compileDocument()` to start immediately without delay.
+  - **Pre-Warmed `isLatexmkAvailable()` on Server Startup**:
+    - Exported `isLatexmkAvailable()` and triggered it in the background when `server.listen()` boots, eliminating the probe overhead on the user's first compile.
+- **Key Learnings & Takeaways**:
+  - *Kpathsea `//` Mechanics on Windows*: Never apply `//` to directories containing `.git`, `.build`, or `node_modules`. Always filter top-level directories and apply `//` strictly to user asset subtrees.
+  - *Git Repositories in Editor Subsystems*: Auto-checkpoints should never track compiled binary artifacts (`*.pdf`) and should never synchronously block interactive rendering loops.
+- **Verification**:
+  - `npm run typecheck` (`tsc --noEmit`) $\rightarrow$ **0 errors**.
+  - Verified live compile timings across all test projects:
+    - `cv`: **5,719 ms $\rightarrow$ 923 ms** (~6.2× faster, 4.8s saved)
+    - `cv-1page-software-engineer`: **2,294 ms $\rightarrow$ 909 ms** (~2.5× faster)
+    - `cv-2page-software-engineer`: **2,260 ms $\rightarrow$ 880 ms** (~2.6× faster)
+    - `CV_Sydney`: **2,654 ms $\rightarrow$ 641 ms** (~4.1× faster)
+    - `MoS2_Thin_Film`: **5,094 ms $\rightarrow$ 2,883 ms** (~1.8× faster)
+- **Files changed**:
+  - MODIFIED: `server/compiler.ts`, `server/git.ts`, `server/index.ts`, `PROJECT_LOG.md`, `ARCHITECTURE.md`
+- **Status at end**: Complete and verified. All typical documents and CVs now compile in under 1 second.
+
+---
+
+## Session: Live Math Preview RCA & Visual Artifact Resolution (2026-09-06)
+
+- **Prompt**: "why this preview feels corrupted and see it doesn't blend with white background of pdf. Do RCA and tell me what is the best way to solve this" -> "go ahead"
+- **Observation / User Problem**:
+  - Live math preview appeared "corrupted" when previewing multi-line alignment environments like `\begin{align}`: equation numbers `(1)` collided directly into formulas (rendering as `f(x) = ax^2 + bx +(1c`), and an unwanted horizontal scrollbar thumb appeared at the bottom of the card.
+  - When the editor was in split mode, the preview card drifted across the central divider into the PDF viewer. The right side of the card over the white PDF page turned into a washed-out white gradient, causing white formula text to completely vanish into the background.
+- **Root Cause Analysis (RCA)**:
+  1. **Unstarred AMS Environments Auto-Numbering in KaTeX**:
+     - In LaTeX/KaTeX, unstarred environments (`align`, `equation`, `gather`, `multline`, `flalign`) automatically generate numbered equation tags `(1)`, `(2)`.
+     - In `katex.css`, `.tag` is positioned with `position: absolute; right: 0;`.
+     - In a compact tooltip card (`max-w-md`), the centered formula spans near the edge. Forcing the tag to `right: 0` placed `(1)` in the exact same horizontal pixels as `+ c`, visually colliding characters.
+     - `cleanMathForKaTeX` in `src/utils/mathDetector.ts` stripped comments, `\label`, and `\tag`, but missed converting auto-numbering environments (`align`) to unnumbered starred environments (`align*`).
+     - Furthermore, default KaTeX `margin: 1em 0;` on `.katex-display` triggered `overflow-auto` in the preview container, spawning an intrusive horizontal scrollbar.
+  2. **The Tailwind `/98` Opacity Bug (100% Background Transparency)**:
+     - `EquationPreview.tsx` used `bg-surface-lightPanel/98 dark:bg-surface-darkPanel/98 backdrop-blur-md`.
+     - Because `98` is not part of Tailwind's default opacity scale (`90, 95, 100` or arbitrary `/[0.98]`), Tailwind discarded both classes during JIT compilation.
+     - The card was rendered with `background-color: transparent` (0% opacity).
+     - With `backdrop-blur-md` and 0% opacity, the card acted as a pure blur lens over whatever was behind it: dark over the editor, pure white over the PDF, and split down the middle.
+     - In dark mode, the math text was styled with `dark:text-stone-100` (`#F5F5F4` / off-white). Rendering white text over a transparent card sitting on a pure white PDF caused near-total loss of contrast.
+  3. **Hardcoded Cursor Offsets Ejecting Card Across Panels**:
+     - In `src/components/Editor/Editor.tsx`, `coords.left + 260` added a hardcoded 260px offset relative to Monaco's container.
+     - In split-view mode, this offset forced the card across the central splitter (`PanelResizeHandle`) into the PDF viewer. Clamping in `EquationPreview.tsx` only checked `window.innerWidth - 380`, completely unaware of the editor's right boundary.
+- **What was done**:
+  - **Environment Normalization in `src/utils/mathDetector.ts`**:
+    - Updated `cleanMathForKaTeX` to automatically normalize auto-numbering math environments (`align`, `equation`, `gather`, `multline`, `flalign`, `alignat`) to unnumbered starred environments (`align*`, `equation*`, etc.) for live preview rendering.
+  - **Opaque Surface & Tag Guard in `src/components/EquationPreview/EquationPreview.tsx`**:
+    - Replaced broken `/98` classes with solid, 100% opaque panel surfaces: `bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-2xl rounded-xl`.
+    - Added CSS child guard `[&_.tag]:hidden` to guarantee no numbering tags can ever collide with equation symbols.
+    - Reduced KaTeX margins (`[&_.katex-display]:my-1`) and styled scrollbars (`[&::-webkit-scrollbar]:h-1`) to eliminate oversized default spacing and bulky scrollbar thumbs.
+  - **Editor-Bounded Coordinate Clamping in `src/components/Editor/Editor.tsx`**:
+    - Replaced the arbitrary `+ 260px` window offset with actual editor DOM coordinates (`editor.getDomNode().getBoundingClientRect()`).
+    - Clamped the preview's horizontal position (`minLeft` to `maxLeft`) strictly within the active editor panel (`editorRect.left + 16` to `editorRect.right - cardWidth - 16`), preventing the popup from ever bleeding across the splitter into the PDF pane.
+    - Positioned the card directly below the active cursor line (with automatic flip-above when near the bottom of the editor).
+    - Hooked preview updates into both `onDidChangeCursorPosition` and `onDidChangeModelContent` so typing and edits update the live preview instantaneously.
+- **Key Learnings & Takeaways**:
+  - *KaTeX Layout in Tooltips*: Never render unstarred numbered environments (`align`, `equation`) inside narrow floating tooltips; KaTeX's `right: 0` tag positioning will collide with centered equations. Always normalize to starred equivalents (`align*`) or suppress `.tag` via CSS.
+  - *Tailwind JIT Opacity Scale*: Tailwind v3 only generates opacity utilities for predefined numbers (`0, 5, 10, ..., 95, 100`). Arbitrary percentages require bracket notation (e.g., `/[0.98]`). If invalid, the utility is silently omitted, leaving elements completely transparent.
+  - *Split-Pane Floating Widgets*: Floating widgets positioned over multi-pane layouts (code editor + document viewer) must use 100% opaque surfaces to prevent background bleed and contrast collapse. Coordinates must be bounded against the parent pane's bounding client rect, not just the global `window.innerWidth`.
+- **Verification**:
+  - `npx vite build` $\rightarrow$ Built successfully in 8.91s with 0 errors.
+  - Tested unstarred environment replacement via KaTeX engine: verified `.tag` generation is completely eliminated.
+- **Files changed**:
+  - MODIFIED: `src/utils/mathDetector.ts`, `src/components/EquationPreview/EquationPreview.tsx`, `src/components/Editor/Editor.tsx`, `PROJECT_LOG.md`
+- **Status at end**: Complete, verified, and logged.
+
+
+---
+
+### Session 010 — 2026-09-06 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "I want you to online research from across reddit and other platform to see the pain point of customer. Give top 3 pain pain point and how can fix it" $\rightarrow$ "check what stack we already have and what can we do to fix" $\rightarrow$ "lets go for all" $\rightarrow$ "and currently the git version histroy is automatic. I want just like github where I can Comment and push so that I know each version. See it does currently and include this as well in plan"
+- **Observation / User Problem**:
+  - Across Reddit (*r/Overleaf*, *r/LaTeX*, *r/PhD*, *r/MachineLearning*) and Hacker News, Overleaf users consistently complain about three major issues:
+    1. **Strict Compute Caps & Timeouts**: Free tier compile timeouts (20-60s) abort complex bibliographies, high-res figures, and TikZ/PGFPlots diagrams.
+    2. **Aggressive Paywalls & Collaboration Squeeze**: Free accounts are restricted to 1 collaborator (2 authors total); developer essentials like Git/GitHub integration and 30-day+ version history are paywalled at \$15–\$30/month.
+    3. **Zero Offline Mode & Deadline Server Downtime**: Authors are locked out without internet (flights, conferences) and live in fear of 502 server crashes hours before major conference deadlines.
+  - While Oberleaf solved the local compute and timeout constraints in prior sessions, it still lacked:
+    - An explicit, GitHub-style versioning workflow (previously all commits were generic background `"Autosave snapshot"` messages).
+    - Remote GitHub/GitLab synchronization to collaborate without cloud subscriptions.
+    - An offline, portable review comment system that survives across Git clones.
+    - Real-time multiplayer editing with peer presence.
+- **Root Cause & Architectural Rationale**:
+  - *Git Version Noise*: Unfiltered auto-commit on every compile flooded the Git log with generic snapshots, making it impossible for researchers to find curated milestone versions or write release notes.
+  - *Proprietary Cloud Lock-In for Review Comments*: Cloud editors store review comments in remote SQL/NoSQL databases, meaning cloning via Git loses all co-author discussions. Storing comments in a structured project file (`.comments.json`) makes comments 100% portable, version-controlled, and offline-compatible.
+  - *Multiplayer Without Expensive Servers*: Running central compilation and WebSocket servers costs hundreds of dollars a month. Leveraging CRDTs (Yjs) over WebRTC peer-to-peer connections achieves live multi-cursor editing at **zero cloud infrastructure cost**.
+- **What was done**:
+  1. **GitHub-Style "Comment & Push" Version Control**:
+     - Upgraded `HistoryDrawer.tsx` with a GitHub-style version commit bar: custom commit message/comment input, optional description, **"Commit Version"** (local milestone), and **"Commit & Push"** (pushes immediately to remote repository).
+     - Added timeline filtering: toggle between **"All Snapshots"** (including background autosaves) and **"Milestones Only"** (curated releases with author comments and distinct Version badges).
+     - Added unpushed commit badges (`↑ 2`) and 1-click Push & Pull buttons with live status tracking.
+     - Added project setting toggle for `autoCommitOnCompile` (saved in `.gitsettings.json`).
+     - Created `GitSyncModal.tsx` for configuring GitHub/GitLab remote URLs, branch tracking, and optional Personal Access Token (PAT).
+  2. **Portable File-Based Review Comments (`.comments.json`)**:
+     - Built `server/comments.ts` with comment threads, replies, and status resolution stored in `.comments.json` directly within the project folder (automatically tracked by Git, 100% offline).
+     - Built `CommentsDrawer.tsx` right drawer showing comments with file/line pills, author badges, quoted snippets, and threaded replies.
+     - Added line decorations in Monaco editor highlighting commented lines with `.comment-highlight-line` and overview ruler indicators.
+     - Added `Alt+M` shortcut and right-click context menu "Add Review Comment" in `Editor.tsx`.
+     - Added Comments button with unread/open badge count in `TopBar.tsx`.
+  3. **Real-Time Peer-to-Peer Multiplayer Collaboration (Yjs + WebRTC)**:
+     - Installed `yjs` and `y-webrtc`.
+     - Built `src/utils/yjsCollab.ts` for zero-server WebRTC collaborative editing with awareness (author display name & cursor color).
+     - Built `CollabModal.tsx` to generate room codes, customize cursor colors, and copy 1-click invite links (`?room=...`).
+     - Added automatic room detection in `App.tsx` when a collaborator opens a shared link.
+     - Added Live Collab button in `TopBar.tsx` with active pulse and connected peer counter.
+  4. **Compiler Acceleration & Cache Cleaning**:
+     - Added `cleanBuildCache(projectDir)` to wipe `.build/` auxiliary files on demand (`POST /api/projects/:id/clean`).
+     - Added optional `--shell-escape` compilation flag in `compileDocument()`.
+     - Added Clean Build button in `TopBar.tsx`.
+- **Key Learnings & Takeaways**:
+  - *Academic Versioning UX*: Academic authors think in terms of draft milestones ("Submitted draft v1", "Addressed Reviewer 2 comments"). Blending automatic compile snapshots with explicit user comments requires strict visual separation and filtering in the UI so the Git timeline remains readable.
+  - *Portable Metadata Architecture*: Review comments, collaborator annotations, and settings should always live within the project directory (`.comments.json`, `.gitsettings.json`). This ensures full data sovereignty: when a user commits to Git, their review threads travel with the source code.
+  - *WebRTC Peer Collaboration*: Browser-native WebRTC signaling with Yjs eliminates the need for maintaining stateful Node.js WebSocket clusters for multi-author editing, drastically simplifying architecture while maintaining 0ms local editing performance.
+  - *Monaco Editor ESM Resolution*: Avoid wrapper libraries with deep nested imports (like `y-monaco`'s legacy ESM path assumptions). Implementing clean, direct event synchronization between Y.Text and Monaco's `onDidChangeContent` is simpler, more maintainable, and guarantees Vite build compatibility.
+- **Verification**:
+  - `npm run typecheck` (`tsc --noEmit`) $\rightarrow$ **0 errors**.
+  - `npm run build` $\rightarrow$ **Built cleanly in 8.89s**.
+- **Files changed**:
+  - CREATED: `src/components/GitSync/GitSyncModal.tsx`, `src/components/Comments/CommentsDrawer.tsx`, `src/components/Collaboration/CollabModal.tsx`, `src/utils/yjsCollab.ts`, `server/comments.ts`
+  - MODIFIED: `server/git.ts`, `server/compiler.ts`, `server/index.ts`, `src/components/History/HistoryDrawer.tsx`, `src/components/Editor/Editor.tsx`, `src/components/TopBar/TopBar.tsx`, `src/App.tsx`, `src/index.css`, `package.json`, `PROJECT_LOG.md`
+- **Status at end**: Complete, verified, and thoroughly logged.
+
+---
+
+### Session 011 — 2026-09-06 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "testing first why i got so many error. see the screenshot and AI Agents tends to use these emoji. Search about AI-ish behaviour online and how to avoid it. and document the same so that future AI doesn't repead and also document the chnages here"
+- **Observations / User Problems**:
+  1. User tested an `align` environment snippet in `projects/test/main.tex` and was surprised to receive 6 compilation errors.
+  2. The error messages in the UI were truncated (e.g., `LaTeX Error:`, `Missing $ ins`, `Misplaced ali`).
+  3. The error panel UI contained emoji clutter (`⚡ Add \usepackage{amsmath}`, `✨ Copy Prompt for AI`), which felt unprofessionally "AI-ish".
+  4. Requested an online investigation into AI-ish behavior tropes, how to eliminate them, and permanent documentation in the repo.
+- **Root Cause Analysis (RCA)**:
+  1. **The TeX Error Cascade**:
+     - `projects/test/main.tex` used `\begin{align}` without `\usepackage{amsmath}` in the preamble.
+     - When `align` is undefined, TeX drops out of math mode and evaluates the environment contents as plain text.
+     - In text mode, `&` (alignment tab) and `^` (superscript) are illegal syntax tokens. Each occurrence triggers a distinct TeX parser error (`Misplaced alignment tab character &`, `Missing $ inserted`), generating 5 downstream secondary errors for 1 missing package.
+  2. **TeX 79-Column Log Wrapping (`max_print_line`)**:
+     - TeX engines wrap console log output at exactly column 79 without word boundaries.
+     - Because the user's project path on Windows was 63 characters long, error messages were split across newlines:
+       - `! LaTeX Error: Environment align undefined.` became `LaTeX Error:\nEnvironment align undefined.`
+       - `! Misplaced alignment tab character &.` became `Misplaced ali\ngnment tab character &.`
+       - `! Missing $ inserted.` became `Missing $ ins\nerted.`
+     - A single-line regex parser captured only the first segment, truncating the message in the UI.
+  3. **AI-ish Behavior & Emoji Fatigue**:
+     - Developer research across Reddit, Hacker News, and engineering blogs demonstrates intense user fatigue with "AI slop": decorative emoji spam (`⚡`, `✨`, `🚀`), performative cheerleading (*"I'd be happy to help!"*), corporate buzzwords (*"delve"*, *"tapestry"*, *"seamless"*), and presenting walls of generic options instead of solving the root cause.
+- **What was done**:
+  - **79-Column Line Reassembly in `server/compiler.ts`**:
+    - Implemented `extractFullErrorMessage()`: detects continuation lines wrapped at column 79 and stitches multi-line TeX errors back together.
+    - Added translation handler for `Misplaced alignment tab character &`.
+  - **Root vs. Cascade Error Classification in `server/compiler.ts`**:
+    - Implemented `markCascadingErrors()`: identifies secondary errors caused by upstream missing packages or undefined environments and flags them with `isCascading: true` and `cascadingFromLine`.
+  - **Clean, Monochrome UI in `src/components/PDFViewer/PDFViewer.tsx`**:
+    - Stripped all decorative emojis from buttons, error badges, and headers.
+    - Replaced with clean Lucide SVG icons (`Wrench`, `Copy`, `Undo2`, `Info`).
+    - Added `Root Cause` badge on primary errors and `Cascades from Line 15` badge on secondary errors.
+    - Updated diagnostics header: `Compilation Diagnostics (1 root issue, 5 secondary)`.
+    - Fixed path and line wrapping: truncated long file paths (`main.tex`) and added `flex-shrink-0` to line pills.
+  - **Clean Toast Notifications in `src/App.tsx`**:
+    - Stripped emoji prefixes from action toasts (`"Added \usepackage{amsmath} to preamble. Recompiling..."`, `"Compilation succeeded with 0 errors."`).
+  - **Created `AI_STYLE_GUIDE.md` & Updated `ARCHITECTURE.md`**:
+    - Documented anti-slop rules, zero-emoji policy, concise tone guidelines, and TeX parser standards.
+    - Linked `AI_STYLE_GUIDE.md` in `ARCHITECTURE.md` for fast discovery by subsequent agents.
+- **Verification**:
+  - Tested `projects/test/.build/main.log` with `test_real_log.ts`: correctly parsed 1 root error (`LaTeX Error: Environment align undefined.`) and 5 cascading errors, with 0 truncated messages.
+  - Ran `test_quick_fix.ts`: 7/7 tests passed.
+  - `npm run typecheck` (`tsc --noEmit`): passed with 0 errors.
+- **Files changed**:
+  - MODIFIED: `server/compiler.ts`, `server/index.ts`, `src/components/PDFViewer/PDFViewer.tsx`, `src/App.tsx`, `ARCHITECTURE.md`, `PROJECT_LOG.md`
+  - CREATED: `AI_STYLE_GUIDE.md`
+- **Status at end**: Complete and verified.
+
+---
+
+### Session 012 — 2026-09-06 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "I was doing test 5, I had to click many fix but still got error. Tell me what happened then we will go for fix" -> "yes apply these all"
+- **Observations / User Problems**:
+  1. User had to click "Fix" 4 separate times sequentially to resolve missing packages (`xcolor`, `amsmath`, `hyperref`, `booktabs`).
+  2. Even after all 4 packages were injected, the document produced 2 compilation errors: `Missing $ inserted.` on Line 19 (`\begin{bmatrix}`) and Line 22 (`\end{bmatrix}`).
+  3. No 1-click Quick Fix button was available for Line 19.
+- **Root Cause Analysis (RCA)**:
+  1. **Inner Math Environment Semantics**:
+     - Unlike outer display environments (`equation`, `align`), inner math environments (`bmatrix`, `pmatrix`, `vmatrix`, `cases`, `aligned`) do not initiate math mode.
+     - When placed directly in body text, TeX automatically injects a `$` at `\begin{bmatrix}` (Line 19) and another `$` at `\end{bmatrix}` (Line 22) to balance delimiters.
+  2. **Sequential TeX Parsing Bottleneck**:
+     - TeX halts at errors, revealing missing package commands one-by-one sequentially rather than reporting all missing packages upfront across the document.
+- **What was done**:
+  - **In-Place Math Mode Wrapping (`wrap_math_mode`)**:
+    - Extended `detectSuggestedFix` in `server/compiler.ts` to identify `Missing $ inserted.` on inner math environments (`bmatrix`, `pmatrix`, `vmatrix`, `cases`, etc.) and return a `wrap_math_mode` fix: `Wrap in \[ ... \]`.
+    - Enhanced `translateTeXError` to provide targeted advice: *"The \begin{bmatrix} environment must be used inside math mode. Wrap it in display math (\[ ... \]) or \begin{equation}."*
+    - Built `wrapMathEnvironment()` in `src/utils/latexPackages.ts`: accurately locates the un-delimited environment in Monaco editor buffer and wraps it in `\[\n...\n\]` with undo safety.
+  - **Proactive Multi-Package AST Scanner & Batch Injection**:
+    - Created `COMMON_PACKAGE_RULES` and `scanMissingPackages()` in `src/utils/latexPackages.ts` and `server/compiler.ts`.
+    - Scans entire document body for 10+ commonly used LaTeX packages (`amsmath`, `graphicx`, `xcolor`, `booktabs`, `hyperref`, `listings`, `tikz`, `tabularx`, `amssymb`, `siunitx`) that lack preamble declarations.
+    - Added `injectPackagesIntoPreamble()`: batch-injects all missing packages at once, ensuring order integrity (standard packages first, `hyperref` last before `\begin{document}`).
+    - Built **"Add All Missing Packages (N)"** proactive banner in `src/components/PDFViewer/PDFViewer.tsx`: renders above error cards when 2 or more packages are missing, fixing all packages in 1 click.
+  - **Document Restoration**:
+    - Updated `projects/test/main.tex` to wrap `\begin{bmatrix}` in `\[ ... \]`.
+- **Verification**:
+  - `test_batch_fix.ts`: Passed all 4 unit tests (package detection, preamble injection, math wrapping, log parser classification).
+  - `test_compile.ts`: Compiled `projects/test/main.tex` with pdflatex -> **Success: true, Errors: 0**.
+  - `npm run typecheck`: Exited with code 0 (`tsc --noEmit`).
+  - `npm run build`: Built cleanly in 4.54s with 0 errors.
+- **Files changed**:
+  - NEW: `src/utils/latexPackages.ts`
+  - MODIFIED: `server/compiler.ts`, `src/App.tsx`, `src/components/PDFViewer/PDFViewer.tsx`, `projects/test/main.tex`, `PROJECT_LOG.md`
+- **Status at end**: Complete, tested, and verified.
+
+
+
+

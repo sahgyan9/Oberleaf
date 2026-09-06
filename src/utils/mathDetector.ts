@@ -23,7 +23,13 @@ const MATH_ENVS = [
  * Strips LaTeX labels, tags, and comments so KaTeX can render smoothly without throwing errors.
  */
 export function cleanMathForKaTeX(math: string): string {
-  return math
+  // Convert auto-numbering environments to unnumbered starred environments for live preview
+  // so KaTeX does not generate (1), (2) tags that collide with math content in compact tooltips
+  const unnumbered = math
+    .replace(/\\begin\{\s*(align|equation|gather|multline|flalign|alignat)\s*\}/g, '\\begin{$1*}')
+    .replace(/\\end\{\s*(align|equation|gather|multline|flalign|alignat)\s*\}/g, '\\end{$1*}');
+
+  return unnumbered
     .replace(/%.*$/gm, '') // Strip LaTeX comments
     .replace(/\\label\{[^}]*\}/g, '') // Strip \label{...}
     .replace(/\\tag\{[^}]*\}/g, '') // Strip \tag{...}

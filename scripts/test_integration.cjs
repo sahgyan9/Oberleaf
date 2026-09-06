@@ -71,7 +71,7 @@ const assert = require('assert');
   const texContent = `\\documentclass{article}
 \\usepackage{graphicx}
 \\title{Figure Pipeline Verification}
-\\author{Overleaf Copy Test}
+\\author{Oberleaf Test}
 \\date{\\today}
 \\begin{document}
 \\maketitle

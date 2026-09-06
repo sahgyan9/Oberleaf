@@ -4,7 +4,7 @@ import { TopBar, ViewMode, ProjectInfo } from './components/TopBar/TopBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor } from './components/Editor/Editor';
-import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle } from './components/PDFViewer/PDFViewer';
+import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix } from './components/PDFViewer/PDFViewer';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
 import { InsertTableModal } from './components/Modals/InsertTableModal';
@@ -13,13 +13,29 @@ import { UploadProgressModal, UploadFileItem } from './components/Modals/UploadP
 import { NewItemModal } from './components/Modals/NewItemModal';
 import { DependencyDoctor, DependencyItem } from './components/DependencyDoctor/DependencyDoctor';
 import { HistoryDrawer } from './components/History/HistoryDrawer';
+import { GitSyncModal } from './components/GitSync/GitSyncModal';
+import { CommentsDrawer, CommentThread } from './components/Comments/CommentsDrawer';
+import { CollabModal } from './components/Collaboration/CollabModal';
+import { CollabSessionConfig } from './utils/yjsCollab';
 import { InsertCitationModal, CitationItem } from './components/Modals/InsertCitationModal';
 import { ProjectContext } from './utils/latexCompletions';
-import { PanelLeftOpen, FolderClosed } from 'lucide-react';
+import { PanelLeftOpen, FolderClosed, ChevronRight, Loader2 } from 'lucide-react';
 import { ProjectsDashboard } from './components/Dashboard/ProjectsDashboard';
 import { extractLatexTitle, getLatexPdfFilename } from './utils/latexTitle';
 import { useToast, ToastContainer } from './components/Toast/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import {
+  DetectedMissingPackage,
+  scanMissingPackages,
+  injectPackagesIntoPreamble,
+  wrapMathEnvironment,
+} from './utils/latexPackages';
+import {
+  wrapOrToggleFormatting,
+  wrapOrToggleSelection,
+  BOLD_FORMAT,
+  ITALIC_FORMAT,
+} from './utils/editorFormatting';
 
 const DEFAULT_STARTER_DOCUMENT = [
   '\\documentclass{article}',
@@ -106,6 +122,11 @@ export const App: React.FC = () => {
   const [pdfCollapsed, setPdfCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('overleaf-copy:pdf-collapsed') === 'true';
   });
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => !!document.fullscreenElement);
+  const [isZenMode, setIsZenMode] = useState<boolean>(false);
+  const [isTopBarHovered, setIsTopBarHovered] = useState<boolean>(false);
+  const hoverTimeoutRef = useRef<any>(null);
+  const hoverDwellRef = useRef<any>(null);
 
   // Compiler State
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
@@ -114,6 +135,10 @@ export const App: React.FC = () => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [lastValidPdfUrl, setLastValidPdfUrl] = useState<string | null>(null);
   const [compileErrors, setCompileErrors] = useState<CompileErrorItem[]>([]);
+  // 1-Click Quick-Fix & Auto-Remedy State
+  const lastPreFixContentRef = useRef<string | null>(null);
+  const [canUndoFix, setCanUndoFix] = useState<boolean>(false);
+  const [detectedMissingPackages, setDetectedMissingPackages] = useState<DetectedMissingPackage[]>([]);
 
   // Live KaTeX Math State
   const [liveEquation, setLiveEquation] = useState<string | null>(null);
@@ -136,6 +161,22 @@ export const App: React.FC = () => {
   // Phase 3: History & Checkpoints State
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
 
+  // Git Remote Sync & Push/Pull State
+  const [isGitSyncModalOpen, setIsGitSyncModalOpen] = useState<boolean>(false);
+  const [gitSyncStatus, setGitSyncStatus] = useState<{ ahead: number; behind: number; remoteUrl: string | null } | null>(null);
+
+  // Review Comments State
+  const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState<boolean>(false);
+  const [comments, setComments] = useState<CommentThread[]>([]);
+  const [openCommentsCount, setOpenCommentsCount] = useState<number>(0);
+  const [commentCursorLine, setCommentCursorLine] = useState<number>(1);
+  const [commentSelectedText, setCommentSelectedText] = useState<string>('');
+
+  // Real-Time Peer-to-Peer Collaboration State
+  const [isCollabModalOpen, setIsCollabModalOpen] = useState<boolean>(false);
+  const [collabSession, setCollabSession] = useState<CollabSessionConfig | null>(null);
+  const [collabPeersCount, setCollabPeersCount] = useState<number>(0);
+
   // Phase 3: Citations State
   const [citations, setCitations] = useState<CitationItem[]>([]);
   const [isCitationModalOpen, setIsCitationModalOpen] = useState<boolean>(false);
@@ -145,6 +186,7 @@ export const App: React.FC = () => {
   const [isJumpingToPdf, setIsJumpingToPdf] = useState<boolean>(false);
   const [isSyncingBackward, setIsSyncingBackward] = useState<boolean>(false);
   const [highlightLine, setHighlightLine] = useState<{ line: number; timestamp: number } | null>(null);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
 
   // Dependency Doctor State
   const [doctorDeps, setDoctorDeps] = useState<DependencyItem[]>([]);
@@ -215,7 +257,7 @@ export const App: React.FC = () => {
         }
       }
     } catch (err) {
-      console.warn('[Overleaf Copy] Network error loading /api/projects:', err);
+      console.warn('[Oberleaf] Network error loading /api/projects:', err);
       // Try local storage cache
       try {
         const cached = localStorage.getItem('overleaf-copy:cached-projects');
@@ -323,15 +365,77 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // When active project changes, reload files, citations, and main.tex
+  // Fetch Git Sync Status
+  const fetchGitSyncStatus = useCallback(async (pId: string) => {
+    if (!pId) return;
+    try {
+      const res = await fetch(`/api/projects/${pId}/git/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setGitSyncStatus({
+          ahead: data.ahead || 0,
+          behind: data.behind || 0,
+          remoteUrl: data.remoteUrl || null,
+        });
+      }
+    } catch {}
+  }, []);
+
+  // Fetch Review Comments
+  const fetchComments = useCallback(async (pId: string) => {
+    if (!pId) return;
+    try {
+      const res = await fetch(`/api/projects/${pId}/comments`);
+      if (res.ok) {
+        const data: CommentThread[] = await res.json();
+        setComments(data);
+        setOpenCommentsCount(data.filter((t) => t.status === 'open').length);
+      }
+    } catch {}
+  }, []);
+
+  const handleCleanBuild = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/clean`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        addToast(data.message || 'Build cache cleared', 'success');
+      } else {
+        addToast(data.error || 'Failed to clean build cache', 'error');
+      }
+    } catch (e: any) {
+      addToast(`Clean error: ${e.message}`, 'error');
+    }
+  }, [projectId, addToast]);
+
+  // When active project changes, reload files, citations, git status, comments, and main.tex
   useEffect(() => {
     if (!projectId) return;
     localStorage.setItem('overleaf-copy:active-project-id', projectId);
     loadProjectFiles(projectId);
     loadCitations(projectId);
+    fetchGitSyncStatus(projectId);
+    fetchComments(projectId);
     setActiveFilePath('main.tex');
     loadFileContent(projectId, 'main.tex');
-  }, [projectId, loadProjectFiles, loadCitations, loadFileContent]);
+  }, [projectId, loadProjectFiles, loadCitations, loadFileContent, fetchGitSyncStatus, fetchComments]);
+
+  // Check for ?room= URL parameter for instant peer joining
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+    if (room && !collabSession) {
+      const authorName = localStorage.getItem('oberleaf_author_name') || 'Peer Collaborator';
+      setCollabSession({
+        room,
+        name: authorName,
+        color: '#15D8B3',
+        onPeersChange: (count) => setCollabPeersCount(count),
+      });
+      addToast(`Joined live collaboration session: ${room}`, 'success');
+    }
+  }, [addToast, collabSession]);
 
   // SyncTeX Forward (Cursor Position / Visible Line -> PDF Page & Coordinates)
   const handleJumpToPdf = useCallback(
@@ -541,6 +645,7 @@ export const App: React.FC = () => {
     setIsCompiling(true);
     setCompileStatus('compiling');
     setCompileErrors([]);
+    setDetectedMissingPackages([]);
 
     try {
       // Flush any pending save first, using the editor's live buffer
@@ -565,6 +670,18 @@ export const App: React.FC = () => {
         // alongside the updated preview rather than hiding the output.
         const errors = result.errors || [];
         setCompileErrors(errors);
+
+        if (errors.length > 0) {
+          setDetectedMissingPackages(result.detectedMissingPackages || scanMissingPackages(getLiveContent()));
+        } else {
+          setDetectedMissingPackages([]);
+        }
+
+        if (errors.length === 0 && lastPreFixContentRef.current) {
+          addToast('Compilation succeeded with 0 errors.', 'success');
+          setCanUndoFix(false);
+          lastPreFixContentRef.current = null;
+        }
 
         if (result.pdfUrl) {
           const freshPdfUrl = `${result.pdfUrl}&t=${Date.now()}`;
@@ -599,6 +716,157 @@ export const App: React.FC = () => {
     } finally {
       setIsCompiling(false);
     }
+  };
+
+  // 1-Click Intelligent Quick-Fix Handler
+  const handleApplyFix = async (fix: SuggestedFix) => {
+    if (fix.type === 'add_preamble') {
+      const currentLiveContent = getLiveContent();
+
+      // Check if package is already declared in preamble
+      const pkgRegex = new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${fix.packageName}\\}`, 'i');
+      if (pkgRegex.test(currentLiveContent)) {
+        addToast(`\\usepackage{${fix.packageName}} is already in your document preamble!`, 'warning');
+        return;
+      }
+
+      // Record snapshot for 1-click rollback
+      lastPreFixContentRef.current = currentLiveContent;
+      setCanUndoFix(true);
+
+      let updatedContent = currentLiveContent;
+      const docClassMatch = updatedContent.match(/(\\documentclass(?:\[.*?\])?\{.*?\})/);
+      const usePackageMatches = [...updatedContent.matchAll(/\\usepackage(?:\[.*?\])?\{.*?\}/g)];
+
+      if (fix.packageName === 'hyperref') {
+        // hyperref should be placed towards the end of the package block before \begin{document}
+        const beginDocMatch = updatedContent.match(/\\begin\{document\}/);
+        if (beginDocMatch && beginDocMatch.index !== undefined) {
+          const insertPos = beginDocMatch.index;
+          updatedContent = updatedContent.slice(0, insertPos) + `${fix.codeSnippet}\n\n` + updatedContent.slice(insertPos);
+        } else if (usePackageMatches.length > 0) {
+          const lastPkg = usePackageMatches[usePackageMatches.length - 1];
+          const insertPos = lastPkg.index! + lastPkg[0].length;
+          updatedContent = updatedContent.slice(0, insertPos) + `\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
+        } else if (docClassMatch && docClassMatch.index !== undefined) {
+          const insertPos = docClassMatch.index + docClassMatch[0].length;
+          updatedContent = updatedContent.slice(0, insertPos) + `\n\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
+        } else {
+          updatedContent = `${fix.codeSnippet}\n${updatedContent}`;
+        }
+      } else {
+        // Standard package: append after the last \usepackage or after \documentclass
+        if (usePackageMatches.length > 0) {
+          const lastPkg = usePackageMatches[usePackageMatches.length - 1];
+          const insertPos = lastPkg.index! + lastPkg[0].length;
+          updatedContent = updatedContent.slice(0, insertPos) + `\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
+        } else if (docClassMatch && docClassMatch.index !== undefined) {
+          const insertPos = docClassMatch.index + docClassMatch[0].length;
+          updatedContent = updatedContent.slice(0, insertPos) + `\n\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
+        } else {
+          updatedContent = `${fix.codeSnippet}\n${updatedContent}`;
+        }
+      }
+
+      // Update Monaco editor buffer and React state
+      if (monacoEditorRef.current) {
+        monacoEditorRef.current.setValue(updatedContent);
+      }
+      setEditorContent(updatedContent);
+      await saveActiveFile(updatedContent);
+
+      addToast(`Added ${fix.codeSnippet} to preamble. Recompiling...`, 'info');
+
+      // Trigger recompile
+      setTimeout(() => {
+        handleCompile();
+      }, 50);
+    } else if (fix.type === 'install_package') {
+      addToast(`Installing '${fix.packageName}' package via TeX distribution...`, 'info');
+      try {
+        const res = await fetch(`/api/projects/${projectId}/packages/install`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packageName: fix.packageName }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          addToast(`${data.message} Recompiling...`, 'success');
+          setTimeout(() => {
+            handleCompile();
+          }, 100);
+        } else {
+          addToast(`Failed to install package: ${data.error || 'Unknown error'}`, 'error');
+        }
+      } catch (err: any) {
+        addToast(`Install request failed: ${err.message}`, 'error');
+      }
+    } else if (fix.type === 'wrap_math_mode') {
+      const currentLiveContent = getLiveContent();
+      lastPreFixContentRef.current = currentLiveContent;
+      setCanUndoFix(true);
+
+      const envName = fix.targetEnvironment || 'bmatrix';
+      const updatedContent = wrapMathEnvironment(currentLiveContent, fix.line || 0, envName);
+
+      if (updatedContent !== currentLiveContent) {
+        if (monacoEditorRef.current) {
+          monacoEditorRef.current.setValue(updatedContent);
+        }
+        setEditorContent(updatedContent);
+        await saveActiveFile(updatedContent);
+
+        addToast(`Wrapped \\begin{${envName}} in display math mode (\\[ ... \\]). Recompiling...`, 'info');
+        setTimeout(() => {
+          handleCompile();
+        }, 50);
+      } else {
+        addToast(`Could not locate \\begin{${envName}} around line ${fix.line || 1} to wrap.`, 'warning');
+      }
+    }
+  };
+
+  // 1-Click Proactive Batch Fix: Injects all detected missing packages into preamble
+  const handleApplyBatchFix = async (pkgs: DetectedMissingPackage[]) => {
+    if (!pkgs || pkgs.length === 0) return;
+
+    const currentLiveContent = getLiveContent();
+    lastPreFixContentRef.current = currentLiveContent;
+    setCanUndoFix(true);
+
+    const updatedContent = injectPackagesIntoPreamble(currentLiveContent, pkgs);
+
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.setValue(updatedContent);
+    }
+    setEditorContent(updatedContent);
+    await saveActiveFile(updatedContent);
+
+    const names = pkgs.map((p) => `\\usepackage{${p.packageName}}`).join(', ');
+    addToast(`Added ${names} to preamble. Recompiling...`, 'info');
+
+    setTimeout(() => {
+      handleCompile();
+    }, 50);
+  };
+
+  // 1-Click Rollback Handler
+  const handleUndoFix = async () => {
+    if (!lastPreFixContentRef.current) return;
+    const reverted = lastPreFixContentRef.current;
+    lastPreFixContentRef.current = null;
+    setCanUndoFix(false);
+
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.setValue(reverted);
+    }
+    setEditorContent(reverted);
+    await saveActiveFile(reverted);
+
+    addToast('Reverted previous automatic change. Recompiling...', 'info');
+    setTimeout(() => {
+      handleCompile();
+    }, 50);
   };
 
   // Insert snippet helper into Monaco editor
@@ -637,37 +905,29 @@ export const App: React.FC = () => {
     }
   };
 
-  // Wrap the current selection in a LaTeX command rather than replacing it.
-  // Selecting a word and clicking Bold used to overwrite it with the literal
-  // snippet "\textbf{text}", destroying what the user had selected.
-  const handleWrapSelection = (prefix: string, suffix: string, placeholder: string) => {
+  const handleBold = useCallback(() => {
+    const editor = monacoEditorRef.current;
+    if (editor) {
+      wrapOrToggleFormatting(editor, BOLD_FORMAT);
+    }
+  }, []);
+
+  const handleItalic = useCallback(() => {
+    const editor = monacoEditorRef.current;
+    if (editor) {
+      wrapOrToggleFormatting(editor, ITALIC_FORMAT);
+    }
+  }, []);
+
+  // Wrap or toggle the current selection in a LaTeX command with smart unwrapping and undo support
+  const handleWrapSelection = useCallback((prefix: string, suffix: string, placeholder: string) => {
     const editor = monacoEditorRef.current;
     if (!editor) {
       setEditorContent((prev) => `${prev}\n${prefix}${placeholder}${suffix}`);
       return;
     }
-
-    const selection = editor.getSelection();
-    const model = editor.getModel();
-    const selected = selection && model ? model.getValueInRange(selection) : '';
-    const inner = selected && selected.length > 0 ? selected : placeholder;
-
-    editor.executeEdits('wrap-selection', [
-      { range: selection, text: `${prefix}${inner}${suffix}`, forceMoveMarkers: true },
-    ]);
-
-    // With no selection, leave the placeholder highlighted so it can be typed over
-    if (!selected && selection) {
-      const start = selection.getStartPosition();
-      editor.setSelection({
-        startLineNumber: start.lineNumber,
-        startColumn: start.column + prefix.length,
-        endLineNumber: start.lineNumber,
-        endColumn: start.column + prefix.length + inner.length,
-      });
-    }
-    editor.focus();
-  };
+    wrapOrToggleSelection(editor, prefix, suffix, placeholder);
+  }, []);
 
   // Multi-File Upload Pipeline
   const handleUploadFiles = (selectedFiles: File[]) => {
@@ -878,6 +1138,98 @@ export const App: React.FC = () => {
     [viewMode, handleSyncTexBackward, handleJumpToPdf]
   );
 
+  // Fullscreen & Zen Mode Handlers
+  const handleToggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+        setIsZenMode(true);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+        setIsZenMode(false);
+      }
+    } catch {
+      // In case native fullscreen is restricted by browser security policies,
+      // still toggle Zen mode for maximum in-window writing canvas
+      setIsZenMode((prev) => !prev);
+    }
+  }, []);
+
+  const handleExitZenMode = useCallback(async () => {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // ignore
+      }
+    }
+    setIsZenMode(false);
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (active) {
+        setIsZenMode(true);
+      } else {
+        setIsZenMode(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const handleTopBarMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (hoverDwellRef.current) {
+      clearTimeout(hoverDwellRef.current);
+      hoverDwellRef.current = null;
+    }
+    setIsTopBarHovered(true);
+  }, []);
+
+  const handleSensorMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (!hoverDwellRef.current) {
+      hoverDwellRef.current = setTimeout(() => {
+        setIsTopBarHovered(true);
+        hoverDwellRef.current = null;
+      }, 100);
+    }
+  }, []);
+
+  const handleSensorMouseLeave = useCallback(() => {
+    if (hoverDwellRef.current) {
+      clearTimeout(hoverDwellRef.current);
+      hoverDwellRef.current = null;
+    }
+  }, []);
+
+  const handleTopBarMouseLeave = useCallback(() => {
+    if (hoverDwellRef.current) {
+      clearTimeout(hoverDwellRef.current);
+      hoverDwellRef.current = null;
+    }
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsTopBarHovered(false);
+    }, 250);
+  }, []);
+
   // Global Keyboard Shortcuts
   useKeyboardShortcuts({
     viewMode,
@@ -886,40 +1238,113 @@ export const App: React.FC = () => {
     setFileTreeCollapsed,
     saveActiveFile,
     getLiveContent,
+    onToggleFitWidth: () => {
+      if (currentView === 'editor' && !pdfCollapsed) {
+        pdfViewerRef.current?.toggleFitWidth?.();
+      }
+    },
+    onToggleFullscreen: handleToggleFullscreen,
+    isZenMode,
+    onExitZenMode: handleExitZenMode,
+    onBold: handleBold,
+    onItalic: handleItalic,
   });
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-surface-light dark:bg-surface-dark text-slate-900 dark:text-white">
       {currentView === 'dashboard' ? (
-        <ProjectsDashboard
-          projects={projects}
-          onSelectProject={handleOpenProject}
-          onNewProject={() => setIsNewProjectModalOpen(true)}
-          onRefreshProjects={loadProjects}
-          onOpenDoctor={() => setIsDoctorOpen(true)}
-          isDoctorHealthy={isDoctorHealthy}
-        />
-      ) : (
-        <div className="flex flex-col h-full w-full overflow-hidden">
-          {/* Top Header Bar */}
-          <TopBar
-            projectName={projectName}
-            projectId={projectId}
+        <div className="h-full w-full overflow-y-auto">
+          <ProjectsDashboard
             projects={projects}
             onSelectProject={handleOpenProject}
             onNewProject={() => setIsNewProjectModalOpen(true)}
-            onBackToProjects={handleBackToProjects}
-            onCompile={handleCompile}
-            isCompiling={isCompiling}
-            compileDuration={compileDuration}
-            viewMode={viewMode}
-            onViewModeChange={handleViewModeChange}
-            onOpenHistory={() => setIsHistoryOpen(true)}
+            onRefreshProjects={loadProjects}
             onOpenDoctor={() => setIsDoctorOpen(true)}
             isDoctorHealthy={isDoctorHealthy}
-            activeFilePath={activeFilePath}
-            saveStatus={saveStatus}
           />
+        </div>
+      ) : (
+        <div className="flex flex-col h-full w-full overflow-hidden relative">
+          {/* Top Header Bar */}
+          {isZenMode ? (
+            <div
+              className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
+              onMouseEnter={handleTopBarMouseEnter}
+              onMouseLeave={handleTopBarMouseLeave}
+            >
+              {/* Top hover sensor zone (slim 4px strip at the absolute top ceiling) */}
+              <div
+                className="h-1 w-full absolute top-0 left-0 pointer-events-auto cursor-pointer"
+                onMouseEnter={handleSensorMouseEnter}
+                onMouseLeave={handleSensorMouseLeave}
+              />
+
+              {/* Sliding TopBar Container */}
+              <div
+                className={`transform transition-transform duration-200 ease-out shadow-lg pointer-events-auto ${
+                  isTopBarHovered ? 'translate-y-0' : '-translate-y-full'
+                }`}
+              >
+                <TopBar
+                  projectName={projectName}
+                  projectId={projectId}
+                  projects={projects}
+                  onSelectProject={handleOpenProject}
+                  onNewProject={() => setIsNewProjectModalOpen(true)}
+                  onBackToProjects={handleBackToProjects}
+                  onCompile={handleCompile}
+                  isCompiling={isCompiling}
+                  compileDuration={compileDuration}
+                  viewMode={viewMode}
+                  onViewModeChange={handleViewModeChange}
+                  onOpenHistory={() => setIsHistoryOpen(true)}
+                  onOpenDoctor={() => setIsDoctorOpen(true)}
+                  isDoctorHealthy={isDoctorHealthy}
+                  activeFilePath={activeFilePath}
+                  saveStatus={saveStatus}
+                  isFullscreen={isFullscreen || isZenMode}
+                  onToggleFullscreen={handleToggleFullscreen}
+                  onOpenSyncModal={() => setIsGitSyncModalOpen(true)}
+                  gitSyncStatus={gitSyncStatus}
+                  onOpenComments={() => setIsCommentsDrawerOpen(true)}
+                  openCommentsCount={openCommentsCount}
+                  onOpenCollab={() => setIsCollabModalOpen(true)}
+                  isCollabActive={!!collabSession}
+                  collabPeersCount={collabPeersCount}
+                  onCleanBuild={handleCleanBuild}
+                />
+              </div>
+            </div>
+          ) : (
+            <TopBar
+              projectName={projectName}
+              projectId={projectId}
+              projects={projects}
+              onSelectProject={handleOpenProject}
+              onNewProject={() => setIsNewProjectModalOpen(true)}
+              onBackToProjects={handleBackToProjects}
+              onCompile={handleCompile}
+              isCompiling={isCompiling}
+              compileDuration={compileDuration}
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+              onOpenHistory={() => setIsHistoryOpen(true)}
+              onOpenDoctor={() => setIsDoctorOpen(true)}
+              isDoctorHealthy={isDoctorHealthy}
+              activeFilePath={activeFilePath}
+              saveStatus={saveStatus}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+              onOpenSyncModal={() => setIsGitSyncModalOpen(true)}
+              gitSyncStatus={gitSyncStatus}
+              onOpenComments={() => setIsCommentsDrawerOpen(true)}
+              openCommentsCount={openCommentsCount}
+              onOpenCollab={() => setIsCollabModalOpen(true)}
+              isCollabActive={!!collabSession}
+              collabPeersCount={collabPeersCount}
+              onCleanBuild={handleCleanBuild}
+            />
+          )}
 
           {/* Main Workspace Body: Resizable 3-Panel Layout */}
           <div className="flex-1 flex overflow-hidden relative">
@@ -939,6 +1364,11 @@ export const App: React.FC = () => {
           </div>
         )}
 
+        {/* Full-screen transparent overlay during panel dragging to prevent Monaco/PDF text selection and dropped mouse events */}
+        {isResizing && (
+          <div className="fixed inset-0 z-50 cursor-col-resize select-none pointer-events-auto bg-transparent" />
+        )}
+
         <PanelGroup
           direction="horizontal"
           autoSaveId="overleaf-copy-layout-v3"
@@ -954,9 +1384,7 @@ export const App: React.FC = () => {
                 defaultSize={18}
                 minSize={12}
                 maxSize={35}
-                collapsible={true}
-                onCollapse={() => setFileTreeCollapsed(true)}
-                onExpand={() => setFileTreeCollapsed(false)}
+                collapsible={false}
                 className="h-full"
               >
                 <FileTree
@@ -974,7 +1402,11 @@ export const App: React.FC = () => {
               </Panel>
 
               {/* Resize Handle between FileTree and Editor */}
-              <PanelResizeHandle className="w-1.5 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group">
+              <PanelResizeHandle
+                hitAreaMargins={{ coarse: 20, fine: 12 }}
+                onDragging={setIsResizing}
+                className="w-1.5 hover:w-2 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-all cursor-col-resize z-20 relative group before:content-[''] before:absolute before:inset-y-0 before:-left-2.5 before:-right-2.5 before:z-30"
+              >
                 <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
               </PanelResizeHandle>
             </>
@@ -986,7 +1418,7 @@ export const App: React.FC = () => {
               id="editor-panel"
               order={2}
               defaultSize={viewMode === 'code' || pdfCollapsed ? 82 : 42}
-              minSize={25}
+              minSize={20}
               className="h-full flex flex-col overflow-hidden"
             >
               <EditorToolbar
@@ -1017,25 +1449,63 @@ export const App: React.FC = () => {
                   onEquationChange={(eq, pos, isDisplay) => {
                     if (!isLiveMathEnabled) {
                       setLiveEquation(null);
-                      return;
+                    } else {
+                      setLiveEquation(eq);
+                      setLiveEquationPos(pos);
+                      setLiveEquationDisplay(isDisplay ?? true);
                     }
-                    setLiveEquation(eq);
-                    setLiveEquationPos(pos);
-                    setLiveEquationDisplay(isDisplay ?? true);
                   }}
                   editorRefOut={monacoEditorRef}
                   getProjectContext={getProjectContext}
                   onJumpToPdf={handleJumpToPdf}
                   highlightLine={highlightLine}
+                  commentLines={comments
+                    .filter((c) => c.file === activeFilePath && c.status === 'open')
+                    .map((c) => c.line)}
+                  onOpenCommentAtCursor={(line, selectedText) => {
+                    setCommentCursorLine(line);
+                    setCommentSelectedText(selectedText);
+                    setIsCommentsDrawerOpen(true);
+                  }}
+                  collabSession={collabSession}
                 />
               </div>
             </Panel>
           )}
 
-          {/* Resize Handle between Editor and PDF */}
+          {/* Resize Handle between Editor and PDF with Overleaf-style SyncTeX divider pill */}
           {viewMode === 'split' && !pdfCollapsed && (
-            <PanelResizeHandle className="w-1.5 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group">
-              <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
+            <PanelResizeHandle
+              hitAreaMargins={{ coarse: 24, fine: 14 }}
+              onDragging={setIsResizing}
+              className="w-1.5 hover:w-2 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-all cursor-col-resize z-20 relative group before:content-[''] before:absolute before:inset-y-0 before:-left-2.5 before:-right-2.5 before:z-30"
+            >
+              {/* Overleaf-Style Divider Control Pill */}
+              <div className="absolute top-1/2 -translate-y-1/2 -left-3.5 z-40 flex flex-col items-center select-none">
+                <div className="flex flex-col items-center bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-full shadow-md py-1 px-0.5 space-y-1 transition-all group-hover:border-scholarly dark:group-hover:border-scholarly-dark group-hover:shadow-lg">
+                  {/* Jump to PDF button (SyncTeX Forward) */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleJumpToPdf();
+                    }}
+                    title="Jump to Cursor in PDF (SyncTeX: Ctrl+Alt+J)"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-scholarly/10 dark:hover:bg-scholarly-dark/15 transition btn-tactile"
+                  >
+                    {isJumpingToPdf ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly dark:text-scholarly-dark" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300 group-hover:text-scholarly dark:group-hover:text-scholarly-dark" />
+                    )}
+                  </button>
+
+                  {/* Tactile Grab Indicator */}
+                  <div className="w-1 h-3 rounded-full bg-stone-300 dark:bg-stone-600 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark transition-colors" />
+                </div>
+              </div>
             </PanelResizeHandle>
           )}
 
@@ -1046,10 +1516,8 @@ export const App: React.FC = () => {
               id="pdf-panel"
               order={3}
               defaultSize={viewMode === 'pdf' ? 100 : 40}
-              minSize={20}
-              collapsible={true}
-              onCollapse={() => setPdfCollapsed(true)}
-              onExpand={() => setPdfCollapsed(false)}
+              minSize={18}
+              collapsible={false}
               className="h-full overflow-hidden"
             >
               <PDFViewer
@@ -1059,6 +1527,11 @@ export const App: React.FC = () => {
                 compileDuration={compileDuration}
                 compileStatus={compileStatus}
                 compileErrors={compileErrors}
+                onApplyFix={handleApplyFix}
+                onUndoFix={handleUndoFix}
+                canUndoFix={canUndoFix}
+                detectedMissingPackages={detectedMissingPackages}
+                onApplyBatchFix={handleApplyBatchFix}
                 onSelectErrorLine={(line) => {
                   if (monacoEditorRef.current) {
                     monacoEditorRef.current.revealLineInCenter(line);
@@ -1182,6 +1655,60 @@ export const App: React.FC = () => {
         projectId={projectId}
         activeFilePath={activeFilePath}
         onRevertSuccess={handleRevertSuccess}
+        onOpenSyncModal={() => setIsGitSyncModalOpen(true)}
+      />
+
+      {/* Git Remote Sync Modal */}
+      <GitSyncModal
+        isOpen={isGitSyncModalOpen}
+        onClose={() => setIsGitSyncModalOpen(false)}
+        projectId={projectId}
+        onSyncSuccess={() => fetchGitSyncStatus(projectId)}
+      />
+
+      {/* Review Comments Drawer */}
+      <CommentsDrawer
+        isOpen={isCommentsDrawerOpen}
+        onClose={() => setIsCommentsDrawerOpen(false)}
+        projectId={projectId}
+        activeFilePath={activeFilePath}
+        cursorLine={commentCursorLine}
+        selectedText={commentSelectedText}
+        onJumpToLine={(file, line) => {
+          if (file !== activeFilePath) {
+            handleSelectFile(file);
+          }
+          setHighlightLine({ line, timestamp: Date.now() });
+        }}
+        onCommentsUpdated={(count) => {
+          setOpenCommentsCount(count);
+          fetchComments(projectId);
+        }}
+      />
+
+      {/* Real-Time Peer-to-Peer Collaboration Modal */}
+      <CollabModal
+        isOpen={isCollabModalOpen}
+        onClose={() => setIsCollabModalOpen(false)}
+        roomCode={collabSession?.room || ''}
+        isCollabActive={!!collabSession}
+        onStartCollab={(room, name, color) => {
+          setCollabSession({
+            room,
+            name,
+            color,
+            onPeersChange: (count) => setCollabPeersCount(count),
+          });
+          setIsCollabModalOpen(false);
+          addToast(`Live collaboration started in room: ${room}`, 'success');
+        }}
+        onStopCollab={() => {
+          setCollabSession(null);
+          setCollabPeersCount(0);
+          setIsCollabModalOpen(false);
+          addToast('Left live collaboration session.', 'info');
+        }}
+        connectedPeersCount={collabPeersCount}
       />
 
       {/* Insert Citation Modal */}

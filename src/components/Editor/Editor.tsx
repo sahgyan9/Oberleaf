@@ -4,6 +4,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { extractMathAtPosition } from '../../utils/mathDetector';
 import { registerLatexCompletions, ProjectContext } from '../../utils/latexCompletions';
 import { registerLatexLanguage } from '../../utils/latexLanguage';
+import { setupMonacoCollab, CollabSessionConfig } from '../../utils/yjsCollab';
+import { wrapOrToggleFormatting, BOLD_FORMAT, ITALIC_FORMAT } from '../../utils/editorFormatting';
 
 interface EditorProps {
   content: string;
@@ -14,6 +16,9 @@ interface EditorProps {
   getProjectContext?: () => ProjectContext;
   onJumpToPdf?: () => void;
   highlightLine?: { line: number; timestamp: number } | null;
+  commentLines?: number[];
+  onOpenCommentAtCursor?: (line: number, selectedText: string) => void;
+  collabSession?: CollabSessionConfig | null;
 }
 
 // Module-level cache to restore cursor & scroll when editor unmounts/remounts across view modes
@@ -28,22 +33,28 @@ export const Editor: React.FC<EditorProps> = ({
   getProjectContext,
   onJumpToPdf,
   highlightLine,
+  commentLines,
+  onOpenCommentAtCursor,
+  collabSession,
 }) => {
   const { theme } = useTheme();
   const editorInstance = useRef<any>(null);
   const monacoInstance = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
+  const commentDecorationsRef = useRef<string[]>([]);
 
   const onCompileRef = useRef(onCompile);
   const onJumpToPdfRef = useRef(onJumpToPdf);
   const onEquationChangeRef = useRef(onEquationChange);
   const getProjectContextRef = useRef(getProjectContext);
+  const onOpenCommentAtCursorRef = useRef(onOpenCommentAtCursor);
 
   useEffect(() => {
     onCompileRef.current = onCompile;
     onJumpToPdfRef.current = onJumpToPdf;
     onEquationChangeRef.current = onEquationChange;
     getProjectContextRef.current = getProjectContext;
+    onOpenCommentAtCursorRef.current = onOpenCommentAtCursor;
   });
 
   // Dynamically sync Monaco theme when user toggles light/dark mode
@@ -52,6 +63,39 @@ export const Editor: React.FC<EditorProps> = ({
       monacoInstance.current.editor.setTheme(theme === 'dark' ? 'scholarlyDark' : 'scholarlyLight');
     }
   }, [theme]);
+
+  // Comment Lines Highlight
+  useEffect(() => {
+    if (!editorInstance.current || !monacoInstance.current) return;
+    const editor = editorInstance.current;
+    const monaco = monacoInstance.current;
+
+    if (!commentLines || commentLines.length === 0) {
+      commentDecorationsRef.current = editor.deltaDecorations(commentDecorationsRef.current, []);
+      return;
+    }
+
+    const newDecs = commentLines.map((line) => ({
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        isWholeLine: true,
+        className: 'comment-highlight-line',
+        overviewRuler: {
+          color: '#49A4BB',
+          position: monaco.editor.OverviewRulerLane.Right,
+        },
+      },
+    }));
+
+    commentDecorationsRef.current = editor.deltaDecorations(commentDecorationsRef.current, newDecs);
+  }, [commentLines]);
+
+  // Yjs Real-Time Collaboration
+  useEffect(() => {
+    if (!collabSession || !editorInstance.current || !monacoInstance.current) return;
+    const cleanup = setupMonacoCollab(editorInstance.current, monacoInstance.current, collabSession);
+    return cleanup;
+  }, [collabSession]);
 
   // SyncTeX Jump Target: Smooth scroll and pulse line highlight
   useEffect(() => {
@@ -175,6 +219,46 @@ export const Editor: React.FC<EditorProps> = ({
       onJumpToPdfRef.current?.();
     });
 
+    // Add Keybinding & Context Menu: Ctrl+B / Cmd+B for Bold (\textbf)
+    editor.addAction({
+      id: 'latex-bold',
+      label: 'Bold (\\textbf)',
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 1.1,
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB],
+      run: (ed: any) => {
+        wrapOrToggleFormatting(ed, BOLD_FORMAT);
+      },
+    });
+
+    // Add Keybinding & Context Menu: Ctrl+I / Cmd+I for Italic (\textit)
+    editor.addAction({
+      id: 'latex-italic',
+      label: 'Italic (\\textit)',
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 1.2,
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI],
+      run: (ed: any) => {
+        wrapOrToggleFormatting(ed, ITALIC_FORMAT);
+      },
+    });
+
+    // Add Keybinding & Context Menu: Alt+M to Add Review Comment
+    editor.addAction({
+      id: 'add-review-comment',
+      label: 'Add Review Comment (Alt+M)',
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.5,
+      keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.KeyM],
+      run: (ed: any) => {
+        const selection = ed.getSelection();
+        const model = ed.getModel();
+        const selectedText = model && selection ? model.getValueInRange(selection) : '';
+        const line = selection ? selection.startLineNumber : ed.getPosition()?.lineNumber || 1;
+        onOpenCommentAtCursorRef.current?.(line, selectedText);
+      },
+    });
+
     // Immediate positioning: if a target line was requested (e.g. view mode switch to split mode)
     // reveal it immediately on mount. Otherwise restore the cached editor view state.
     if (highlightLine?.line) {
@@ -206,12 +290,14 @@ export const Editor: React.FC<EditorProps> = ({
       }
     }
 
-    // Detect cursor math context accurately
-    editor.onDidChangeCursorPosition((e) => {
+    // Detect cursor math context accurately and clamp preview within editor panel
+    const updateMathPreview = (pos?: any) => {
       const model = editor.getModel();
       if (!model) return;
 
-      const position = e.position;
+      const position = pos || editor.getPosition();
+      if (!position) return;
+
       const text = model.getValue();
       const offset = model.getOffsetAt(position);
 
@@ -219,12 +305,34 @@ export const Editor: React.FC<EditorProps> = ({
 
       if (mathCtx) {
         const coords = editor.getScrolledVisiblePosition(position);
-        if (coords) {
+        const domNode = editor.getDomNode();
+        if (coords && domNode) {
+          const editorRect = domNode.getBoundingClientRect();
+          const cursorScreenX = editorRect.left + coords.left;
+          const cursorScreenY = editorRect.top + coords.top;
+          const cardWidth = 380;
+
+          // Clamp horizontally inside the editor panel so preview never bleeds into PDF pane
+          const minLeft = editorRect.left + 16;
+          const maxLeft = Math.max(minLeft, editorRect.right - cardWidth - 16);
+          const safeLeft = Math.min(Math.max(cursorScreenX, minLeft), maxLeft);
+
+          // Position below the line by default, or flip above if near bottom of editor
+          const lineHeight = coords.height || 22;
+          const previewHeightEst = 130;
+          let safeTop = cursorScreenY + lineHeight + 8;
+          if (safeTop + previewHeightEst > editorRect.bottom - 16) {
+            const aboveTop = cursorScreenY - previewHeightEst - 8;
+            if (aboveTop >= editorRect.top + 8) {
+              safeTop = aboveTop;
+            }
+          }
+
           onEquationChangeRef.current(
             mathCtx.math,
             {
-              top: coords.top + 70,
-              left: Math.min(coords.left + 260, window.innerWidth - 320),
+              top: safeTop,
+              left: safeLeft,
             },
             mathCtx.displayMode
           );
@@ -233,6 +341,14 @@ export const Editor: React.FC<EditorProps> = ({
       }
 
       onEquationChangeRef.current(null);
+    };
+
+    editor.onDidChangeCursorPosition((e) => {
+      updateMathPreview(e.position);
+    });
+
+    editor.onDidChangeModelContent(() => {
+      updateMathPreview();
     });
   };
 
@@ -255,6 +371,11 @@ export const Editor: React.FC<EditorProps> = ({
           fontSize: 14,
           fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
           lineNumbers: 'on',
+          lineNumbersMinChars: 3,
+          glyphMargin: false,
+          folding: true,
+          showFoldingControls: 'mouseover',
+          lineDecorationsWidth: 4,
           minimap: { enabled: false },
           wordWrap: 'on',
           automaticLayout: true,
@@ -262,7 +383,23 @@ export const Editor: React.FC<EditorProps> = ({
           tabSize: 2,
           padding: { top: 12, bottom: 12 },
           smoothScrolling: true,
-          wordBasedSuggestions: 'off',
+          tabCompletion: 'on',
+          wordBasedSuggestions: 'currentDocument',
+          quickSuggestions: {
+            other: 'on',
+            comments: 'off',
+            strings: 'on',
+          },
+          suggest: {
+            preview: true,
+            previewMode: 'subwordSmart',
+            showWords: true,
+            insertMode: 'replace',
+          },
+          inlineSuggest: {
+            enabled: true,
+            mode: 'subwordSmart',
+          },
         }}
       />
     </div>

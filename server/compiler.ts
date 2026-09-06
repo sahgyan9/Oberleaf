@@ -3,11 +3,31 @@ import path from 'path';
 import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 
+export interface SuggestedFix {
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode';
+  packageName?: string;
+  codeSnippet: string;
+  label: string;
+  description: string;
+  line?: number;
+  targetEnvironment?: string;
+}
+
+export interface DetectedMissingPackage {
+  packageName: string;
+  codeSnippet: string;
+  label: string;
+  description: string;
+}
+
 export interface CompileError {
   file: string;
   line: number;
   message: string;
   friendlyExplanation?: string;
+  suggestedFix?: SuggestedFix;
+  isCascading?: boolean;
+  cascadingFromLine?: number;
   raw: string;
 }
 
@@ -20,6 +40,7 @@ export interface CompileResult {
   rawLog: string;
   documentTitle?: string;
   pdfDownloadFilename?: string;
+  detectedMissingPackages?: DetectedMissingPackage[];
 }
 
 // Don Norman Error Translator: maps cryptic TeX errors to helpful human advice
@@ -72,6 +93,10 @@ function translateTeXError(rawText: string): string {
     return 'Typo or unrecognized command. Check the command name right after the line number.';
   }
   if (raw.includes('Missing $ inserted')) {
+    const mathEnvMatch = raw.match(/\\begin\{(bmatrix|pmatrix|vmatrix|Vmatrix|Bmatrix|matrix|cases|aligned|gathered|split)\}/i);
+    if (mathEnvMatch) {
+      return `The \\begin{${mathEnvMatch[1]}} environment must be used inside math mode. Wrap it in display math (\\[ ... \\]) or \\begin{equation}.`;
+    }
     return 'Mathematical symbol used outside of a math environment. Wrap the formula in $...$ or \\begin{equation}.';
   }
   if (raw.includes('Emergency stop')) {
@@ -81,6 +106,378 @@ function translateTeXError(rawText: string): string {
     return "Unclosed bracket '{' or parenthesis. A command didn't find its closing delimiter.";
   }
   return 'Review the line indicated for syntax errors.';
+}
+
+export const COMMON_PACKAGE_RULES: Array<{
+  packageName: string;
+  codeSnippet: string;
+  pattern: RegExp;
+  description: string;
+}> = [
+  {
+    packageName: 'amsmath',
+    codeSnippet: '\\usepackage{amsmath}',
+    pattern: /\\begin\{(align\*?|gather\*?|multline\*?|bmatrix|pmatrix|vmatrix|Vmatrix|Bmatrix|aligned|gathered)\}|\\(eqref|DeclareMathOperator|substack)\b/,
+    description: 'Provides advanced math environments, matrix notation, and \\eqref references.',
+  },
+  {
+    packageName: 'graphicx',
+    codeSnippet: '\\usepackage{graphicx}',
+    pattern: /\\includegraphics\b/,
+    description: 'Enables embedding figures and scaling graphics.',
+  },
+  {
+    packageName: 'xcolor',
+    codeSnippet: '\\usepackage{xcolor}',
+    pattern: /\\(textcolor|definecolor|colorlet|pagecolor)\b|\\color\{/,
+    description: 'Provides text and background color commands.',
+  },
+  {
+    packageName: 'booktabs',
+    codeSnippet: '\\usepackage{booktabs}',
+    pattern: /\\(toprule|midrule|bottomrule|cmidrule)\b/,
+    description: 'High-quality table rules (\\toprule, \\midrule, \\bottomrule).',
+  },
+  {
+    packageName: 'hyperref',
+    codeSnippet: '\\usepackage{hyperref}',
+    pattern: /\\(href|url|hypersetup|autoref)\b/,
+    description: 'Clickable hyperlinks, URLs, and cross-references.',
+  },
+  {
+    packageName: 'listings',
+    codeSnippet: '\\usepackage{listings}',
+    pattern: /\\begin\{lstlisting\}|\\(lstinline|lstset)\b/,
+    description: 'Syntax-highlighted source code listings and inline code blocks.',
+  },
+  {
+    packageName: 'tikz',
+    codeSnippet: '\\usepackage{tikz}',
+    pattern: /\\begin\{tikzpicture\}|\\tikz\b/,
+    description: 'Vector graphics and programmatic diagrams.',
+  },
+  {
+    packageName: 'tabularx',
+    codeSnippet: '\\usepackage{tabularx}',
+    pattern: /\\begin\{tabularx\}/,
+    description: 'Auto-sizing table columns matching text width.',
+  },
+  {
+    packageName: 'amssymb',
+    codeSnippet: '\\usepackage{amssymb}',
+    pattern: /\\(mathbb|checkmark|subseteqq|subsetneq|triangleq|mathbbm)\b/,
+    description: 'Extended mathematical symbols and blackboard bold fonts.',
+  },
+  {
+    packageName: 'siunitx',
+    codeSnippet: '\\usepackage{siunitx}',
+    pattern: /\\(SI|si|qty|ang|num|unit)\b/,
+    description: 'Consistent scientific units and numeric formatting.',
+  },
+];
+
+export function scanMissingPackages(source: string): DetectedMissingPackage[] {
+  if (!source || typeof source !== 'string') return [];
+
+  // Extract preamble (before \begin{document})
+  const beginDocIdx = source.indexOf('\\begin{document}');
+  const preamble = beginDocIdx !== -1 ? source.slice(0, beginDocIdx) : source;
+
+  const missing: DetectedMissingPackage[] = [];
+
+  for (const rule of COMMON_PACKAGE_RULES) {
+    const isDeclared = new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${rule.packageName}\\}`, 'i').test(preamble);
+    if (!isDeclared) {
+      if (rule.pattern.test(source)) {
+        missing.push({
+          packageName: rule.packageName,
+          codeSnippet: rule.codeSnippet,
+          label: `Add \\usepackage{${rule.packageName}}`,
+          description: rule.description,
+        });
+      }
+    }
+  }
+
+  return missing;
+}
+
+// Intelligent Quick-Fix Engine: Detects missing packages, unescaped macros, and math environment wraps
+export function detectSuggestedFix(rawText: string, message: string = '', lineNumber: number = 0): SuggestedFix | undefined {
+  const combined = `${message} ${rawText}`.replace(/\r?\n\s*/g, ' ').replace(/\s+/g, ' ');
+  const isUndefinedCtrl = /Undefined control sequence/i.test(combined);
+
+  // 0. Inner Math Mode Wrapping (e.g. \begin{bmatrix} or \begin{cases} outside math mode)
+  const mathEnvMatch = combined.match(/\\begin\{(bmatrix|pmatrix|vmatrix|Vmatrix|Bmatrix|matrix|cases|aligned|gathered|split)\}/i);
+  if (
+    (/Missing \$ inserted/i.test(combined) ||
+      /Display math should end with/i.test(combined) ||
+      /Bad math environment delimiter/i.test(combined) ||
+      /LaTeX Error: \w+ not in outer par mode/i.test(combined)) &&
+    mathEnvMatch
+  ) {
+    const envName = mathEnvMatch[1];
+    return {
+      type: 'wrap_math_mode',
+      packageName: 'amsmath',
+      targetEnvironment: envName,
+      line: lineNumber,
+      codeSnippet: `\\[\n\\begin{${envName}}\n...\n\\end{${envName}}\n\\]`,
+      label: `Wrap in \\[ ... \\]`,
+      description: `The \\begin{${envName}} environment requires math mode. Wrap it in display math mode (\\[ ... \\]).`,
+    };
+  }
+
+  // 1. Math packages (amsmath)
+  if (
+    /Environment\s+(align\*?|gather\*?|multline\*?|bmatrix|pmatrix|vmatrix|Vmatrix|Bmatrix|aligned|gathered)\s+undefined/i.test(combined) ||
+    (isUndefinedCtrl && /\\(eqref|DeclareMathOperator|substack)\b/i.test(combined))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'amsmath',
+      codeSnippet: '\\usepackage{amsmath}',
+      label: 'Add \\usepackage{amsmath}',
+      description: 'Provides advanced multi-line equations, matrices, and \\eqref references.',
+    };
+  }
+
+  // 2. Graphics package (graphicx)
+  if (
+    (isUndefinedCtrl && /\\includegraphics\b/i.test(combined)) ||
+    /Cannot determine size of graphic/i.test(combined) ||
+    /File ['`]graphicx\.sty['`]\s+not found/i.test(combined)
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'graphicx',
+      codeSnippet: '\\usepackage{graphicx}',
+      label: 'Add \\usepackage{graphicx}',
+      description: 'Required for embedding figures, images, and scaling graphic elements.',
+    };
+  }
+
+  // 3. Hyperlinks & URLs (hyperref)
+  if (isUndefinedCtrl && /\\(href|url|hypersetup|autoref)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'hyperref',
+      codeSnippet: '\\usepackage{hyperref}',
+      label: 'Add \\usepackage{hyperref}',
+      description: 'Enables clickable hyperlinks, web URLs, and cross-references.',
+    };
+  }
+
+  // 4. Booktabs for professional tables
+  if (isUndefinedCtrl && /\\(toprule|midrule|bottomrule|cmidrule)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'booktabs',
+      codeSnippet: '\\usepackage{booktabs}',
+      label: 'Add \\usepackage{booktabs}',
+      description: 'Required for high-quality table rules (\\toprule, \\midrule, \\bottomrule).',
+    };
+  }
+
+  // 5. Code Listings (listings)
+  if (
+    /Environment\s+lstlisting\s+undefined/i.test(combined) ||
+    (isUndefinedCtrl && /\\(lstinline|lstset)\b/i.test(combined))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'listings',
+      codeSnippet: '\\usepackage{listings}',
+      label: 'Add \\usepackage{listings}',
+      description: 'Provides syntax-highlighted source code listings and inline code blocks.',
+    };
+  }
+
+  // 6. Colors (xcolor)
+  if (
+    isUndefinedCtrl &&
+    (/\\(definecolor|textcolor|colorbox|pagecolor)\b/i.test(combined) ||
+      (/\\color\b/i.test(combined) && !combined.includes('\\colortbl')))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'xcolor',
+      codeSnippet: '\\usepackage{xcolor}',
+      label: 'Add \\usepackage{xcolor}',
+      description: 'Enables colored text, background highlighting, and custom color definitions.',
+    };
+  }
+
+  // 7. TikZ diagrams
+  if (
+    /Environment\s+tikzpicture\s+undefined/i.test(combined) ||
+    (isUndefinedCtrl && /\\(tikz|node)\b/i.test(combined))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'tikz',
+      codeSnippet: '\\usepackage{tikz}',
+      label: 'Add \\usepackage{tikz}',
+      description: 'Powerful graphics toolkit for programmatic diagrams, plots, and charts.',
+    };
+  }
+
+  // 8. Bold math (bm)
+  if (isUndefinedCtrl && /\\(bm|boldsymbol)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'bm',
+      codeSnippet: '\\usepackage{bm}',
+      label: 'Add \\usepackage{bm}',
+      description: 'Provides true bold font formatting for mathematical symbols.',
+    };
+  }
+
+  // 9. Subcaptions / Subfigures
+  if (
+    /Environment\s+(subfigure|subtable)\s+undefined/i.test(combined) ||
+    (isUndefinedCtrl && /\\subcaption/i.test(combined))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'subcaption',
+      codeSnippet: '\\usepackage{subcaption}',
+      label: 'Add \\usepackage{subcaption}',
+      description: 'Supports multi-panel subfigures and subtables with independent captions.',
+    };
+  }
+
+  // 10. SI Units (siunitx)
+  if (isUndefinedCtrl && /\\(SI|si|qty|unit|num)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'siunitx',
+      codeSnippet: '\\usepackage{siunitx}',
+      label: 'Add \\usepackage{siunitx}',
+      description: 'Standardized typesetting for physical quantities and SI units.',
+    };
+  }
+
+  // 11. Multirow tables
+  if (isUndefinedCtrl && /\\multirow\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'multirow',
+      codeSnippet: '\\usepackage{multirow}',
+      label: 'Add \\usepackage{multirow}',
+      description: 'Enables table cells that span across multiple rows.',
+    };
+  }
+
+  // 12. Geometry
+  if (isUndefinedCtrl && /\\(geometry|newgeometry)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'geometry',
+      codeSnippet: '\\usepackage{geometry}',
+      label: 'Add \\usepackage{geometry}',
+      description: 'Configures paper margins, header spacing, and page orientation.',
+    };
+  }
+
+  // 13. Microtype
+  if (isUndefinedCtrl && /\\microtypesetup\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'microtype',
+      codeSnippet: '\\usepackage{microtype}',
+      label: 'Add \\usepackage{microtype}',
+      description: 'Micro-typographic optimization for cleaner line-breaking and spacing.',
+    };
+  }
+
+  // 14. Lipsum placeholder
+  if (isUndefinedCtrl && /\\lipsum\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'lipsum',
+      codeSnippet: '\\usepackage{lipsum}',
+      label: 'Add \\usepackage{lipsum}',
+      description: 'Generates standard dummy placeholder paragraphs.',
+    };
+  }
+
+  // 15. Algorithms (algorithm2e)
+  if (
+    /Environment\s+(algorithm|algorithmic)\s+undefined/i.test(combined) ||
+    (isUndefinedCtrl && /\\(Require|Ensure|State)\b/i.test(combined))
+  ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'algorithm2e',
+      codeSnippet: '\\usepackage[ruled,vlined]{algorithm2e}',
+      label: 'Add \\usepackage{algorithm2e}',
+      description: 'Provides environments and formatting for pseudocode and algorithms.',
+    };
+  }
+
+  // 16. Cleveref
+  if (isUndefinedCtrl && /\\(cref|Cref)\b/i.test(combined)) {
+    return {
+      type: 'add_preamble',
+      packageName: 'cleveref',
+      codeSnippet: '\\usepackage{cleveref}',
+      label: 'Add \\usepackage{cleveref}',
+      description: 'Intelligent cross-referencing that automatically names referenced objects.',
+    };
+  }
+
+  // 17. Missing system .sty file
+  const styMatch = combined.match(/File ['`]([a-zA-Z0-9_\-]+)\.sty['`]\s+not found/i);
+  if (styMatch) {
+    const pkg = styMatch[1];
+    return {
+      type: 'install_package',
+      packageName: pkg,
+      codeSnippet: `\\usepackage{${pkg}}`,
+      label: `Install '${pkg}' package`,
+      description: `Package file '${pkg}.sty' is missing from your LaTeX system distribution.`,
+    };
+  }
+
+  return undefined;
+}
+
+// Reconstructs messages that TeX hard-wraps at 79 columns or across linebreaks
+function extractFullErrorMessage(initialMsg: string, subsequentLines: string[], fullLine: string): string {
+  let msg = initialMsg;
+
+  for (let k = 0; k < Math.min(subsequentLines.length, 3); k++) {
+    const next = subsequentLines[k];
+    if (!next || next.trim() === '') break;
+    // Stop if next line is a new error indicator, file location, or TeX line pointer
+    if (
+      next.startsWith('! ') ||
+      /^[A-Za-z]:.*?:\d+:/.test(next) ||
+      /^l\.\d+/.test(next) ||
+      /^<inserted text>/.test(next) ||
+      next.startsWith('See the LaTeX manual') ||
+      next.startsWith('Type  H <return>') ||
+      next.startsWith('Your command was ignored')
+    ) {
+      break;
+    }
+
+    if (fullLine.length >= 78 || /:\s*$/.test(msg) || !/[.!?]$/.test(msg)) {
+      if (msg.endsWith(' ') || /:\s*$/.test(msg)) {
+        msg = msg.trim() + ' ' + next.trim();
+      } else {
+        msg = msg + next.trim();
+      }
+      if (/[.!?]$/.test(msg)) {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return msg.trim();
 }
 
 export function parseLatexLog(logContent: string): { errors: CompileError[]; warnings: string[] } {
@@ -99,16 +496,18 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
       /^((?:[A-Za-z]:)?[^:]*?\.(?:tex|sty|cls|bib)):(\d+):\s*(.*)$/
     );
     if (fileLineMatch) {
-      const [, file, lineStr, message] = fileLineMatch;
-      // Combine with next lines in case TeX wrapped the message
-      const nextLines = lines.slice(i + 1, i + 3).join(' ');
-      const combined = `${message} ${nextLines}`;
-      const raw = lines.slice(i, i + 4).join('\n');
+      const [, file, lineStr, rawMessage] = fileLineMatch;
+      const fullMessage = extractFullErrorMessage(rawMessage, lines.slice(i + 1, i + 4), line);
+      // Combine with next lines in case TeX wrapped the message or put macro on next line
+      const nextLines = lines.slice(i + 1, i + 6).join(' ');
+      const combined = `${fullMessage} ${nextLines}`;
+      const raw = lines.slice(i, i + 5).join('\n');
       errors.push({
         file,
         line: parseInt(lineStr, 10),
-        message: message.trim(),
+        message: fullMessage,
         friendlyExplanation: translateTeXError(combined),
+        suggestedFix: detectSuggestedFix(combined, fullMessage, parseInt(lineStr, 10)),
         raw,
       });
       continue;
@@ -116,7 +515,8 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
 
     // Classic '! ...' TeX error format
     if (line.startsWith('! ')) {
-      const message = line.substring(2).trim();
+      const rawMessage = line.substring(2);
+      const fullMessage = extractFullErrorMessage(rawMessage, lines.slice(i + 1, i + 4), line);
       let lineNumber = 0;
       let file = 'main.tex';
 
@@ -129,12 +529,13 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
         }
       }
 
-      const combined = lines.slice(i, i + 4).join(' ');
+      const combined = `${fullMessage} ${lines.slice(i, i + 4).join(' ')}`;
       errors.push({
         file,
         line: lineNumber,
-        message,
+        message: fullMessage,
         friendlyExplanation: translateTeXError(combined),
+        suggestedFix: detectSuggestedFix(combined, fullMessage, lineNumber),
         raw: lines.slice(i, i + 4).join('\n'),
       });
     }
@@ -150,6 +551,7 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
         line: 1,
         message: line.substring(1).trim(),
         friendlyExplanation: translateTeXError(combined),
+        suggestedFix: detectSuggestedFix(combined, line, 1),
         raw: lines.slice(i, i + 4).join('\n'),
       });
     }
@@ -160,7 +562,7 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
     }
   }
 
-  return { errors: dedupeErrors(errors), warnings: [...new Set(warnings)] };
+  return { errors: markCascadingErrors(dedupeErrors(errors)), warnings: [...new Set(warnings)] };
 }
 
 // TeX repeats itself: the same fault appears in the on-disk log and again in
@@ -177,9 +579,14 @@ function dedupeErrors(errors: CompileError[]): CompileError[] {
       const existing = unique.find(
         (e) => `${e.file}:${e.line}:${e.message.trim()}` === key
       );
-      if (existing && existing.line <= 0 && err.line > 0) {
-        existing.line = err.line;
-        existing.file = err.file;
+      if (existing) {
+        if (existing.line <= 0 && err.line > 0) {
+          existing.line = err.line;
+          existing.file = err.file;
+        }
+        if (!existing.suggestedFix && err.suggestedFix) {
+          existing.suggestedFix = err.suggestedFix;
+        }
       }
       continue;
     }
@@ -188,6 +595,34 @@ function dedupeErrors(errors: CompileError[]): CompileError[] {
   }
 
   return unique;
+}
+
+// Identifies secondary errors cascading from the primary root error
+function markCascadingErrors(errors: CompileError[]): CompileError[] {
+  if (errors.length <= 1) return errors;
+
+  const rootError = errors[0];
+
+  return errors.map((err, idx) => {
+    if (idx === 0) return err;
+
+    // Detect if this subsequent error is a classic TeX cascade caused by the unresolved root error
+    const isCascadePattern =
+      /Misplaced alignment|Missing \$ inserted|ended by \\end|Undefined control sequence|Runaway argument|Extra \}|Emergency stop/i.test(
+        err.message
+      );
+
+    if (isCascadePattern && (rootError.suggestedFix || rootError.line > 0)) {
+      return {
+        ...err,
+        isCascading: true,
+        cascadingFromLine: rootError.line,
+        friendlyExplanation: `Secondary error cascading from Line ${rootError.line}. Resolving the root issue on Line ${rootError.line} will fix this.`,
+      };
+    }
+
+    return err;
+  });
 }
 
 // The whole point of compiling locally is not hitting a compute wall, so the
@@ -204,7 +639,7 @@ const DEFAULT_COMPILE_TIMEOUT_MS = (() => {
 // per server process. undefined = not yet checked; true/false = known.
 let latexmkAvailableCache: boolean | undefined = undefined;
 
-async function isLatexmkAvailable(): Promise<boolean> {
+export async function isLatexmkAvailable(): Promise<boolean> {
   if (latexmkAvailableCache !== undefined) return latexmkAvailableCache;
 
   // Cheap probe: ask latexmk to print its version. No TeX files are touched,
@@ -219,6 +654,58 @@ async function isLatexmkAvailable(): Promise<boolean> {
 
   latexmkAvailableCache = !unavailable;
   return latexmkAvailableCache;
+}
+
+function getProjectSearchPaths(
+  projectDir: string,
+  buildDir: string
+): { texInputs: string; bibInputs: string } {
+  const sep = path.delimiter;
+  const userSubdirs: string[] = [];
+
+  try {
+    const entries = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const entry of entries) {
+      // Include user subfolders (e.g. figures, sections, images).
+      // Explicitly ignore .git, .build, node_modules, etc., preventing catastrophic Kpathsea crawls inside Git objects.
+      if (
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules' &&
+        entry.name !== 'dist'
+      ) {
+        userSubdirs.push(path.join(projectDir, entry.name));
+      }
+    }
+  } catch {
+    // Ignore if directory read fails
+  }
+
+  // Include cwd, project directory, user subdirectories (with // for nested subfolders), and buildDir.
+  // The trailing empty element creates a trailing delimiter, telling Kpathsea to search standard system TeX packages.
+  const basePaths = [
+    '.',
+    projectDir,
+    ...userSubdirs.map((d) => `${d}//`),
+    buildDir,
+    '',
+  ];
+
+  let texInputs = basePaths.join(sep);
+  if (process.env.TEXINPUTS) {
+    texInputs += process.env.TEXINPUTS.endsWith(sep)
+      ? process.env.TEXINPUTS
+      : `${process.env.TEXINPUTS}${sep}`;
+  }
+
+  let bibInputs = basePaths.join(sep);
+  if (process.env.BIBINPUTS) {
+    bibInputs += process.env.BIBINPUTS.endsWith(sep)
+      ? process.env.BIBINPUTS
+      : `${process.env.BIBINPUTS}${sep}`;
+  }
+
+  return { texInputs, bibInputs };
 }
 
 function executeCommand(
@@ -283,10 +770,27 @@ function executeCommand(
   });
 }
 
+export function cleanBuildCache(projectDir: string): { cleaned: boolean; message: string } {
+  const buildDir = path.join(projectDir, '.build');
+  if (fs.existsSync(buildDir)) {
+    try {
+      const files = fs.readdirSync(buildDir);
+      for (const f of files) {
+        fs.rmSync(path.join(buildDir, f), { recursive: true, force: true });
+      }
+      return { cleaned: true, message: 'Build cache cleared successfully.' };
+    } catch (err: any) {
+      return { cleaned: false, message: `Failed to clean build cache: ${err.message}` };
+    }
+  }
+  return { cleaned: true, message: 'Build cache already clean.' };
+}
+
 export async function compileDocument(
   projectDir: string,
   mainFile: string = 'main.tex',
-  engine: 'pdflatex' | 'xelatex' | 'lualatex' = 'pdflatex'
+  engine: 'pdflatex' | 'xelatex' | 'lualatex' = 'pdflatex',
+  options: { shellEscape?: boolean } = {}
 ): Promise<CompileResult> {
   const startTime = Date.now();
   const buildDir = path.join(projectDir, '.build');
@@ -307,20 +811,8 @@ export async function compileDocument(
     }
   }
 
-  // Set TEXINPUTS so LaTeX searches the project directory and all subdirectories recursively (//)
-  // Exactly matching Overleaf's automatic file and figure resolution
-  const sep = path.delimiter;
-  const normProjectDir = projectDir.replace(/\\/g, '/');
-  const normBuildDir = buildDir.replace(/\\/g, '/');
-  const texInputs = `.${sep}${projectDir}//${sep}${normProjectDir}//${sep}${buildDir}${sep}${normBuildDir}${sep}${process.env.TEXINPUTS ? process.env.TEXINPUTS + sep : ''}`;
-
-  // bibtex resolves .bib files through BIBINPUTS, not TEXINPUTS, and it runs
-  // with the build directory as its working directory. Without this it opens
-  // whatever "references.bib" it can find on the default path and silently
-  // emits an empty bibliography, leaving every \cite rendered as [?].
-  const bibInputs = `.${sep}${projectDir}//${sep}${normProjectDir}//${sep}${
-    process.env.BIBINPUTS ? process.env.BIBINPUTS + sep : ''
-  }`;
+  // Resolve search paths for LaTeX and BibTeX (excluding .git and .build)
+  const { texInputs, bibInputs } = getProjectSearchPaths(projectDir, buildDir);
 
   const compileEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -342,6 +834,7 @@ export async function compileDocument(
     '-synctex=1',
     '-file-line-error',
     `-outdir=${buildDir}`,
+    ...(options.shellEscape ? ['-shell-escape'] : []),
     path.join(projectDir, mainFile),
   ];
 
@@ -353,6 +846,7 @@ export async function compileDocument(
     '-file-line-error',
     '-synctex=1',
     `-output-directory=${buildDir}`,
+    ...(options.shellEscape ? ['-shell-escape'] : []),
     relMainFile,
   ];
 
@@ -407,6 +901,7 @@ export async function compileDocument(
   const mainSource = readSafe(mainSourcePath);
   const documentTitle = extractLatexTitle(mainSource) || undefined;
   const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
+  const detectedMissingPackages = scanMissingPackages(mainSource);
 
   return {
     success: pdfGenerated,
@@ -417,6 +912,7 @@ export async function compileDocument(
     rawLog: fullLog + (res.stderr ? `\n${res.stderr}` : ''),
     documentTitle,
     pdfDownloadFilename,
+    detectedMissingPackages,
   };
 }
 

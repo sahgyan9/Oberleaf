@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
 import { runDependencyCheck } from './doctor.js';
-import { compileDocument } from './compiler.js';
+import { compileDocument, isLatexmkAvailable, cleanBuildCache } from './compiler.js';
 import {
   listProjects,
   createProject,
@@ -18,10 +20,25 @@ import {
 } from './projects.js';
 import {
   createProjectCommit,
+  createExplicitCommit,
   getProjectHistory,
   getCommitDiff,
   revertToCommit,
+  getRemoteUrl,
+  setRemoteUrl,
+  getGitSyncStatus,
+  pushToRemote,
+  pullFromRemote,
+  getGitSettings,
+  saveGitSettings,
 } from './git.js';
+import {
+  loadComments,
+  addCommentThread,
+  addCommentReply,
+  updateCommentStatus,
+  deleteCommentThread,
+} from './comments.js';
 import { getProjectSyncTex } from './synctex.js';
 import { getProjectCitations, addProjectCitation } from './bibtex.js';
 import { getProjectPdfFilename, sanitizeFilename } from './latexTitle.js';
@@ -527,18 +544,101 @@ app.post('/api/projects/:id/compile', async (req, res) => {
     const mainFile = req.body.mainFile || 'main.tex';
     const engine = req.body.engine || 'pdflatex';
 
-    // Auto-create snapshot commit before compile
-    try {
-      await createProjectCommit(
+    // Auto-create snapshot commit only if explicitly enabled in project settings (default: false)
+    const gitSettings = getGitSettings(projectDir);
+    if (gitSettings.autoCommitOnCompile) {
+      createProjectCommit(
         projectDir,
         `Auto-checkpoint before compile (${new Date().toLocaleTimeString()})`
-      );
-    } catch {
-      // Non-fatal if git commit fails
+      ).catch(() => {
+        // Non-fatal if git commit fails
+      });
     }
 
-    const result = await compileDocument(projectDir, mainFile, engine);
+    const result = await compileDocument(projectDir, mainFile, engine, {
+      shellEscape: !!req.body.shellEscape,
+    });
     res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7.1. Clean Build Cache Endpoint
+app.post('/api/projects/:id/clean', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const result = cleanBuildCache(projectDir);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const execAsync = promisify(exec);
+
+// 7.5. Package Installer Endpoint (MiKTeX mpm, TeX Live tlmgr, or CTAN mirror fallback)
+app.post('/api/projects/:id/packages/install', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { packageName } = req.body;
+    if (!packageName || typeof packageName !== 'string') {
+      return res.status(400).json({ error: 'Valid packageName is required' });
+    }
+
+    const cleanPkg = packageName.trim().replace(/[^a-zA-Z0-9_\-]/g, '');
+    if (!cleanPkg) {
+      return res.status(400).json({ error: 'Invalid packageName' });
+    }
+
+    // Attempt 1: Try MiKTeX Package Manager (mpm)
+    try {
+      const { stdout } = await execAsync(`mpm --install=${cleanPkg}`);
+      return res.json({
+        success: true,
+        method: 'mpm',
+        message: `Successfully installed '${cleanPkg}' via MiKTeX Package Manager.`,
+        stdout,
+      });
+    } catch {
+      // mpm failed or not installed, continue
+    }
+
+    // Attempt 2: Try TeX Live Package Manager (tlmgr)
+    try {
+      const { stdout } = await execAsync(`tlmgr install ${cleanPkg}`);
+      return res.json({
+        success: true,
+        method: 'tlmgr',
+        message: `Successfully installed '${cleanPkg}' via TeX Live (tlmgr).`,
+        stdout,
+      });
+    } catch {
+      // tlmgr failed, continue
+    }
+
+    // Attempt 3: Direct download from CTAN mirror into project root
+    try {
+      const targetStyPath = path.join(projectDir, `${cleanPkg}.sty`);
+      const ctanUrl = `https://mirrors.ctan.org/macros/latex/contrib/${cleanPkg}/${cleanPkg}.sty`;
+      const ctanRes = await fetch(ctanUrl);
+      if (ctanRes.ok) {
+        const styText = await ctanRes.text();
+        fs.writeFileSync(targetStyPath, styText, 'utf-8');
+        return res.json({
+          success: true,
+          method: 'ctan',
+          message: `Downloaded '${cleanPkg}.sty' from CTAN directly into project directory.`,
+          file: `${cleanPkg}.sty`,
+        });
+      }
+    } catch {
+      // ignore
+    }
+
+    return res.status(500).json({
+      error: `Could not install package '${cleanPkg}'. Please verify your TeX package manager or install it manually.`,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -585,6 +685,172 @@ app.post('/api/projects/:id/history/revert', async (req, res) => {
     if (!hash) return res.status(400).json({ error: 'Commit hash required' });
     const result = await revertToCommit(projectDir, hash);
     res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8.1. Explicit GitHub-Style Version Commit
+app.post('/api/projects/:id/git/commit', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { message, description } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Commit message / comment is required' });
+    }
+    const result = await createExplicitCommit(projectDir, message, description);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8.2. Git Settings (Auto-commit on compile toggle)
+app.get('/api/projects/:id/git/settings', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const settings = getGitSettings(projectDir);
+    res.json(settings);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/git/settings', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { autoCommitOnCompile } = req.body;
+    saveGitSettings(projectDir, { autoCommitOnCompile: !!autoCommitOnCompile });
+    res.json({ success: true, settings: getGitSettings(projectDir) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8.3. Git Remote & Sync Endpoints
+app.get('/api/projects/:id/git/status', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const status = await getGitSyncStatus(projectDir);
+    res.json(status);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/projects/:id/git/remote', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const remoteUrl = await getRemoteUrl(projectDir);
+    res.json({ remoteUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/git/remote', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { remoteUrl, token } = req.body;
+    if (!remoteUrl || !remoteUrl.trim()) {
+      return res.status(400).json({ error: 'Remote URL is required' });
+    }
+    const cleanUrl = await setRemoteUrl(projectDir, remoteUrl, token);
+    res.json({ success: true, remoteUrl: cleanUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/git/push', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { branch, token } = req.body;
+    const result = await pushToRemote(projectDir, branch, token);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/git/pull', async (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { branch, token } = req.body;
+    const result = await pullFromRemote(projectDir, branch, token);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8.4. Portable Review Comments Endpoints
+app.get('/api/projects/:id/comments', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const comments = loadComments(projectDir);
+    res.json(comments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/comments', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { file, line, selectedText, author, text } = req.body;
+    if (!file || line === undefined || !text) {
+      return res.status(400).json({ error: 'file, line, and text are required' });
+    }
+    const thread = addCommentThread(projectDir, { file, line, selectedText, author, text });
+    res.json(thread);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/comments/:commentId/replies', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { author, text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Reply text is required' });
+    }
+    const updated = addCommentReply(projectDir, req.params.commentId, { author, text });
+    if (!updated) {
+      return res.status(404).json({ error: 'Comment thread not found' });
+    }
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/projects/:id/comments/:commentId/status', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const { status } = req.body;
+    if (status !== 'open' && status !== 'resolved') {
+      return res.status(400).json({ error: 'Status must be "open" or "resolved"' });
+    }
+    const updated = updateCommentStatus(projectDir, req.params.commentId, status);
+    if (!updated) {
+      return res.status(404).json({ error: 'Comment thread not found' });
+    }
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/projects/:id/comments/:commentId', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const deleted = deleteCommentThread(projectDir, req.params.commentId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Comment thread not found' });
+    }
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -770,23 +1036,69 @@ app.get('/api/pdf', (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
+// 12. System Shortcut Registration Endpoint
+app.post('/api/system/create-shortcut', async (_req, res) => {
+  try {
+    const projectRoot = process.cwd();
+    const scriptPath = path.join(projectRoot, 'scripts', 'setup-windows.ps1');
+
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ success: false, error: 'Setup script not found at ' + scriptPath });
+    }
+
+    const child = spawn('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      scriptPath
+    ], {
+      cwd: projectRoot,
+      windowsHide: true
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        return res.json({
+          success: true,
+          message: 'Oberleaf shortcut successfully created on your Desktop and Start Menu!'
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          error: stderr || stdout || `Process exited with code ${code}`
+        });
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Seed initial projects matching Overleaf landing screenshot
 seedScreenshotProjects();
 
 const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Overleaf Copy] Server daemon running at http://127.0.0.1:${PORT}`);
+  console.log(`[Oberleaf] Server daemon running at http://127.0.0.1:${PORT}`);
+  // Pre-warm the latexmk/perl availability check in background so first compile is instant
+  isLatexmkAvailable().catch(() => {});
 });
 
 server.on('error', (err: any) => {
   if (err.code === 'EADDRINUSE') {
     console.error(
-      `[Overleaf Copy] Port ${PORT} is already in use.\n` +
+      `[Oberleaf] Port ${PORT} is already in use.\n` +
       `  → Run: npx kill-port ${PORT}   (or restart your terminal)\n` +
       `  → Then run: npm start`
     );
     process.exit(1);
   } else {
-    console.error('[Overleaf Copy] Server error:', err);
+    console.error('[Oberleaf] Server error:', err);
     process.exit(1);
   }
 });

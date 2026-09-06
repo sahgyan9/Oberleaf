@@ -19,9 +19,14 @@ import {
   X,
   Search,
   ArrowLeft,
-  Sparkles,
   Check,
+  Undo2,
+  Wrench,
+  Copy,
+  Info,
 } from 'lucide-react';
+
+import { DetectedMissingPackage } from '../../utils/latexPackages';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
@@ -29,11 +34,24 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 // on-screen "actual size" rendering (96 CSS px per inch).
 const CSS_UNITS = 96 / 72;
 
+export interface SuggestedFix {
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode';
+  packageName?: string;
+  codeSnippet: string;
+  label: string;
+  description: string;
+  line?: number;
+  targetEnvironment?: string;
+}
+
 export interface CompileErrorItem {
   file: string;
   line: number;
   message: string;
   friendlyExplanation?: string;
+  suggestedFix?: SuggestedFix;
+  isCascading?: boolean;
+  cascadingFromLine?: number;
   raw?: string;
 }
 
@@ -48,6 +66,7 @@ export interface SyncTexTarget {
 
 export interface PDFViewerHandle {
   getVisibleSyncTarget: () => { page: number; x: number; y: number; text?: string } | null;
+  toggleFitWidth: () => void;
 }
 
 interface PageDims {
@@ -76,6 +95,11 @@ interface PDFViewerProps {
   onSyncTexBackward?: (page: number, x: number, y: number, text?: string) => void;
   isSyncingBackward?: boolean;
   downloadFileName?: string;
+  onApplyFix?: (fix: SuggestedFix) => void;
+  onUndoFix?: () => void;
+  canUndoFix?: boolean;
+  detectedMissingPackages?: DetectedMissingPackage[];
+  onApplyBatchFix?: (pkgs: DetectedMissingPackage[]) => void;
 }
 
 export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
@@ -91,6 +115,11 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   onSyncTexBackward,
   isSyncingBackward,
   downloadFileName,
+  onApplyFix,
+  onUndoFix,
+  canUndoFix,
+  detectedMissingPackages,
+  onApplyBatchFix,
 }, ref) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeSyncToast, setActiveSyncToast] = useState<SyncTexTarget | null>(null);
@@ -168,6 +197,57 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
     }
   }, [pageDims, scale]);
 
+  const computeFitWidthZoom = useCallback(() => {
+    if (!containerRef.current || pageDims.length === 0) return 80;
+    const firstPageWidth = pageDims[0]?.width || 595.28;
+    const containerWidth = containerRef.current.clientWidth;
+    // Account for container padding (p-4 = 32px) + breathing room (16px)
+    const availableWidth = Math.max(200, containerWidth - 48);
+    const targetScale = availableWidth / firstPageWidth;
+    const targetZoom = Math.round((targetScale / CSS_UNITS) * 100);
+    return Math.max(50, Math.min(200, targetZoom));
+  }, [pageDims]);
+
+  const handleToggleFitWidth = useCallback(() => {
+    updateViewportAnchor();
+    setIsFitWidth((prev) => {
+      const next = !prev;
+      localStorage.setItem('overleaf-copy:pdf-fit-width', next.toString());
+      if (next) {
+        const fitZoom = computeFitWidthZoom();
+        setZoom(fitZoom);
+      }
+      return next;
+    });
+  }, [updateViewportAnchor, computeFitWidthZoom]);
+
+  useEffect(() => {
+    if (!isFitWidth) return;
+    const fitZoom = computeFitWidthZoom();
+    setZoom(fitZoom);
+  }, [isFitWidth, computeFitWidthZoom]);
+
+  useEffect(() => {
+    if (!isFitWidth || !containerRef.current) return;
+    const el = containerRef.current;
+    let resizeTimer: any = null;
+
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      updateViewportAnchor();
+      resizeTimer = setTimeout(() => {
+        const fitZoom = computeFitWidthZoom();
+        setZoom(fitZoom);
+      }, 50);
+    });
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      clearTimeout(resizeTimer);
+    };
+  }, [isFitWidth, computeFitWidthZoom, updateViewportAnchor]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -222,8 +302,9 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
           text: bestText || undefined,
         };
       },
+      toggleFitWidth: handleToggleFitWidth,
     }),
-    [pageDims, scale, updateViewportAnchor]
+    [pageDims, scale, updateViewportAnchor, handleToggleFitWidth]
   );
 
   const getWordAtPoint = (pageIndex: number, xPt: number, yPt: number): string | null => {
@@ -361,56 +442,6 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
     setTimeout(() => setCopiedIndex(null), 2500);
   };
 
-  const computeFitWidthZoom = useCallback(() => {
-    if (!containerRef.current || pageDims.length === 0) return 80;
-    const firstPageWidth = pageDims[0]?.width || 595.28;
-    const containerWidth = containerRef.current.clientWidth;
-    // Account for container padding (p-4 = 32px) + breathing room (16px)
-    const availableWidth = Math.max(200, containerWidth - 48);
-    const targetScale = availableWidth / firstPageWidth;
-    const targetZoom = Math.round((targetScale / CSS_UNITS) * 100);
-    return Math.max(50, Math.min(200, targetZoom));
-  }, [pageDims]);
-
-  useEffect(() => {
-    if (!isFitWidth) return;
-    const fitZoom = computeFitWidthZoom();
-    setZoom(fitZoom);
-  }, [isFitWidth, computeFitWidthZoom]);
-
-  useEffect(() => {
-    if (!isFitWidth || !containerRef.current) return;
-    const el = containerRef.current;
-    let resizeTimer: any = null;
-
-    const observer = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      updateViewportAnchor();
-      resizeTimer = setTimeout(() => {
-        const fitZoom = computeFitWidthZoom();
-        setZoom(fitZoom);
-      }, 50);
-    });
-
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      clearTimeout(resizeTimer);
-    };
-  }, [isFitWidth, computeFitWidthZoom, updateViewportAnchor]);
-
-  const handleToggleFitWidth = () => {
-    updateViewportAnchor();
-    setIsFitWidth((prev) => {
-      const next = !prev;
-      localStorage.setItem('overleaf-copy:pdf-fit-width', next.toString());
-      if (next) {
-        const fitZoom = computeFitWidthZoom();
-        setZoom(fitZoom);
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     localStorage.setItem('overleaf-copy:pdf-zoom', zoom.toString());
@@ -706,7 +737,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
           </button>
           <button
             onClick={handleToggleFitWidth}
-            title={isFitWidth ? 'Fit to Width (Active)' : 'Fit to Width'}
+            title={isFitWidth ? 'Fit to Width (Active) (F)' : 'Fit to Width (F)'}
             className={`p-1 rounded transition text-[10px] btn-tactile ${
               isFitWidth
                 ? 'bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark font-medium border border-scholarly/30 dark:border-scholarly-dark/40'
@@ -870,88 +901,186 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
         className="flex-1 overflow-auto p-4 relative"
       >
         <div className="min-w-fit w-full flex flex-col items-center justify-start">
-        {/* Error Diagnostics Banner with 1-Click "Copy Prompt for AI" */}
-        {compileErrors.length > 0 && (
-          <div className="w-full max-w-2xl mb-4 bg-crimson-subtle/70 dark:bg-crimson-darkSubtle/60 border border-crimson/30 rounded-lg p-3 text-xs space-y-2.5 shadow-md flex-shrink-0 animate-in fade-in duration-150 font-sans">
-            <div className="flex items-center justify-between font-semibold text-crimson dark:text-crimson-dark">
-              <span className="flex items-center space-x-1.5">
-                <AlertTriangle className="w-4 h-4" />
-                <span>Compilation Diagnostics ({compileErrors.length} issues)</span>
-              </span>
-              <span className="text-[10px] text-stone-500 font-normal">
-                {isShowingStalePdf ? 'Showing last valid PDF below' : 'Fix errors to generate PDF'}
-              </span>
-            </div>
+        {/* Error Diagnostics Banner */}
+        {compileErrors.length > 0 && (() => {
+          const rootErrorsCount = compileErrors.filter((e) => !e.isCascading).length;
+          const cascadeErrorsCount = compileErrors.filter((e) => e.isCascading).length;
 
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {compileErrors.map((err, idx) => {
-                const isFigureError =
-                  err.message.toLowerCase().includes('figure') ||
-                  err.message.includes('image') ||
-                  err.friendlyExplanation?.includes('Figure');
+          return (
+            <div className="w-full max-w-2xl mb-4 bg-crimson-subtle/70 dark:bg-crimson-darkSubtle/60 border border-crimson/30 rounded-lg p-3 text-xs space-y-2.5 shadow-md flex-shrink-0 animate-in fade-in duration-150 font-sans">
+              <div className="flex items-center justify-between font-semibold text-crimson dark:text-crimson-dark">
+                <span className="flex items-center space-x-1.5">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>
+                    Compilation Diagnostics ({rootErrorsCount} root issue{rootErrorsCount === 1 ? '' : 's'}
+                    {cascadeErrorsCount > 0 ? `, ${cascadeErrorsCount} secondary` : ''})
+                  </span>
+                </span>
+                <div className="flex items-center space-x-2">
+                  {canUndoFix && onUndoFix && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUndoFix();
+                      }}
+                      title="Revert previous automatic fix and restore code"
+                      className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700 transition shadow-xs btn-tactile"
+                    >
+                      <Undo2 className="w-3 h-3" />
+                      <span>Undo Fix</span>
+                    </button>
+                  )}
+                  <span className="text-[10px] text-stone-500 font-normal">
+                    {isShowingStalePdf ? 'Showing last valid PDF below' : 'Fix errors to generate PDF'}
+                  </span>
+                </div>
+              </div>
 
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => err.line && onSelectErrorLine?.(err.line)}
-                    className="p-2.5 rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-crimson/20 dark:border-crimson-dark/20 cursor-pointer hover:border-crimson/50 hover:shadow-xs transition space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-1.5 font-medium">
-                        {isFigureError && <ImageOff className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />}
-                        <span className="font-mono text-crimson dark:text-crimson-dark text-xs">
-                          {err.line > 0 ? `Line ${err.line}` : 'Compile Error'}
-                        </span>
-                        {err.file && (
-                          <span className="text-stone-400 text-[10px] font-mono">
-                            ({err.file})
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        {/* 1-Click "Copy Prompt for AI" Button */}
-                        <button
-                          onClick={(e) => handleCopyAIPrompt(err, idx, e)}
-                          title="Copy a pre-formatted prompt with this error and context to paste into ChatGPT, Claude, or Gemini"
-                          className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-300/70 dark:border-stone-700 transition btn-tactile"
-                        >
-                          {copiedIndex === idx ? (
-                            <>
-                              <Check className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
-                              <span className="text-scholarly dark:text-scholarly-dark">Prompt Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3 h-3 text-amber-500" />
-                              <span>Copy Prompt for AI</span>
-                            </>
-                          )}
-                        </button>
-
-                        {err.line > 0 && (
-                          <span className="text-stone-400 hover:text-scholarly text-[10px]">
-                            Jump →
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <p className="text-stone-800 dark:text-stone-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                      {err.message}
-                    </p>
-
-                    {err.friendlyExplanation && (
-                      <div className="p-1.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans">
-                        💡 {err.friendlyExplanation}
-                      </div>
-                    )}
+              {/* Proactive Batch Fix Banner: when multiple missing packages are detected */}
+              {detectedMissingPackages && detectedMissingPackages.length > 1 && onApplyBatchFix && (
+                <div className="p-2.5 rounded-md bg-scholarly-subtle/80 dark:bg-scholarly-darkSubtle/70 border border-scholarly/30 dark:border-scholarly-dark/40 flex items-center justify-between shadow-xs">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <Wrench className="w-4 h-4 text-scholarly dark:text-scholarly-dark flex-shrink-0" />
+                    <span className="text-stone-800 dark:text-stone-200 text-xs truncate">
+                      Detected <strong>{detectedMissingPackages.length}</strong> missing packages across document:{' '}
+                      <span className="font-mono font-medium text-scholarly dark:text-scholarly-dark">
+                        {detectedMissingPackages.map((p) => `\\usepackage{${p.packageName}}`).join(', ')}
+                      </span>
+                    </span>
                   </div>
-                );
-              })}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onApplyBatchFix(detectedMissingPackages);
+                    }}
+                    title="Inject all missing packages into preamble in one operation"
+                    className="flex items-center space-x-1.5 px-3 py-1 rounded text-[11px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile flex-shrink-0 ml-3"
+                  >
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>Add All ({detectedMissingPackages.length})</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {compileErrors.map((err, idx) => {
+                  const isFigureError =
+                    err.message.toLowerCase().includes('figure') ||
+                    err.message.includes('image') ||
+                    err.friendlyExplanation?.includes('Figure');
+                  const fileName = err.file ? err.file.split(/[/\\]/).pop() : 'main.tex';
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => err.line && onSelectErrorLine?.(err.line)}
+                      className={`p-2.5 rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border cursor-pointer transition space-y-2 ${
+                        err.isCascading
+                          ? 'border-stone-200 dark:border-stone-800/80 opacity-85 hover:opacity-100'
+                          : 'border-crimson/30 dark:border-crimson-dark/30 hover:border-crimson/60 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center space-x-1.5 font-medium min-w-0">
+                          {isFigureError && <ImageOff className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />}
+                          <span className="font-mono text-crimson dark:text-crimson-dark text-xs whitespace-nowrap font-semibold">
+                            {err.line > 0 ? `Line ${err.line}` : 'Compile Error'}
+                          </span>
+                          <span className="text-stone-400 text-[10px] font-mono truncate" title={err.file}>
+                            ({fileName})
+                          </span>
+                          {err.isCascading ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-normal bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 whitespace-nowrap">
+                              Cascades from Line {err.cascadingFromLine || 1}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-crimson-subtle dark:bg-crimson-darkSubtle text-crimson dark:text-crimson-dark border border-crimson/20 whitespace-nowrap">
+                              Root Cause
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          {/* 1-Click Quick Fix Button */}
+                          {err.suggestedFix && onApplyFix && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onApplyFix(err.suggestedFix!);
+                              }}
+                              title={err.suggestedFix.description}
+                              className="flex items-center space-x-1.5 px-2.5 py-1 rounded text-[10px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile"
+                            >
+                              <Wrench className="w-3 h-3 flex-shrink-0" />
+                              <span>{err.suggestedFix.label}</span>
+                            </button>
+                          )}
+
+                          {/* 1-Click Copy Prompt Button */}
+                          <button
+                            onClick={(e) => handleCopyAIPrompt(err, idx, e)}
+                            title="Copy error prompt to clipboard"
+                            className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 transition btn-tactile"
+                          >
+                            {copiedIndex === idx ? (
+                              <>
+                                <Check className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
+                                <span className="text-scholarly dark:text-scholarly-dark font-medium">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3 text-stone-500" />
+                                <span>Copy Prompt</span>
+                              </>
+                            )}
+                          </button>
+
+                          {err.line > 0 && (
+                            <span className="text-stone-400 hover:text-scholarly text-[10px] font-medium">
+                              Jump →
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-stone-800 dark:text-stone-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+                        {err.message}
+                      </p>
+
+                      {/* Recommended Fix Box */}
+                      {err.suggestedFix && (
+                        <div className="p-2 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center justify-between">
+                          <span className="flex items-center space-x-1.5">
+                            <Wrench className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark flex-shrink-0" />
+                            <span><strong>Recommended fix:</strong> {err.suggestedFix.description}</span>
+                          </span>
+                          {onApplyFix && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onApplyFix(err.suggestedFix!);
+                              }}
+                              className="underline text-[10px] font-medium text-scholarly dark:text-scholarly-dark hover:opacity-80 flex-shrink-0 ml-2"
+                            >
+                              Apply Fix →
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {err.friendlyExplanation && !err.suggestedFix && (
+                        <div className="p-1.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center space-x-1.5">
+                          <Info className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+                          <span>{err.friendlyExplanation}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* SyncTeX Floating Notification Banner */}
         {activeSyncToast && (
