@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { extractLatexTitle } from './latexTitle.js';
 
 export interface CompileError {
   file: string;
@@ -17,6 +18,8 @@ export interface CompileResult {
   errors: CompileError[];
   warnings: string[];
   rawLog: string;
+  documentTitle?: string;
+  pdfDownloadFilename?: string;
 }
 
 // Don Norman Error Translator: maps cryptic TeX errors to helpful human advice
@@ -168,10 +171,12 @@ function dedupeErrors(errors: CompileError[]): CompileError[] {
   const unique: CompileError[] = [];
 
   for (const err of errors) {
-    const key = `${err.message.trim()}`;
+    const key = `${err.file}:${err.line}:${err.message.trim()}`;
     if (seen.has(key)) {
       // Keep the entry that carries a usable line number
-      const existing = unique.find((e) => e.message.trim() === key);
+      const existing = unique.find(
+        (e) => `${e.file}:${e.line}:${e.message.trim()}` === key
+      );
       if (existing && existing.line <= 0 && err.line > 0) {
         existing.line = err.line;
         existing.file = err.file;
@@ -194,6 +199,27 @@ const DEFAULT_COMPILE_TIMEOUT_MS = (() => {
   const parsed = parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 600000;
 })();
+
+// Cache whether latexmk+Perl are available so we pay the probe cost only once
+// per server process. undefined = not yet checked; true/false = known.
+let latexmkAvailableCache: boolean | undefined = undefined;
+
+async function isLatexmkAvailable(): Promise<boolean> {
+  if (latexmkAvailableCache !== undefined) return latexmkAvailableCache;
+
+  // Cheap probe: ask latexmk to print its version. No TeX files are touched,
+  // so this completes in milliseconds — or immediately fails if Perl is absent.
+  const probe = await executeCommand('latexmk', ['--version'], process.cwd(), 5000);
+  const unavailable =
+    !!probe.error ||
+    /is not recognized|command not found|ENOENT/i.test(probe.stderr) ||
+    /can't (find|locate).*perl|perl.*not (found|installed)|script engine.*perl|could not find.*perl/i.test(
+      probe.stdout + probe.stderr
+    );
+
+  latexmkAvailableCache = !unavailable;
+  return latexmkAvailableCache;
+}
 
 function executeCommand(
   cmd: string,
@@ -307,9 +333,8 @@ export async function compileDocument(
   const auxFile = path.join(buildDir, `${baseName}.aux`);
 
   // latexmk is preferred: it decides how many passes are needed and runs
-  // bibtex/biber on its own. Only fall back when it is genuinely unavailable,
-  // rather than on any non-zero exit -- a LaTeX error also exits non-zero, and
-  // re-running the engine there produced a second copy of every log message.
+  // bibtex/biber on its own. The availability check is cached after the first
+  // compile so we don't pay the probe overhead on every subsequent keypress.
   const latexmkArgs = [
     '-pdf',
     `-pdflatex=${engine}`,
@@ -320,26 +345,22 @@ export async function compileDocument(
     path.join(projectDir, mainFile),
   ];
 
-  let res = await executeCommand('latexmk', latexmkArgs, projectDir, undefined, compileEnv);
+  // Portable flags only. -c-style-errors, -disable-installer and
+  // -include-directory are MiKTeX extensions that make this path fail
+  // outright on TeX Live; TEXINPUTS already covers file resolution.
+  const directArgs = [
+    '-interaction=nonstopmode',
+    '-file-line-error',
+    '-synctex=1',
+    `-output-directory=${buildDir}`,
+    relMainFile,
+  ];
 
-  // ENOENT means no latexmk on PATH; latexmk also aborts when Perl is absent.
-  const latexmkUnavailable =
-    !!res.error ||
-    /is not recognized|command not found|ENOENT/i.test(res.stderr) ||
-    /can't (find|locate).*perl|perl.*not (found|installed)/i.test(res.stdout + res.stderr);
+  let res: { code: number | null; stdout: string; stderr: string; error?: Error };
 
-  if (latexmkUnavailable) {
-    // Portable flags only. -c-style-errors, -disable-installer and
-    // -include-directory are MiKTeX extensions that make this path fail
-    // outright on TeX Live; TEXINPUTS already covers file resolution.
-    const directArgs = [
-      '-interaction=nonstopmode',
-      '-file-line-error',
-      '-synctex=1',
-      `-output-directory=${buildDir}`,
-      relMainFile,
-    ];
-
+  if (await isLatexmkAvailable()) {
+    res = await executeCommand('latexmk', latexmkArgs, projectDir, undefined, compileEnv);
+  } else {
     res = await executeCommand(engine, directArgs, projectDir, undefined, compileEnv);
 
     // Without latexmk nothing resolves citations or cross-references, so drive
@@ -382,6 +403,11 @@ export async function compileDocument(
     }
   }
 
+  const mainSourcePath = path.isAbsolute(mainFile) ? mainFile : path.join(projectDir, mainFile);
+  const mainSource = readSafe(mainSourcePath);
+  const documentTitle = extractLatexTitle(mainSource) || undefined;
+  const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
+
   return {
     success: pdfGenerated,
     pdfUrl: pdfGenerated ? `/api/pdf?file=${encodeURIComponent(outputPdf)}` : undefined,
@@ -389,6 +415,8 @@ export async function compileDocument(
     errors,
     warnings,
     rawLog: fullLog + (res.stderr ? `\n${res.stderr}` : ''),
+    documentTitle,
+    pdfDownloadFilename,
   };
 }
 

@@ -56,14 +56,14 @@ ${body}  \\end{tabular}
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 select-none">
-      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightSubtle dark:border-surface-darkSubtle w-full max-w-md rounded-xl p-5 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-          <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-semibold text-sm">
-            <TableIcon className="w-4 h-4 text-brand-mint" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none font-sans">
+      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder w-full max-w-md rounded-xl p-5 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-surface-lightBorder dark:border-surface-darkBorder pb-3">
+          <div className="flex items-center space-x-2 text-stone-900 dark:text-stone-100 font-serif font-semibold text-base">
+            <TableIcon className="w-4 h-4 text-scholarly dark:text-scholarly-dark" />
             <span>Visual Table Generator</span>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded">
+          <button onClick={onClose} className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded btn-tactile">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -71,11 +71,11 @@ ${body}  \\end{tabular}
         <div className="space-y-4 text-xs">
           {/* Interactive Grid Selector */}
           <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-2 font-medium">
-              Dimensions: <span className="text-brand-mint font-mono">{hoverRows} Rows × {hoverCols} Columns</span>
+            <label className="block text-stone-600 dark:text-stone-400 mb-2 font-medium">
+              Dimensions: <span className="text-scholarly dark:text-scholarly-dark font-mono font-medium">{hoverRows} Rows × {hoverCols} Columns</span>
             </label>
             <div
-              className="grid grid-cols-6 gap-1 p-2 bg-surface-lightSubtle dark:bg-surface-darkSubtle rounded-lg border border-slate-200 dark:border-slate-800 w-fit"
+              className="grid grid-cols-6 gap-1 p-2 bg-surface-lightSubtle dark:bg-surface-darkSubtle rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder w-fit"
               onMouseLeave={() => {
                 setHoverRows(rows);
                 setHoverCols(cols);
@@ -99,8 +99,8 @@ ${body}  \\end{tabular}
                     }}
                     className={`w-6 h-6 rounded-sm border cursor-pointer transition ${
                       isHovered
-                        ? 'bg-brand-mint/30 border-brand-mint'
-                        : 'bg-transparent border-slate-300 dark:border-slate-700'
+                        ? 'bg-scholarly-subtle/80 dark:bg-scholarly-darkSubtle border-scholarly dark:border-scholarly-dark'
+                        : 'bg-transparent border-stone-300 dark:border-stone-700'
                     }`}
                   />
                 );
@@ -115,54 +115,54 @@ ${body}  \\end{tabular}
                 type="checkbox"
                 checked={hasHeader}
                 onChange={(e) => setHasHeader(e.target.checked)}
-                className="rounded accent-brand-mint"
+                className="rounded accent-scholarly"
               />
-              <span className="text-slate-700 dark:text-slate-300">Header row</span>
+              <span className="text-stone-700 dark:text-stone-300">Header row</span>
             </label>
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={hasBorders}
                 onChange={(e) => setHasBorders(e.target.checked)}
-                className="rounded accent-brand-mint"
+                className="rounded accent-scholarly"
               />
-              <span className="text-slate-700 dark:text-slate-300">Borders (\\hline)</span>
+              <span className="text-stone-700 dark:text-stone-300">Borders (\\hline)</span>
             </label>
           </div>
 
           {/* Caption */}
           <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-medium">Caption</label>
+            <label className="block text-stone-600 dark:text-stone-400 mb-1 font-medium">Caption</label>
             <input
               type="text"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              className="w-full bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-slate-300 dark:border-slate-700 rounded-md p-2 text-slate-900 dark:text-white focus:border-brand-mint outline-none"
+              className="w-full bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder rounded-md p-2 text-stone-900 dark:text-stone-100 focus:border-scholarly dark:focus:border-scholarly-dark outline-none font-sans"
             />
           </div>
 
           {/* Label */}
           <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-medium">Reference Label</label>
+            <label className="block text-stone-600 dark:text-stone-400 mb-1 font-medium">Reference Label</label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-slate-300 dark:border-slate-700 rounded-md p-2 text-slate-900 dark:text-white focus:border-brand-mint outline-none font-mono"
+              className="w-full bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder rounded-md p-2 text-stone-900 dark:text-stone-100 focus:border-scholarly dark:focus:border-scholarly-dark outline-none font-mono"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-surface-lightBorder dark:border-surface-darkBorder">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-md border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition"
+            className="px-3 py-1.5 rounded-md border border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-xs font-medium transition btn-tactile"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-1.5 rounded-md bg-brand-mint text-slate-950 hover:brightness-110 text-xs font-semibold shadow-md shadow-brand-mint/20 transition"
+            className="px-4 py-1.5 rounded-md bg-scholarly dark:bg-scholarly-dark hover:bg-scholarly-hover text-white text-xs font-medium shadow-xs transition btn-tactile"
           >
             Insert Table
           </button>

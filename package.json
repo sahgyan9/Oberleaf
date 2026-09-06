@@ -1,16 +1,19 @@
 {
-  "name": "overleaf-copy",
+  "name": "oberleaf",
   "private": true,
   "version": "1.0.0",
-  "description": "Local-first LaTeX editor with instant equation preview, side-by-side PDF preview, and zero compute timeouts.",
+  "description": "The open-source, local-first LaTeX suite with instant equation preview, side-by-side PDF rendering, and zero compute timeouts.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:icons": "node ./scripts/generate-icons.cjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "server": "tsx watch server/index.ts",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-NetTCPConnection -LocalPort 3001, 5173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }\"",
+    "logs": "powershell -NoProfile -Command \"if (Test-Path logs/project.log) { Get-Content -Path logs/project.log -Wait -Tail 50 } else { Write-Host 'No logs found yet. Start the app first.' }\"",
     "setup:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-windows.ps1"
   },
   "dependencies": {

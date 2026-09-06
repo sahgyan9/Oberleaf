@@ -1,12 +1,38 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/assets/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Overleaf Copy — Local LaTeX Suite</title>
+    <title>Oberleaf — Fast Scholarly LaTeX Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Dark-mode guard: runs synchronously before any rendering to prevent FOUC.
+         Reads the user's saved preference from localStorage; defaults to dark if
+         no preference has been stored yet. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('overleaf-copy:theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var useDark = stored ? stored === 'dark' : prefersDark !== false;
+          if (useDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // localStorage blocked (e.g. private mode) — fall back to dark
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-surface-light dark:bg-surface-dark text-slate-900 dark:text-slate-100 min-h-screen antialiased selection:bg-brand-mint selection:text-slate-900">
+  <body class="bg-surface-light dark:bg-surface-dark text-[#1C1917] dark:text-[#F5F5F4] min-h-screen antialiased selection:bg-[#1B5E20]/20 dark:selection:bg-[#2EA043]/30">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

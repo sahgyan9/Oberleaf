@@ -1,7 +1,7 @@
-# Overleaf Copy ⚡
+# Oberleaf 🍃
 
 <p align="center">
-  <img src="assets/icon.svg" width="128" height="128" alt="Overleaf Copy Logo" />
+  <img src="assets/icon.svg" width="128" height="128" alt="Oberleaf Logo" />
 </p>
 
 <p align="center">
@@ -19,11 +19,11 @@
 
 ---
 
-## 💡 Why Overleaf Copy?
+## 💡 Why Oberleaf?
 
 Overleaf's free tier imposes strict compilation timeouts (typically 60–120 seconds). Large documents with dense bibliographies, high-resolution figures, or extensive PGFPlots/TikZ environments frequently hit compute walls and freeze.
 
-**Overleaf Copy** compiles directly on your local CPU:
+**Oberleaf** compiles directly on your local CPU:
 - 🚀 **1–2 Second Compilations:** Uses your multi-core processor for near-instant builds.
 - ♾️ **Unlimited Compute Time:** Zero timeout errors, compile 500-page theses or complex graphics with no limits.
 - ⚡ **Instant Equation Preview:** KaTeX renders math formulas live beneath your cursor with 0ms latency as you type.
@@ -34,7 +34,7 @@ Overleaf's free tier imposes strict compilation timeouts (typically 60–120 sec
 
 ## 🎨 Brand Identity & Design System
 
-Overleaf Copy is built around a distinct, modern 4-color palette designed for high legibility and eye comfort in both Light and Dark modes:
+Oberleaf is built around a distinct, modern 4-color palette designed for high legibility and eye comfort in both Light and Dark modes:
 
 | Color | Hex | Role |
 | :--- | :--- | :--- |
@@ -78,10 +78,10 @@ Overleaf Copy is built around a distinct, modern 4-color palette designed for hi
 
 ### Installation & Launch
 
-1. **Clone the repository:**
+1. **Clone the repository** (or copy this folder to your preferred location):
    ```bash
-   git clone https://github.com/your-username/overleaf-copy.git
-   cd overleaf-copy
+   git clone https://github.com/sahgyan9/Oberleaf.git
+   cd Oberleaf
    ```
 
 2. **Install dependencies:**
@@ -99,7 +99,7 @@ Overleaf Copy is built around a distinct, modern 4-color palette designed for hi
 
 ## 🪟 Windows Search Integration
 
-You can launch **Overleaf Copy** directly from your Windows Start Menu just like a native desktop app:
+You can launch **Oberleaf** directly from your Windows Start Menu just like a native desktop app:
 
 1. In the project folder, run:
    ```powershell
@@ -107,13 +107,13 @@ You can launch **Overleaf Copy** directly from your Windows Start Menu just like
    ```
 2. Press the **Windows Key** and type:
    ```
-   overleaf
+   oberleaf
    ```
    or
    ```
-   Overleaf Copy
+   Oberleaf
    ```
-3. Hit **Enter** — Overleaf Copy will launch in the background with its custom icon and open your browser automatically.
+3. Hit **Enter** — Oberleaf will launch in the background with its custom icon and open your browser automatically.
 
 ---
 
@@ -131,16 +131,19 @@ You can launch **Overleaf Copy** directly from your Windows Start Menu just like
 | Shortcut | Action |
 | :--- | :--- |
 | `Ctrl + Enter` (or `Cmd + Enter`) | **Recompile Document** |
-| `Ctrl + Shift + 1` | Full Code Mode (Maximize Editor) |
-| `Ctrl + Shift + 2` | Split Mode (Editor + PDF Preview) |
-| `Ctrl + Shift + 3` | Full PDF Mode (Maximize Preview) |
+| `Ctrl + 7` (or `Cmd + 7`) | **Full Code Mode** (Maximize Editor) |
+| `Ctrl + 8` (or `Cmd + 8`) | **Split Mode** (Editor + PDF Preview) |
+| `Ctrl + 9` (or `Cmd + 9`) | **Full PDF Mode** (Maximize Preview; double/triple/continuous press toggles between all 3 views) |
+| `Ctrl + B` (or `Cmd + B`) | **Toggle Sidebar** (File Tree) |
+| `Ctrl + S` (or `Cmd + S`) | **Save Active File** |
+| `Ctrl + Alt + J` | **SyncTeX Forward** (Jump from cursor to PDF location) |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-overleaf-copy/
+Oberleaf/
 ├── assets/                  # High-res SVG and Windows ICO logos
 ├── scripts/                 # Windows Start Menu installer & silent launcher
 ├── server/                  # Local Node.js / Express compiler daemon

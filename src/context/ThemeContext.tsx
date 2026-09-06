@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('overleaf_copy_theme') as Theme;
+    const saved = localStorage.getItem('overleaf-copy:theme') as Theme;
     return saved || 'dark';
   });
 
@@ -25,7 +25,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('overleaf_copy_theme', theme);
+    localStorage.setItem('overleaf-copy:theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {

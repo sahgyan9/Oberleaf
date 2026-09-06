@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import MonacoEditor, { OnMount, OnChange } from '@monaco-editor/react';
+import MonacoEditor, { OnMount, OnChange, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../context/ThemeContext';
 import { extractMathAtPosition } from '../../utils/mathDetector';
 import { registerLatexCompletions, ProjectContext } from '../../utils/latexCompletions';
@@ -16,6 +16,9 @@ interface EditorProps {
   highlightLine?: { line: number; timestamp: number } | null;
 }
 
+// Module-level cache to restore cursor & scroll when editor unmounts/remounts across view modes
+let lastEditorViewState: any = null;
+
 export const Editor: React.FC<EditorProps> = ({
   content,
   onChange,
@@ -31,12 +34,6 @@ export const Editor: React.FC<EditorProps> = ({
   const monacoInstance = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
 
-  // @monaco-editor/react captures `onMount` from the FIRST render and never
-  // refreshes it, so anything registered inside onMount closes over that
-  // render's props forever. Reading the callbacks through refs that are
-  // updated every render keeps the editor commands pointed at current state.
-  // Without this, Ctrl+Enter saved the editor's mount-time content (an empty
-  // string) over the real file before compiling it.
   const onCompileRef = useRef(onCompile);
   const onJumpToPdfRef = useRef(onJumpToPdf);
   const onEquationChangeRef = useRef(onEquationChange);
@@ -48,6 +45,13 @@ export const Editor: React.FC<EditorProps> = ({
     onEquationChangeRef.current = onEquationChange;
     getProjectContextRef.current = getProjectContext;
   });
+
+  // Dynamically sync Monaco theme when user toggles light/dark mode
+  useEffect(() => {
+    if (monacoInstance.current) {
+      monacoInstance.current.editor.setTheme(theme === 'dark' ? 'scholarlyDark' : 'scholarlyLight');
+    }
+  }, [theme]);
 
   // SyncTeX Jump Target: Smooth scroll and pulse line highlight
   useEffect(() => {
@@ -83,45 +87,83 @@ export const Editor: React.FC<EditorProps> = ({
     return () => clearTimeout(timer);
   }, [highlightLine]);
 
+  // Save Monaco editor view state before unmount so it can be restored seamlessly
+  useEffect(() => {
+    return () => {
+      if (editorInstance.current) {
+        try {
+          lastEditorViewState = editorInstance.current.saveViewState();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
+
+  // Pre-define themes before Monaco renders to eliminate white flash
+  const handleBeforeMount: BeforeMount = (monaco) => {
+    // Define Scholarly Dark Theme
+    monaco.editor.defineTheme('scholarlyDark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: '2EA043', fontStyle: 'bold' },
+        { token: 'keyword.control', foreground: '38BDF8', fontStyle: 'bold' },
+        { token: 'tag', foreground: '2EA043' },
+        { token: 'type', foreground: '34C759', fontStyle: 'bold' },
+        { token: 'string.escape', foreground: 'F59E0B' },
+        { token: 'delimiter', foreground: 'A8A29E' },
+        { token: 'operator', foreground: '2EA043' },
+        { token: 'number', foreground: '38BDF8' },
+        { token: 'comment', foreground: '78716C', fontStyle: 'italic' },
+      ],
+      colors: {
+        'editor.background': '#1C1C1F',
+        'editor.foreground': '#F5F5F4',
+        'editorCursor.foreground': '#2EA043',
+        'editor.lineHighlightBackground': '#26262B80',
+        'editorLineNumber.foreground': '#78716C',
+        'editorLineNumber.activeForeground': '#F5F5F4',
+        'editorGutter.background': '#1C1C1F',
+      },
+    });
+
+    // Define Scholarly Light Paper Theme
+    monaco.editor.defineTheme('scholarlyLight', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: '1B5E20', fontStyle: 'bold' },
+        { token: 'keyword.control', foreground: '2563EB', fontStyle: 'bold' },
+        { token: 'tag', foreground: '1B5E20' },
+        { token: 'type', foreground: '164E1B', fontStyle: 'bold' },
+        { token: 'string.escape', foreground: 'D97706' },
+        { token: 'delimiter', foreground: '57534E' },
+        { token: 'operator', foreground: '1B5E20' },
+        { token: 'number', foreground: '2563EB' },
+        { token: 'comment', foreground: 'A8A29E', fontStyle: 'italic' },
+      ],
+      colors: {
+        'editor.background': '#FBFBFA',
+        'editor.foreground': '#1C1917',
+        'editorCursor.foreground': '#1B5E20',
+        'editor.lineHighlightBackground': '#F4F3EF90',
+        'editorLineNumber.foreground': '#A8A29E',
+        'editorLineNumber.activeForeground': '#1C1917',
+        'editorGutter.background': '#FBFBFA',
+      },
+    });
+  };
+
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorInstance.current = editor;
     monacoInstance.current = monaco;
     if (editorRefOut) editorRefOut.current = editor;
 
-    // The language must exist before anything else: Monaco only applies
-    // tokenizer rules and completion providers to registered languages.
     registerLatexLanguage(monaco);
-
-    // Register once, reading the project context through a ref. Registering
-    // with the prop directly captured the context as it stood at mount time,
-    // and because Monaco loads from a CDN it mounts several seconds after
-    // citations have already arrived -- so \cite{ offered nothing, for good.
     registerLatexCompletions(monaco, () =>
       getProjectContextRef.current?.() ?? { citations: [], files: [] }
     );
-
-    // Define custom LaTeX theme highlighting with our brand colors
-    monaco.editor.defineTheme('brandDark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'keyword', foreground: '49A4BB', fontStyle: 'bold' },
-        { token: 'keyword.control', foreground: '2E6FA0', fontStyle: 'bold' },
-        { token: 'tag', foreground: '49A4BB' },
-        { token: 'type', foreground: '15D8B3', fontStyle: 'bold' },
-        { token: 'string.escape', foreground: 'F59E0B' },
-        { token: 'delimiter', foreground: '94A3B8' },
-        { token: 'operator', foreground: '15D8B3' },
-        { token: 'number', foreground: '15D8B3' },
-        { token: 'comment', foreground: '64748B', fontStyle: 'italic' },
-      ],
-      colors: {
-        'editor.background': '#111827',
-        'editor.foreground': '#F8FAFC',
-        'editorCursor.foreground': '#15D8B3',
-        'editor.lineHighlightBackground': '#1E293B50',
-      },
-    });
 
     // Add Keybinding: Ctrl+Enter / Cmd+Enter to compile
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
@@ -132,6 +174,37 @@ export const Editor: React.FC<EditorProps> = ({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyJ, () => {
       onJumpToPdfRef.current?.();
     });
+
+    // Immediate positioning: if a target line was requested (e.g. view mode switch to split mode)
+    // reveal it immediately on mount. Otherwise restore the cached editor view state.
+    if (highlightLine?.line) {
+      const line = highlightLine.line;
+      editor.revealLineInCenter(line);
+      editor.setPosition({ lineNumber: line, column: 1 });
+      decorationsRef.current = editor.deltaDecorations(
+        [],
+        [
+          {
+            range: new monaco.Range(line, 1, line, 1),
+            options: {
+              isWholeLine: true,
+              className: 'synctex-highlight-line',
+            },
+          },
+        ]
+      );
+      setTimeout(() => {
+        if (editorInstance.current) {
+          decorationsRef.current = editorInstance.current.deltaDecorations(decorationsRef.current, []);
+        }
+      }, 2500);
+    } else if (lastEditorViewState) {
+      try {
+        editor.restoreViewState(lastEditorViewState);
+      } catch {
+        // ignore
+      }
+    }
 
     // Detect cursor math context accurately
     editor.onDidChangeCursorPosition((e) => {
@@ -159,7 +232,6 @@ export const Editor: React.FC<EditorProps> = ({
         }
       }
 
-      // If no math around cursor, dismiss preview
       onEquationChangeRef.current(null);
     });
   };
@@ -174,13 +246,14 @@ export const Editor: React.FC<EditorProps> = ({
         height="100%"
         defaultLanguage="latex"
         language="latex"
-        theme={theme === 'dark' ? 'brandDark' : 'vs'}
+        theme={theme === 'dark' ? 'scholarlyDark' : 'scholarlyLight'}
+        beforeMount={handleBeforeMount}
         value={content}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
         options={{
           fontSize: 14,
-          fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
+          fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
           lineNumbers: 'on',
           minimap: { enabled: false },
           wordWrap: 'on',
@@ -189,10 +262,6 @@ export const Editor: React.FC<EditorProps> = ({
           tabSize: 2,
           padding: { top: 12, bottom: 12 },
           smoothScrolling: true,
-          // Monaco otherwise offers every word already in the document as a
-          // completion. In prose-heavy LaTeX that buries the real \cite and
-          // \ref suggestions -- typing "\cite{smith:2020-" would surface
-          // "article" (scraped from \documentclass) ahead of the actual key.
           wordBasedSuggestions: 'off',
         }}
       />

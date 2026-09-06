@@ -36,12 +36,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onToggleLiveMath,
 }) => {
   return (
-    <div className="h-9 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightSubtle dark:border-surface-darkSubtle px-3 flex items-center space-x-1 select-none text-slate-600 dark:text-slate-300">
+    <div className="h-9 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightBorder dark:border-surface-darkBorder px-3 flex items-center space-x-1 select-none text-stone-600 dark:text-stone-300 transition-colors">
       {/* Formatting buttons */}
       <button
         onClick={() => onWrapSelection('\\textbf{', '}', 'text')}
         title="Bold (\\textbf)"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
         <Bold className="w-3.5 h-3.5" />
       </button>
@@ -49,18 +49,18 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <button
         onClick={() => onWrapSelection('\\textit{', '}', 'text')}
         title="Italic (\\textit)"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
         <Italic className="w-3.5 h-3.5" />
       </button>
 
-      <div className="w-[1px] h-4 bg-slate-300 dark:bg-slate-700 mx-1" />
+      <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-1" />
 
       {/* Sections & Math */}
       <button
         onClick={() => onInsertSnippet('\\section{Section Title}\n')}
         title="Insert Section"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
         <Heading className="w-3.5 h-3.5" />
       </button>
@@ -68,7 +68,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <button
         onClick={() => onWrapSelection('$', '$', 'x')}
         title="Inline Math ($...$)"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition font-mono text-xs font-semibold"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition font-mono text-xs font-semibold btn-tactile"
       >
         <Sigma className="w-3.5 h-3.5" />
       </button>
@@ -80,33 +80,33 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 \\end{equation}\n`)
         }
         title="Display Equation (\\begin{equation})"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition text-xs font-mono"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition text-xs font-mono btn-tactile"
       >
         [eq]
       </button>
 
-      <div className="w-[1px] h-4 bg-slate-300 dark:bg-slate-700 mx-1" />
+      <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-1" />
 
       {/* Overleaf-Style Modals: Image & Table */}
       <button
         onClick={onOpenImageModal}
         title="Insert Figure / Image"
-        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
-        <ImageIcon className="w-3.5 h-3.5 text-brand-cyan" />
+        <ImageIcon className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark" />
         <span className="hidden sm:inline">Image</span>
       </button>
 
       <button
         onClick={onOpenTableModal}
         title="Insert Table (Visual Generator)"
-        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
-        <TableIcon className="w-3.5 h-3.5 text-brand-mint" />
+        <TableIcon className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
         <span className="hidden sm:inline">Table</span>
       </button>
 
-      <div className="w-[1px] h-4 bg-slate-300 dark:bg-slate-700 mx-1" />
+      <div className="w-[1px] h-4 bg-stone-300 dark:bg-stone-700 mx-1" />
 
       {/* Lists */}
       <button
@@ -117,7 +117,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 \\end{itemize}\n`)
         }
         title="Bullet List"
-        className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
         <List className="w-3.5 h-3.5" />
       </button>
@@ -126,9 +126,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <button
         onClick={() => (onOpenCitationModal ? onOpenCitationModal() : onInsertSnippet('\\cite{citation_key}'))}
         title="Browse & Insert Citations (\\cite)"
-        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-brand-mint transition"
+        className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
       >
-        <Quote className="w-3.5 h-3.5 text-brand-ocean" />
+        <Quote className="w-3.5 h-3.5 text-citation dark:text-citation-dark" />
         <span className="hidden sm:inline">Cite</span>
       </button>
 
@@ -141,12 +141,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onClick={onJumpToPdf}
           disabled={isJumpingToPdf}
           title="Jump to Cursor Location in PDF (SyncTeX: Ctrl+Alt+J)"
-          className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-medium text-slate-800 dark:text-brand-mint bg-brand-mint/10 hover:bg-brand-mint/20 border border-brand-mint/30 transition disabled:opacity-50 select-none mr-2"
+          className="flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium text-stone-700 dark:text-stone-200 bg-stone-200/80 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700 border border-stone-300 dark:border-stone-700 transition disabled:opacity-50 select-none mr-2 btn-tactile"
         >
           {isJumpingToPdf ? (
-            <Loader2 className="w-3 h-3 animate-spin text-brand-mint" />
+            <Loader2 className="w-3 h-3 animate-spin text-scholarly dark:text-scholarly-dark" />
           ) : (
-            <Target className="w-3 h-3 text-brand-mint" />
+            <Target className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
           )}
           <span className="hidden md:inline">Jump to PDF</span>
           <kbd className="hidden lg:inline text-[9px] px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono font-normal">
@@ -160,10 +160,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <button
           onClick={onToggleLiveMath}
           title={isLiveMathEnabled ? "Live Math Preview is ON. Click to disable." : "Live Math Preview is OFF. Click to enable."}
-          className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-mono transition border ${
+          className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition border btn-tactile ${
             isLiveMathEnabled
-              ? 'bg-brand-mint/10 border-brand-mint/40 text-brand-mint'
-              : 'border-slate-300 dark:border-slate-700 text-slate-400 hover:text-slate-200'
+              ? 'bg-[#1B5E20]/15 dark:bg-[#2EA043]/20 border-[#1B5E20]/40 dark:border-[#2EA043]/50 text-[#1B5E20] dark:text-[#2EA043] font-medium'
+              : 'border-stone-300 dark:border-stone-700 text-stone-400 hover:text-stone-200'
           }`}
         >
           <Sigma className="w-3 h-3" />

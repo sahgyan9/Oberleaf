@@ -70,7 +70,6 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
         const data: HistoryCommit[] = await res.json();
         setCommits(data);
         if (data.length > 0 && !selectedCommit) {
-          // Select first commit or previous commit by default
           setSelectedCommit(data[0]);
         }
       }
@@ -103,7 +102,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           setDiffData(data);
         }
       } catch {
-        setDiffData(null);
+        // ignore
       } finally {
         setIsLoadingDiff(false);
       }
@@ -112,10 +111,10 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   );
 
   useEffect(() => {
-    if (selectedCommit && isOpen) {
+    if (selectedCommit) {
       fetchDiff(selectedCommit);
     }
-  }, [selectedCommit, isOpen, fetchDiff]);
+  }, [selectedCommit, fetchDiff]);
 
   // Create Checkpoint Handler
   const handleCreateCheckpoint = async (e: React.FormEvent) => {
@@ -133,15 +132,12 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
 
       if (res.ok) {
         setCheckpointName('');
-        setCheckpointStatus('Checkpoint created!');
+        setCheckpointStatus('Checkpoint preserved.');
         await fetchHistory();
         setTimeout(() => setCheckpointStatus(null), 3000);
-      } else {
-        const err = await res.json();
-        setCheckpointStatus(`Failed: ${err.error || 'Error'}`);
       }
-    } catch (err: any) {
-      setCheckpointStatus(`Error: ${err.message}`);
+    } catch {
+      setCheckpointStatus('Failed to create checkpoint.');
     } finally {
       setIsCreatingCheckpoint(false);
     }
@@ -196,23 +192,23 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-5xl h-full bg-surface-lightPanel dark:bg-surface-darkPanel border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
+      <div className="w-full max-w-5xl h-full bg-surface-lightPanel dark:bg-surface-darkPanel border-l border-surface-lightBorder dark:border-surface-darkBorder flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
         {/* Top Header */}
-        <div className="h-14 px-4 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between bg-surface-light dark:bg-surface-dark flex-shrink-0">
+        <div className="h-14 px-4 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between bg-surface-light dark:bg-surface-dark flex-shrink-0">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-indigo/20 dark:bg-brand-indigo/40 flex items-center justify-center text-brand-mint">
+            <div className="w-8 h-8 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-center text-scholarly dark:text-scholarly-dark">
               <History className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                <span>Version History & Checkpoints</span>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-brand-mint/10 text-brand-mint border border-brand-mint/20">
-                  Git-backed
+              <h2 className="text-sm font-serif font-semibold text-stone-900 dark:text-stone-100 flex items-center space-x-2">
+                <span>Version History & Git Checkpoints</span>
+                <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-surface-lightBorder dark:border-surface-darkBorder">
+                  Local Git
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Visual side-by-side diff comparison and 1-click version restore
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                Visual side-by-side diff comparison and 1-click restore without cloud limitations
               </p>
             </div>
           </div>
@@ -222,13 +218,13 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
               onClick={fetchHistory}
               disabled={isLoading}
               title="Refresh Timeline"
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="p-2 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-brand-mint' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-scholarly' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="p-2 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
             >
               <X className="w-5 h-5" />
             </button>
@@ -236,22 +232,22 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
         </div>
 
         {/* Checkpoint Creation Bar */}
-        <div className="px-4 py-3 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex-shrink-0">
+        <div className="px-4 py-3 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightBorder dark:border-surface-darkBorder flex-shrink-0">
           <form onSubmit={handleCreateCheckpoint} className="flex items-center space-x-2">
             <div className="relative flex-1">
-              <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
                 value={checkpointName}
                 onChange={(e) => setCheckpointName(e.target.value)}
-                placeholder="Name a checkpoint (e.g., Before rewriting abstract, Submitted draft v1)..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-brand-mint text-slate-900 dark:text-white placeholder:text-slate-400"
+                placeholder="Name a checkpoint (e.g., Before rewriting methodology, Submitted draft v1)..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg text-xs bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder focus:outline-none focus:border-scholarly dark:focus:border-scholarly-dark text-stone-900 dark:text-stone-100 placeholder:text-stone-400 font-sans"
               />
             </div>
             <button
               type="submit"
               disabled={!checkpointName.trim() || isCreatingCheckpoint}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-brand-mint hover:brightness-110 active:scale-95 text-slate-950 font-semibold text-xs transition disabled:opacity-50 flex-shrink-0"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-scholarly dark:bg-scholarly-dark hover:bg-scholarly-hover text-white font-medium text-xs transition disabled:opacity-50 flex-shrink-0 btn-tactile shadow-xs"
             >
               {isCreatingCheckpoint ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -263,7 +259,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           </form>
 
           {checkpointStatus && (
-            <p className="text-[11px] text-brand-mint mt-1.5 flex items-center space-x-1">
+            <p className="text-[11px] text-scholarly dark:text-scholarly-dark mt-1.5 flex items-center space-x-1 font-medium">
               <CheckCircle2 className="w-3 h-3" />
               <span>{checkpointStatus}</span>
             </p>
@@ -273,20 +269,20 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
         {/* Main Content Area: 2 Columns (Timeline List + Diff Viewer) */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Column: Timeline Commits */}
-          <div className="w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-surface-light dark:bg-surface-dark flex-shrink-0">
-            <div className="px-3 py-2 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between text-xs text-slate-500">
+          <div className="w-80 border-r border-surface-lightBorder dark:border-surface-darkBorder flex flex-col bg-surface-light dark:bg-surface-dark flex-shrink-0">
+            <div className="px-3 py-2 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between text-xs text-stone-500">
               <span className="font-semibold uppercase tracking-wider text-[10px]">
                 Snapshots ({commits.length})
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">click to diff</span>
+              <span className="text-[10px] text-stone-400 font-mono">click to diff</span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {commits.length === 0 && !isLoading && (
-                <div className="p-4 text-center text-xs text-slate-400">
-                  <GitCommit className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-500" />
+                <div className="p-4 text-center text-xs text-stone-400 font-sans">
+                  <GitCommit className="w-8 h-8 mx-auto mb-2 opacity-40 text-stone-500" />
                   <p>No commits recorded yet.</p>
-                  <p className="text-[10px] mt-1 text-slate-500">
+                  <p className="text-[10px] mt-1 text-stone-500">
                     Snapshots are created automatically before every compile.
                   </p>
                 </div>
@@ -301,17 +297,17 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   <button
                     key={commit.hash}
                     onClick={() => setSelectedCommit(commit)}
-                    className={`w-full text-left p-2.5 rounded-lg border transition text-xs flex flex-col space-y-1 relative group ${
+                    className={`w-full text-left p-2.5 rounded-lg border transition text-xs flex flex-col space-y-1 relative group btn-tactile ${
                       isSelected
-                        ? 'bg-brand-indigo/15 dark:bg-brand-indigo/35 border-brand-mint/60 shadow-sm'
-                        : 'bg-surface-lightPanel dark:bg-surface-darkPanel border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        ? 'bg-stone-200/70 dark:bg-stone-800 border-l-2 border-scholarly dark:border-scholarly-dark shadow-xs'
+                        : 'bg-surface-lightPanel dark:bg-surface-darkPanel border-surface-lightBorder dark:border-surface-darkBorder hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 font-medium">
                         {commit.shortHash}
                       </span>
-                      <span className="text-[10px] text-slate-400 flex items-center space-x-1">
+                      <span className="text-[10px] text-stone-400 flex items-center space-x-1">
                         <Clock className="w-2.5 h-2.5" />
                         <span>{formatCommitDate(commit.date)}</span>
                       </span>
@@ -319,20 +315,20 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
 
                     <div className="flex items-start space-x-1.5">
                       {isCheckpoint ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-brand-mint/20 text-brand-mint uppercase tracking-wider flex-shrink-0 mt-0.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark uppercase tracking-wider flex-shrink-0 mt-0.5">
                           Checkpoint
                         </span>
                       ) : isAutoCompile ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-brand-ocean/20 text-brand-ocean uppercase tracking-wider flex-shrink-0 mt-0.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400 uppercase tracking-wider flex-shrink-0 mt-0.5">
                           Auto
                         </span>
                       ) : null}
-                      <p className="text-xs text-slate-800 dark:text-slate-200 font-medium line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-stone-800 dark:text-stone-200 font-medium line-clamp-2 leading-relaxed">
                         {commit.message}
                       </p>
                     </div>
 
-                    <div className="text-[10px] text-slate-400 truncate">
+                    <div className="text-[10px] text-stone-400 truncate">
                       by {commit.author_name || 'Author'}
                     </div>
                   </button>
@@ -344,15 +340,15 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           {/* Right Column: Visual Side-by-Side Diff Editor */}
           <div className="flex-1 flex flex-col bg-surface-lightPanel dark:bg-surface-darkPanel overflow-hidden">
             {/* Diff Header */}
-            <div className="h-11 px-4 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between text-xs bg-surface-lightSubtle dark:bg-surface-darkSubtle flex-shrink-0">
+            <div className="h-11 px-4 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between text-xs bg-surface-lightSubtle dark:bg-surface-darkSubtle flex-shrink-0">
               <div className="flex items-center space-x-2">
-                <FileCode className="w-4 h-4 text-brand-cyan" />
-                <span className="font-mono font-medium text-slate-900 dark:text-white">
+                <FileCode className="w-4 h-4 text-scholarly dark:text-scholarly-dark" />
+                <span className="font-mono font-medium text-stone-900 dark:text-stone-100">
                   {activeFilePath}
                 </span>
                 {selectedCommit && (
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    (Comparing commit <span className="text-brand-mint">{selectedCommit.shortHash}</span> with current)
+                  <span className="text-[11px] text-stone-500 font-mono">
+                    (Comparing snapshot <span className="text-scholarly dark:text-scholarly-dark">{selectedCommit.shortHash}</span> with current)
                   </span>
                 )}
               </div>
@@ -361,7 +357,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setShowConfirmRevert(true)}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition text-xs font-semibold"
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-crimson-subtle dark:bg-crimson-darkSubtle text-crimson dark:text-crimson-dark border border-crimson/30 hover:bg-crimson/20 transition text-xs font-medium btn-tactile"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Restore this version</span>
@@ -373,8 +369,8 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             {/* Monaco DiffEditor Viewport */}
             <div className="flex-1 relative overflow-hidden">
               {isLoadingDiff ? (
-                <div className="h-full flex items-center justify-center space-x-2 text-xs text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-brand-mint" />
+                <div className="h-full flex items-center justify-center space-x-2 text-xs text-stone-400">
+                  <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
                   <span>Loading diff comparison...</span>
                 </div>
               ) : diffData ? (
@@ -386,7 +382,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   modified={diffData.newContent}
                   options={{
                     fontSize: 13,
-                    fontFamily: "'Fira Code', Consolas, monospace",
+                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                     readOnly: true,
                     renderSideBySide: true,
                     minimap: { enabled: false },
@@ -396,8 +392,8 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   }}
                 />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-2">
-                  <GitCommit className="w-8 h-8 opacity-40 text-slate-500" />
+                <div className="h-full flex flex-col items-center justify-center text-stone-400 text-xs p-6 space-y-2">
+                  <GitCommit className="w-8 h-8 opacity-40 text-stone-500" />
                   <p>Select a snapshot from the timeline on the left to view diff changes.</p>
                 </div>
               )}
@@ -407,30 +403,30 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
 
         {/* Confirmation Modal for Reverting */}
         {showConfirmRevert && selectedCommit && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/40 rounded-xl p-5 shadow-2xl space-y-4">
-              <div className="flex items-center space-x-3 text-rose-500">
-                <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-crimson/40 rounded-xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3 text-crimson dark:text-crimson-dark">
+                <div className="w-10 h-10 rounded-full bg-crimson-subtle dark:bg-crimson-darkSubtle flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  <h3 className="font-serif font-bold text-sm text-stone-900 dark:text-stone-100">
                     Restore Project to Checkpoint?
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Commit: <span className="font-mono text-rose-400">{selectedCommit.shortHash}</span>
+                  <p className="text-xs text-stone-500 font-mono">
+                    Commit: <span>{selectedCommit.shortHash}</span>
                   </p>
                 </div>
               </div>
 
-              <div className="text-xs text-slate-600 dark:text-slate-300 bg-surface-light dark:bg-surface-dark p-3 rounded-lg space-y-2 border border-slate-200 dark:border-slate-800">
+              <div className="text-xs text-stone-700 dark:text-stone-300 bg-surface-lightSubtle dark:bg-surface-darkSubtle p-3 rounded-lg space-y-2 border border-surface-lightBorder dark:border-surface-darkBorder">
                 <p>
                   This will restore all files in the project to match snapshot{' '}
-                  <strong className="text-slate-900 dark:text-white">"{selectedCommit.message}"</strong>.
+                  <strong className="text-stone-900 dark:text-stone-100">"{selectedCommit.message}"</strong>.
                 </p>
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-stone-500 dark:text-stone-400 text-[11px]">
                   ✓ A safety checkpoint of your current state will be automatically created before restoring,
-                  so nothing will ever be permanently lost.
+                  so no writing will be permanently lost.
                 </p>
               </div>
 
@@ -438,7 +434,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowConfirmRevert(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-800 transition btn-tactile"
                 >
                   Cancel
                 </button>
@@ -446,7 +442,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   type="button"
                   onClick={handleRevert}
                   disabled={isReverting}
-                  className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center space-x-1.5 shadow-md shadow-rose-600/30 disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg text-xs font-medium bg-crimson hover:bg-crimson-dark text-white transition flex items-center space-x-1.5 shadow-xs disabled:opacity-50 btn-tactile"
                 >
                   {isReverting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Confirm Restore</span>

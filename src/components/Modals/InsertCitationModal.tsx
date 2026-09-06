@@ -177,17 +177,17 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
         {/* Modal Header */}
         <div className="h-14 px-5 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between bg-surface-light dark:bg-surface-dark flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-brand-cyan/10 flex items-center justify-center text-brand-cyan">
+            <div className="w-8 h-8 rounded-lg bg-citation-subtle/80 dark:bg-citation-darkSubtle/40 border border-citation/20 flex items-center justify-center text-citation dark:text-citation-dark">
               <Quote className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <h2 className="text-sm font-serif font-semibold text-stone-900 dark:text-stone-100 flex items-center space-x-2">
                 <span>Citation & Bibliography Manager</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-mint/10 text-brand-mint border border-brand-mint/20">
+                <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-surface-lightBorder dark:border-surface-darkBorder">
                   BibTeX
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
                 Browse project references, insert \cite commands, or add new papers
               </p>
             </div>
@@ -195,20 +195,20 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center border-b border-surface-lightSubtle dark:border-surface-darkSubtle px-5 bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs flex-shrink-0">
+        <div className="flex items-center border-b border-surface-lightBorder dark:border-surface-darkBorder px-5 bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs flex-shrink-0">
           <button
             onClick={() => setActiveTab('browse')}
-            className={`py-2.5 px-3 font-semibold transition border-b-2 flex items-center space-x-1.5 ${
+            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile ${
               activeTab === 'browse'
-                ? 'border-brand-mint text-brand-mint'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'border-scholarly dark:border-scholarly-dark text-scholarly dark:text-scholarly-dark font-semibold'
+                : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -217,10 +217,10 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
 
           <button
             onClick={() => setActiveTab('add')}
-            className={`py-2.5 px-3 font-semibold transition border-b-2 flex items-center space-x-1.5 ${
+            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile ${
               activeTab === 'add'
-                ? 'border-brand-mint text-brand-mint'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'border-scholarly dark:border-scholarly-dark text-scholarly dark:text-scholarly-dark font-semibold'
+                : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -233,33 +233,33 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
           <div className="flex-1 flex flex-col overflow-hidden p-5 space-y-4">
             {/* Search Input */}
             <div className="relative flex-shrink-0">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search citations by title, author, key, or year..."
-                className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-brand-mint text-slate-900 dark:text-white placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-2 rounded-lg text-xs bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark text-stone-900 dark:text-stone-100 placeholder:text-stone-400 transition"
               />
             </div>
 
             {/* Citations List */}
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
               {isLoading ? (
-                <div className="h-40 flex items-center justify-center space-x-2 text-xs text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-brand-mint" />
+                <div className="h-40 flex items-center justify-center space-x-2 text-xs text-stone-400">
+                  <Loader2 className="w-4 h-4 animate-spin text-scholarly-green dark:text-scholarly-greenDark" />
                   <span>Loading bibliography references...</span>
                 </div>
               ) : filteredCitations.length === 0 ? (
-                <div className="h-48 flex flex-col items-center justify-center text-slate-400 text-center p-6 space-y-2 border border-dashed border-slate-300 dark:border-slate-800 rounded-xl">
-                  <Bookmark className="w-8 h-8 opacity-40 text-slate-500" />
-                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                <div className="h-48 flex flex-col items-center justify-center text-stone-400 text-center p-6 space-y-2 border border-dashed border-surface-lightBorder dark:border-surface-darkBorder rounded-xl">
+                  <Bookmark className="w-8 h-8 opacity-40 text-stone-500" />
+                  <p className="text-xs font-medium text-stone-700 dark:text-stone-300">
                     {citations.length === 0
                       ? 'No citations in this project yet.'
                       : 'No citations match your search.'}
                   </p>
-                  <p className="text-[11px] text-slate-400 max-w-sm">
-                    Switch to the <span className="text-brand-mint font-semibold">Add Reference</span> tab
+                  <p className="text-[11px] text-stone-400 max-w-sm">
+                    Switch to the <span className="text-scholarly-green dark:text-scholarly-greenDark font-semibold">Add Reference</span> tab
                     to paste BibTeX markup from Google Scholar or arXiv.
                   </p>
                 </div>
@@ -267,18 +267,18 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                 filteredCitations.map((item) => (
                   <div
                     key={item.key}
-                    className="p-3.5 rounded-xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 hover:border-brand-mint/40 transition space-y-2 group"
+                    className="p-3.5 rounded-xl bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder hover:border-scholarly-green/40 dark:hover:border-scholarly-greenDark/40 transition space-y-2 group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-brand-indigo/15 dark:bg-brand-indigo/35 text-brand-indigo dark:text-brand-mint font-bold">
+                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-scholarly-blue/10 dark:bg-scholarly-blue/20 text-scholarly-blue font-semibold">
                           {item.key}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400 uppercase font-semibold">
                           {item.type || 'article'}
                         </span>
                         {item.year && (
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="text-[10px] text-stone-400 font-mono">
                             ({item.year})
                           </span>
                         )}
@@ -287,34 +287,34 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       <button
                         onClick={() => handleCopyKey(item.key)}
                         title="Copy Citation Key"
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+                        className="p-1 rounded hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-200 transition"
                       >
                         {copiedKey === item.key ? (
-                          <Check className="w-3.5 h-3.5 text-brand-mint" />
+                          <Check className="w-3.5 h-3.5 text-scholarly-green dark:text-scholarly-greenDark" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" />
                         )}
                       </button>
                     </div>
 
-                    <p className="text-xs font-medium text-slate-900 dark:text-white leading-snug">
+                    <p className="text-xs font-medium text-stone-900 dark:text-stone-100 leading-snug">
                       {item.title || 'Untitled Reference'}
                     </p>
 
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-2">
+                    <div className="text-[11px] text-stone-500 dark:text-stone-400 flex flex-wrap gap-x-2">
                       <span>{item.author || 'Unknown Author'}</span>
                       {item.journal && <span>· <em>{item.journal}</em></span>}
                       {item.volume && <span>Vol. {item.volume}</span>}
                     </div>
 
                     {/* Quick Insertion Actions */}
-                    <div className="flex items-center space-x-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center space-x-2 pt-1.5 border-t border-stone-200/60 dark:border-stone-800/80">
                       <button
                         onClick={() => {
                           onInsert(`\\cite{${item.key}}`);
                           onClose();
                         }}
-                        className="px-2.5 py-1 rounded bg-brand-mint/10 hover:bg-brand-mint/20 text-brand-mint font-mono text-[11px] font-semibold transition"
+                        className="px-2.5 py-1 rounded-md bg-scholarly-green/10 hover:bg-scholarly-green/20 text-scholarly-green dark:text-scholarly-greenDark font-mono text-[11px] font-semibold transition"
                       >
                         \cite&#123;{item.key}&#125;
                       </button>
@@ -323,7 +323,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                           onInsert(`\\citep{${item.key}}`);
                           onClose();
                         }}
-                        className="px-2.5 py-1 rounded bg-brand-ocean/10 hover:bg-brand-ocean/20 text-brand-ocean font-mono text-[11px] font-semibold transition"
+                        className="px-2.5 py-1 rounded-md bg-scholarly-blue/10 hover:bg-scholarly-blue/20 text-scholarly-blue font-mono text-[11px] font-semibold transition"
                       >
                         \citep&#123;{item.key}&#125;
                       </button>
@@ -345,8 +345,8 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                 onClick={() => setAddMode('raw')}
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${
                   addMode === 'raw'
-                    ? 'bg-brand-mint text-slate-950 font-semibold'
-                    : 'bg-surface-light dark:bg-surface-dark text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-scholarly-green dark:bg-scholarly-greenDark text-white font-semibold shadow-xs'
+                    : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
                 }`}
               >
                 Paste BibTeX (Scholar / arXiv)
@@ -356,8 +356,8 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                 onClick={() => setAddMode('fields')}
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${
                   addMode === 'fields'
-                    ? 'bg-brand-mint text-slate-950 font-semibold'
-                    : 'bg-surface-light dark:bg-surface-dark text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-scholarly-green dark:bg-scholarly-greenDark text-white font-semibold shadow-xs'
+                    : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
                 }`}
               >
                 Structured Form
@@ -366,12 +366,12 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
 
             {/* Error or Success feedback */}
             {saveError && (
-              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 text-xs">
                 {saveError}
               </div>
             )}
             {saveSuccess && (
-              <div className="p-2.5 rounded-lg bg-brand-mint/10 border border-brand-mint/30 text-brand-mint text-xs flex items-center space-x-1.5">
+              <div className="p-2.5 rounded-lg bg-scholarly-green/10 border border-scholarly-green/30 text-scholarly-green dark:text-scholarly-greenDark text-xs flex items-center space-x-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{saveSuccess}</span>
               </div>
@@ -380,15 +380,15 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
             {/* Raw BibTeX Mode */}
             {addMode === 'raw' ? (
               <div className="flex-1 flex flex-col space-y-1.5 min-h-[160px]">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
-                  <FileText className="w-3.5 h-3.5 text-brand-cyan" />
+                <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center space-x-1.5">
+                  <FileText className="w-3.5 h-3.5 text-scholarly-blue" />
                   <span>Raw BibTeX Markup</span>
                 </label>
                 <textarea
                   value={rawBibtex}
                   onChange={(e) => setRawBibtex(e.target.value)}
                   placeholder={`@article{einstein1905,\n  title={Zur Elektrodynamik bewegter K{\\"o}rper},\n  author={Einstein, Albert},\n  journal={Annalen der Physik},\n  volume={17},\n  pages={891--921},\n  year={1905}\n}`}
-                  className="flex-1 p-3 rounded-xl font-mono text-xs bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-brand-mint text-slate-900 dark:text-white placeholder:text-slate-500 leading-relaxed resize-none"
+                  className="flex-1 p-3 rounded-lg font-mono text-xs bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark text-stone-900 dark:text-stone-100 placeholder:text-stone-400 leading-relaxed resize-none transition"
                 />
               </div>
             ) : (
@@ -396,13 +396,13 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
               <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Entry Type
                     </label>
                     <select
                       value={formType}
                       onChange={(e) => setFormType(e.target.value)}
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark transition"
                     >
                       <option value="article">@article (Journal paper)</option>
                       <option value="book">@book (Textbook / Monograph)</option>
@@ -412,7 +412,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Citation Key *
                     </label>
                     <input
@@ -420,13 +420,13 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formKey}
                       onChange={(e) => setFormKey(e.target.value)}
                       placeholder="e.g. novoselov2004electric"
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-brand-mint"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 font-mono text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                  <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                     Title *
                   </label>
                   <input
@@ -434,13 +434,13 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="e.g. Electric field effect in atomically thin carbon films"
-                    className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint"
+                    className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark transition"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Author(s) (separated by "and")
                     </label>
                     <input
@@ -448,12 +448,12 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formAuthor}
                       onChange={(e) => setFormAuthor(e.target.value)}
                       placeholder="e.g. Novoselov, K. S. and Geim, A. K."
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Year
                     </label>
                     <input
@@ -461,14 +461,14 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formYear}
                       onChange={(e) => setFormYear(e.target.value)}
                       placeholder="2024"
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint font-mono"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark font-mono transition"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Journal / Venue
                     </label>
                     <input
@@ -476,12 +476,12 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formJournal}
                       onChange={(e) => setFormJournal(e.target.value)}
                       placeholder="e.g. Science"
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Volume
                     </label>
                     <input
@@ -489,12 +489,12 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formVolume}
                       onChange={(e) => setFormVolume(e.target.value)}
                       placeholder="e.g. 306"
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint font-mono"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark font-mono transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                    <label className="block text-stone-700 dark:text-stone-300 font-medium mb-1">
                       Pages
                     </label>
                     <input
@@ -502,7 +502,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       value={formPages}
                       onChange={(e) => setFormPages(e.target.value)}
                       placeholder="e.g. 666-669"
-                      className="w-full p-2 rounded-lg bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-brand-mint font-mono"
+                      className="w-full p-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-900 dark:text-stone-100 text-xs focus:outline-hidden focus:border-scholarly-green dark:focus:border-scholarly-greenDark font-mono transition"
                     />
                   </div>
                 </div>
@@ -510,11 +510,11 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
             )}
 
             {/* Save Button Footer */}
-            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-surface-lightSubtle dark:border-surface-darkSubtle flex-shrink-0">
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-surface-lightBorder dark:border-surface-darkBorder flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('browse')}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-800 transition"
               >
                 Cancel
               </button>
@@ -522,7 +522,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-brand-mint hover:brightness-110 active:scale-95 text-slate-950 font-semibold text-xs transition shadow-md shadow-brand-mint/20 disabled:opacity-50"
+                className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-scholarly-green hover:bg-scholarly-greenDark active:scale-98 text-white font-semibold text-xs transition shadow-xs disabled:opacity-50 btn-tactile"
               >
                 {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>Save to references.bib</span>

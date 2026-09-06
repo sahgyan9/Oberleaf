@@ -4,28 +4,98 @@ import { TopBar, ViewMode, ProjectInfo } from './components/TopBar/TopBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor } from './components/Editor/Editor';
-import { PDFViewer, CompileErrorItem, SyncTexTarget } from './components/PDFViewer/PDFViewer';
+import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle } from './components/PDFViewer/PDFViewer';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
 import { InsertTableModal } from './components/Modals/InsertTableModal';
 import { NewProjectModal } from './components/Modals/NewProjectModal';
 import { UploadProgressModal, UploadFileItem } from './components/Modals/UploadProgressModal';
+import { NewItemModal } from './components/Modals/NewItemModal';
 import { DependencyDoctor, DependencyItem } from './components/DependencyDoctor/DependencyDoctor';
 import { HistoryDrawer } from './components/History/HistoryDrawer';
 import { InsertCitationModal, CitationItem } from './components/Modals/InsertCitationModal';
 import { ProjectContext } from './utils/latexCompletions';
 import { PanelLeftOpen, FolderClosed } from 'lucide-react';
+import { ProjectsDashboard } from './components/Dashboard/ProjectsDashboard';
+import { extractLatexTitle, getLatexPdfFilename } from './utils/latexTitle';
+import { useToast, ToastContainer } from './components/Toast/Toast';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+
+const DEFAULT_STARTER_DOCUMENT = [
+  '\\documentclass{article}',
+  '\\usepackage{amsmath,amssymb}',
+  '\\usepackage{graphicx}',
+  '\\usepackage{hyperref}',
+  '',
+  '\\title{\\textbf{Scholarly Atelier: Local \\LaTeX{} Workspace}}',
+  '\\author{Local Academic Researcher}',
+  '\\date{\\today}',
+  '',
+  '\\begin{document}',
+  '',
+  '\\maketitle',
+  '',
+  '\\begin{abstract}',
+  'Welcome to your local-first Overleaf alternative. Designed for university students and academic researchers who need unlimited compute time, instant local compilation, live KaTeX equation previews, and Git version history without cloud timeout constraints.',
+  '\\end{abstract}',
+  '',
+  '\\section{Local Compilation \\& Speed}',
+  'Unlike cloud services with strict compile quotas, your documents compile locally using your machine\'s native \\LaTeX{} engine.',
+  '',
+  '\\begin{itemize}',
+  '    \\item \\textbf{Recompile}: Press \\texttt{Ctrl+Enter} (or \\texttt{Cmd+Enter}) anytime to build your PDF.',
+  '    \\item \\textbf{Live Math}: Type equations like $E = mc^2$ or $\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$ to see instant parchment previews.',
+  '    \\item \\textbf{SyncTeX}: Jump from code to PDF with one click, or \\texttt{Ctrl+Click} in the PDF to jump back to your code.',
+  '    \\item \\textbf{Checkpoints}: Access automated Git snapshots with visual diffs anytime.',
+  '\\end{itemize}',
+  '',
+  '\\section{Mathematical Formulation}',
+  'Gaussian distribution probability density function:',
+  '\\begin{equation}',
+  '    f(x) = \\frac{1}{\\sigma \\sqrt{2\\pi}} \\exp\\left( -\\frac{1}{2}\\left(\\frac{x - \\mu}{\\sigma}\\right)^2 \\right)',
+  '\\end{equation}',
+  '',
+  '\\section{Error Diagnostics}',
+  'If a syntax error occurs during compilation, the Diagnostic Assistant provides plain-language explanations and a \\textbf{``Copy Prompt for AI\'\'} button to solve complex macro issues instantly.',
+  '',
+  '\\end{document}',
+  '',
+].join('\n');
 
 export const App: React.FC = () => {
-  // Projects State
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [projectId, setProjectId] = useState<string>(() => {
-    return localStorage.getItem('overleaf-copy:active-project-id') || 'sample-project';
+  // Toast notification system (replaces window.alert)
+  const { toasts, addToast, removeToast } = useToast();
+
+  // Navigation View State ('dashboard' vs 'editor')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>(() => {
+    return window.location.hash.startsWith('#/project/') ? 'editor' : 'dashboard';
   });
-  const [projectName, setProjectName] = useState<string>('Sample Project');
+
+  // Projects State
+  const [projects, setProjects] = useState<ProjectInfo[]>(() => {
+    try {
+      const cached = localStorage.getItem('overleaf-copy:cached-projects');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    // Return empty array — server is the source of truth; loadProjects() fills this on mount.
+    return [];
+  });
+  const [projectId, setProjectId] = useState<string>(() => {
+    return localStorage.getItem('overleaf-copy:active-project-id') || '';
+  });
+  const [projectName, setProjectName] = useState<string>('');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFilePath, setActiveFilePath] = useState<string>('main.tex');
-  const [editorContent, setEditorContent] = useState<string>('');
+  const [editorContent, setEditorContent] = useState<string>(() => {
+    return localStorage.getItem('overleaf-copy:last-content') || DEFAULT_STARTER_DOCUMENT;
+  });
+  const [docTitle, setDocTitle] = useState<string | null>(() => {
+    const initial = localStorage.getItem('overleaf-copy:last-content') || DEFAULT_STARTER_DOCUMENT;
+    return extractLatexTitle(initial);
+  });
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
 
   // View & UI State
@@ -60,6 +130,8 @@ export const App: React.FC = () => {
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
   const [uploadQueue, setUploadQueue] = useState<UploadFileItem[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  // NewItemModal state (replaces window.prompt for new file/folder)
+  const [newItemModal, setNewItemModal] = useState<{ mode: 'file' | 'folder'; parentFolder: string } | null>(null);
 
   // Phase 3: History & Checkpoints State
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
@@ -81,6 +153,7 @@ export const App: React.FC = () => {
 
   // Refs
   const monacoEditorRef = useRef<any>(null);
+  const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const fileTreePanelRef = useRef<ImperativePanelHandle>(null);
   const pdfPanelRef = useRef<ImperativePanelHandle>(null);
   const autoSaveTimerRef = useRef<any>(null);
@@ -113,37 +186,89 @@ export const App: React.FC = () => {
   const loadProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/projects');
-      if (res.ok) {
-        const data: ProjectInfo[] = await res.json();
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+      const data: ProjectInfo[] = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
         setProjects(data);
+        localStorage.setItem('overleaf-copy:cached-projects', JSON.stringify(data));
 
-        if (data.length === 0) {
-          setIsNewProjectModalOpen(true);
-          return;
+        // Check if URL hash specifies an existing project
+        const hash = window.location.hash;
+        if (hash.startsWith('#/project/')) {
+          const hashId = hash.replace('#/project/', '').trim();
+          const match = data.find((p) => p.id === hashId);
+          if (match) {
+            setProjectId(match.id);
+            setProjectName(match.name);
+            return;
+          }
         }
 
-        // Determine which project to load
+        // Determine which project to load in background
         const savedId = localStorage.getItem('overleaf-copy:active-project-id');
         const match = data.find((p) => p.id === savedId) || data[0];
-        setProjectId(match.id);
-        setProjectName(match.name);
+        if (match) {
+          setProjectId(match.id);
+          setProjectName(match.name);
+        }
       }
-    } catch {
-      // Offline mock project
-      setProjects([
-        {
-          id: 'sample-project',
-          name: 'Quantum Research Note',
-          template: 'blank',
-          updatedAt: new Date().toISOString(),
-        },
-      ]);
+    } catch (err) {
+      console.warn('[Overleaf Copy] Network error loading /api/projects:', err);
+      // Try local storage cache
+      try {
+        const cached = localStorage.getItem('overleaf-copy:cached-projects');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProjects(parsed);
+            return;
+          }
+        }
+      } catch {}
     }
   }, []);
 
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  // Open project from dashboard into editor
+  const handleOpenProject = useCallback((id: string) => {
+    setProjectId(id);
+    const match = projects.find((p) => p.id === id);
+    if (match) setProjectName(match.name);
+    localStorage.setItem('overleaf-copy:active-project-id', id);
+    window.location.hash = `#/project/${id}`;
+    setCurrentView('editor');
+  }, [projects]);
+
+  // Return from editor back to projects dashboard
+  const handleBackToProjects = useCallback(() => {
+    setCurrentView('dashboard');
+    window.location.hash = '#/projects';
+  }, []);
+
+  // Sync view state with browser URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#/project/')) {
+        const id = hash.replace('#/project/', '').trim();
+        if (id) {
+          setProjectId(id);
+          const match = projects.find((p) => p.id === id);
+          if (match) setProjectName(match.name);
+          setCurrentView('editor');
+        }
+      } else {
+        setCurrentView('dashboard');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [projects]);
 
   // Load Project Files
   const loadProjectFiles = useCallback(async (pId: string) => {
@@ -167,11 +292,21 @@ export const App: React.FC = () => {
       const res = await fetch(`/api/projects/${pId}/file?path=${encodeURIComponent(relPath)}`);
       if (res.ok) {
         const content = await res.text();
-        setEditorContent(content);
+        const finalContent = content || (relPath === 'main.tex' ? DEFAULT_STARTER_DOCUMENT : '');
+        setEditorContent(finalContent);
         setSaveStatus('saved');
+        localStorage.setItem('overleaf-copy:last-content', finalContent);
+        if (relPath === 'main.tex') {
+          const parsedTitle = extractLatexTitle(finalContent);
+          setDocTitle(parsedTitle);
+        }
+      } else if (relPath === 'main.tex') {
+        setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
       }
     } catch {
-      // If error or not found, leave as is
+      if (relPath === 'main.tex') {
+        setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
+      }
     }
   }, []);
 
@@ -198,46 +333,74 @@ export const App: React.FC = () => {
     loadFileContent(projectId, 'main.tex');
   }, [projectId, loadProjectFiles, loadCitations, loadFileContent]);
 
-  // SyncTeX Forward (Cursor Position -> PDF Page & Coordinates)
-  const handleJumpToPdf = useCallback(async () => {
-    if (!monacoEditorRef.current || isJumpingToPdf) return;
-    const position = monacoEditorRef.current.getPosition();
-    const line = position?.lineNumber || 1;
+  // SyncTeX Forward (Cursor Position / Visible Line -> PDF Page & Coordinates)
+  const handleJumpToPdf = useCallback(
+    async (targetMode?: ViewMode) => {
+      if (!monacoEditorRef.current || isJumpingToPdf) return;
+      const editor = monacoEditorRef.current;
+      const position = editor.getPosition();
+      const visibleRanges = editor.getVisibleRanges?.();
+      const visibleStart = visibleRanges?.[0]?.startLineNumber;
+      const visibleEnd = visibleRanges?.[0]?.endLineNumber;
 
-    setIsJumpingToPdf(true);
-    try {
-      const res = await fetch(
-        `/api/projects/${projectId}/synctex/forward?file=${encodeURIComponent(
-          activeFilePath
-        )}&line=${line}`
-      );
-      if (res.ok) {
-        const result = await res.json();
-        if (result.page) {
-          setSynctexTarget({
-            page: result.page,
-            x: result.x,
-            y: result.y,
-            line: result.line,
-            file: result.file,
-            timestamp: Date.now(),
-          });
+      let line = 1;
+      if (
+        position &&
+        visibleStart &&
+        visibleEnd &&
+        position.lineNumber >= visibleStart &&
+        position.lineNumber <= visibleEnd
+      ) {
+        line = position.lineNumber;
+      } else if (visibleStart && visibleEnd) {
+        line = Math.round((visibleStart + visibleEnd) / 2);
+      } else if (position) {
+        line = position.lineNumber;
+      }
 
-          // Reveal PDF panel if hidden or in code mode
-          if (viewMode === 'code') {
-            setViewMode('split');
-          }
-          if (pdfCollapsed) {
-            setPdfCollapsed(false);
+      setIsJumpingToPdf(true);
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/synctex/forward?file=${encodeURIComponent(
+            activeFilePath
+          )}&line=${line}`
+        );
+        if (res.ok) {
+          const result = await res.json();
+          if (result.page) {
+            setSynctexTarget({
+              page: result.page,
+              x: result.x,
+              y: result.y,
+              line: result.line,
+              file: result.file,
+              timestamp: Date.now(),
+            });
+
+            // Reveal PDF panel if hidden or in code mode (unless target mode was explicitly specified)
+            if (targetMode) {
+              setViewMode(targetMode);
+            } else if (viewMode === 'code') {
+              setViewMode('split');
+            }
+            if (pdfCollapsed) {
+              setPdfCollapsed(false);
+            }
           }
         }
+      } catch {
+        // SyncTeX not compiled or ready
+      } finally {
+        setIsJumpingToPdf(false);
       }
-    } catch {
-      // SyncTeX not compiled or ready
-    } finally {
-      setIsJumpingToPdf(false);
-    }
-  }, [projectId, activeFilePath, isJumpingToPdf, viewMode, pdfCollapsed]);
+    },
+    [projectId, activeFilePath, isJumpingToPdf, viewMode, pdfCollapsed]
+  );
+
+  // Consume SyncTeX forward target once PDFViewer has processed the navigation
+  const handleSyncTexHandled = useCallback(() => {
+    setSynctexTarget(null);
+  }, []);
 
   // SyncTeX Backward (PDF Click / Selection -> Source File & Line)
   const handleSyncTexBackward = useCallback(
@@ -353,9 +516,16 @@ export const App: React.FC = () => {
   }, [editorContent]);
 
   // Debounced auto-save on editor change (800ms)
-  const handleEditorChange = (newVal: string) => {
+  const handleEditorChange = useCallback((newVal: string) => {
     setEditorContent(newVal);
     setSaveStatus('unsaved');
+
+    if (activeFilePath === 'main.tex') {
+      const parsed = extractLatexTitle(newVal);
+      if (parsed) {
+        setDocTitle(parsed);
+      }
+    }
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -363,7 +533,7 @@ export const App: React.FC = () => {
     autoSaveTimerRef.current = setTimeout(() => {
       saveActiveFile(newVal);
     }, 800);
-  };
+  }, [activeFilePath, saveActiveFile]);
 
   // Compile Handler
   const handleCompile = async () => {
@@ -378,9 +548,6 @@ export const App: React.FC = () => {
         clearTimeout(autoSaveTimerRef.current);
       }
       const contentToCompile = getLiveContent();
-      if (contentToCompile !== editorContent) {
-        setEditorContent(contentToCompile);
-      }
       await saveActiveFile(contentToCompile);
 
       const res = await fetch(`/api/projects/${projectId}/compile`, {
@@ -403,6 +570,9 @@ export const App: React.FC = () => {
           const freshPdfUrl = `${result.pdfUrl}&t=${Date.now()}`;
           setPdfUrl(freshPdfUrl);
           setLastValidPdfUrl(freshPdfUrl);
+        }
+        if (result.documentTitle) {
+          setDocTitle(result.documentTitle);
         }
         setCompileStatus(errors.length > 0 ? 'failed' : 'success');
       } else {
@@ -433,7 +603,9 @@ export const App: React.FC = () => {
 
   // Insert snippet helper into Monaco editor
   const handleInsertSnippet = (snippet: string, preambleAddition?: string) => {
-    let updatedContent = editorContent;
+    // Read the live Monaco buffer — editorContent state can lag by up to 800 ms
+    // (the auto-save debounce) so preamble-duplicate checks must use the live value.
+    let updatedContent = getLiveContent();
 
     // If preamble package is needed (e.g. \usepackage{graphicx}) and missing
     if (preambleAddition && !updatedContent.includes(preambleAddition.trim())) {
@@ -570,13 +742,13 @@ export const App: React.FC = () => {
   };
 
   // File Tree Actions
-  const handleSelectFile = (relPath: string) => {
+  const handleSelectFile = useCallback((relPath: string) => {
     const ext = '.' + relPath.split('.').pop()?.toLowerCase();
     const textExts = ['.tex', '.bib', '.txt', '.sty', '.cls', '.md'];
 
     if (textExts.includes(ext)) {
       if (saveStatus === 'unsaved') {
-        saveActiveFile(editorContent);
+        saveActiveFile(getLiveContent());
       }
       setActiveFilePath(relPath);
       loadFileContent(projectId, relPath);
@@ -584,7 +756,7 @@ export const App: React.FC = () => {
       // If user clicked an image, open Insert Image modal
       setIsImageModalOpen(true);
     }
-  };
+  }, [saveStatus, saveActiveFile, getLiveContent, projectId, loadFileContent]);
 
   const handleRenameItem = async (oldPath: string, newName: string) => {
     try {
@@ -601,10 +773,10 @@ export const App: React.FC = () => {
         loadProjectFiles(projectId);
       } else {
         const err = await res.json();
-        alert(`Rename failed: ${err.error}`);
+        addToast(`Rename failed: ${err.error}`, 'error');
       }
     } catch (e: any) {
-      alert(`Rename error: ${e.message}`);
+      addToast(`Rename error: ${e.message}`, 'error');
     }
   };
 
@@ -622,10 +794,10 @@ export const App: React.FC = () => {
         loadProjectFiles(projectId);
       } else {
         const err = await res.json();
-        alert(`Delete failed: ${err.error}`);
+        addToast(`Delete failed: ${err.error}`, 'error');
       }
     } catch (e: any) {
-      alert(`Delete error: ${e.message}`);
+      addToast(`Delete error: ${e.message}`, 'error');
     }
   };
 
@@ -640,126 +812,128 @@ export const App: React.FC = () => {
         loadProjectFiles(projectId);
       }
     } catch (e: any) {
-      alert(`Duplicate error: ${e.message}`);
+      addToast(`Duplicate error: ${e.message}`, 'error');
     }
   };
 
-  const handleNewFile = async (parentFolder = '') => {
-    const fName = prompt('Enter new filename (e.g. references.bib, chapter1.tex):');
-    if (!fName) return;
-    const targetPath = parentFolder ? `${parentFolder}/${fName}` : fName;
+  // Open the NewItemModal for creating files or folders
+  const handleNewFile = (parentFolder = '') => {
+    setNewItemModal({ mode: 'file', parentFolder });
+  };
+
+  const handleNewFolder = (parentFolder = '') => {
+    setNewItemModal({ mode: 'folder', parentFolder });
+  };
+
+  // Called by NewItemModal after the user types a name and confirms
+  const handleCreateNewItem = async (itemName: string) => {
+    if (!newItemModal) return;
+    const { mode, parentFolder } = newItemModal;
+    const targetPath = parentFolder ? `${parentFolder}/${itemName}` : itemName;
     try {
       const res = await fetch(`/api/projects/${projectId}/create-file`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPath, type: 'file' }),
+        body: JSON.stringify({ targetPath, type: mode === 'folder' ? 'directory' : 'file' }),
       });
       if (res.ok) {
         loadProjectFiles(projectId);
-        handleSelectFile(targetPath);
+        if (mode === 'file') handleSelectFile(targetPath);
+        addToast(
+          mode === 'file' ? `File "${itemName}" created.` : `Folder "${itemName}" created.`,
+          'success'
+        );
       } else {
         const err = await res.json();
-        alert(`Failed: ${err.error}`);
+        addToast(`Failed: ${err.error}`, 'error');
       }
     } catch (e: any) {
-      alert(`Error: ${e.message}`);
+      addToast(`Error: ${e.message}`, 'error');
     }
   };
 
-  const handleNewFolder = async (parentFolder = '') => {
-    const folderName = prompt('Enter new folder name (e.g. sections, figures):');
-    if (!folderName) return;
-    const targetPath = parentFolder ? `${parentFolder}/${folderName}` : folderName;
-    try {
-      const res = await fetch(`/api/projects/${projectId}/create-file`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPath, type: 'directory' }),
-      });
-      if (res.ok) {
-        loadProjectFiles(projectId);
-      } else {
-        const err = await res.json();
-        alert(`Failed: ${err.error}`);
-      }
-    } catch (e: any) {
-      alert(`Error: ${e.message}`);
-    }
-  };
+  // Coordinated View Mode Transitions:
+  // 1. When switching from full PDF mode into Split or Code mode,
+  //    automatically sync Monaco editor to the section visible in the PDF.
+  // 2. When switching from full Code mode into PDF or Split mode,
+  //    automatically sync PDF preview to the cursor / visible section in the Code editor.
+  const handleViewModeChange = useCallback(
+    (newMode: ViewMode) => {
+      const oldMode = viewMode;
+      if (oldMode === newMode) return;
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+S / Cmd+S: Save
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault();
-        saveActiveFile(getLiveContent());
-      }
-
-      // Ctrl+B: Toggle Sidebar
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
-        e.preventDefault();
-        setFileTreeCollapsed((prev) => !prev);
-      }
-
-      // View Mode Shortcuts (Ctrl+Shift+1/2/3)
-      if (e.ctrlKey && e.shiftKey) {
-        if (e.key === '!' || e.key === '1') {
-          e.preventDefault();
-          setViewMode('code');
-        } else if (e.key === '@' || e.key === '2') {
-          e.preventDefault();
-          setViewMode('split');
-        } else if (e.key === '#' || e.key === '3') {
-          e.preventDefault();
-          setViewMode('pdf');
+      if (oldMode === 'pdf' && (newMode === 'split' || newMode === 'code')) {
+        const syncTarget = pdfViewerRef.current?.getVisibleSyncTarget();
+        if (syncTarget) {
+          handleSyncTexBackward(syncTarget.page, syncTarget.x, syncTarget.y, syncTarget.text);
         }
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [getLiveContent, saveActiveFile]);
+
+      if (oldMode === 'code' && (newMode === 'pdf' || newMode === 'split')) {
+        handleJumpToPdf(newMode);
+      }
+
+      setViewMode(newMode);
+    },
+    [viewMode, handleSyncTexBackward, handleJumpToPdf]
+  );
+
+  // Global Keyboard Shortcuts
+  useKeyboardShortcuts({
+    viewMode,
+    setViewMode: handleViewModeChange,
+    setPdfCollapsed,
+    setFileTreeCollapsed,
+    saveActiveFile,
+    getLiveContent,
+  });
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-surface-light dark:bg-surface-dark text-slate-900 dark:text-white">
-      {/* Top Header Bar */}
-      <TopBar
-        projectName={projectName}
-        projectId={projectId}
-        projects={projects}
-        onSelectProject={(pId) => {
-          const match = projects.find((p) => p.id === pId);
-          if (match) {
-            setProjectId(match.id);
-            setProjectName(match.name);
-          }
-        }}
-        onNewProject={() => setIsNewProjectModalOpen(true)}
-        onCompile={handleCompile}
-        isCompiling={isCompiling}
-        compileDuration={compileDuration}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onOpenHistory={() => setIsHistoryOpen(true)}
-        onOpenDoctor={() => setIsDoctorOpen(true)}
-        isDoctorHealthy={isDoctorHealthy}
-        activeFilePath={activeFilePath}
-        saveStatus={saveStatus}
-      />
+      {currentView === 'dashboard' ? (
+        <ProjectsDashboard
+          projects={projects}
+          onSelectProject={handleOpenProject}
+          onNewProject={() => setIsNewProjectModalOpen(true)}
+          onRefreshProjects={loadProjects}
+          onOpenDoctor={() => setIsDoctorOpen(true)}
+          isDoctorHealthy={isDoctorHealthy}
+        />
+      ) : (
+        <div className="flex flex-col h-full w-full overflow-hidden">
+          {/* Top Header Bar */}
+          <TopBar
+            projectName={projectName}
+            projectId={projectId}
+            projects={projects}
+            onSelectProject={handleOpenProject}
+            onNewProject={() => setIsNewProjectModalOpen(true)}
+            onBackToProjects={handleBackToProjects}
+            onCompile={handleCompile}
+            isCompiling={isCompiling}
+            compileDuration={compileDuration}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            onOpenHistory={() => setIsHistoryOpen(true)}
+            onOpenDoctor={() => setIsDoctorOpen(true)}
+            isDoctorHealthy={isDoctorHealthy}
+            activeFilePath={activeFilePath}
+            saveStatus={saveStatus}
+          />
 
-      {/* Main Workspace Body: Resizable 3-Panel Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
+          {/* Main Workspace Body: Resizable 3-Panel Layout */}
+          <div className="flex-1 flex overflow-hidden relative">
         {/* Collapsed Sidebar Rail (when collapsed) */}
         {fileTreeCollapsed && (
-          <div className="w-10 h-full border-r border-surface-lightSubtle dark:border-surface-darkSubtle bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col items-center py-3 space-y-3 z-10 flex-shrink-0 select-none">
+          <div className="w-10 h-full border-r border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col items-center py-3 space-y-3 z-10 flex-shrink-0 select-none transition-colors">
             <button
               onClick={() => setFileTreeCollapsed(false)}
               title="Expand Files Sidebar (Ctrl+B)"
-              className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-mint transition"
+              className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
             >
               <PanelLeftOpen className="w-4 h-4" />
             </button>
-            <div className="text-slate-400 p-1">
+            <div className="text-stone-400 p-1">
               <FolderClosed className="w-4 h-4" />
             </div>
           </div>
@@ -767,7 +941,7 @@ export const App: React.FC = () => {
 
         <PanelGroup
           direction="horizontal"
-          autoSaveId="overleaf-copy-layout-v2"
+          autoSaveId="overleaf-copy-layout-v3"
           className="flex-1 h-full"
         >
           {/* Panel 1: File Tree Sidebar */}
@@ -776,6 +950,7 @@ export const App: React.FC = () => {
               <Panel
                 ref={fileTreePanelRef}
                 id="file-tree-panel"
+                order={1}
                 defaultSize={18}
                 minSize={12}
                 maxSize={35}
@@ -799,8 +974,8 @@ export const App: React.FC = () => {
               </Panel>
 
               {/* Resize Handle between FileTree and Editor */}
-              <PanelResizeHandle className="w-1.5 hover:bg-brand-mint/60 active:bg-brand-mint transition-colors cursor-col-resize z-20 relative group">
-                <div className="w-0.5 h-6 bg-slate-300 dark:bg-slate-700 group-hover:bg-brand-mint mx-auto rounded-full mt-[45vh]" />
+              <PanelResizeHandle className="w-1.5 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group">
+                <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
               </PanelResizeHandle>
             </>
           )}
@@ -809,6 +984,7 @@ export const App: React.FC = () => {
           {viewMode !== 'pdf' && (
             <Panel
               id="editor-panel"
+              order={2}
               defaultSize={viewMode === 'code' || pdfCollapsed ? 82 : 42}
               minSize={25}
               className="h-full flex flex-col overflow-hidden"
@@ -858,8 +1034,8 @@ export const App: React.FC = () => {
 
           {/* Resize Handle between Editor and PDF */}
           {viewMode === 'split' && !pdfCollapsed && (
-            <PanelResizeHandle className="w-1.5 hover:bg-brand-mint/60 active:bg-brand-mint transition-colors cursor-col-resize z-20 relative group">
-              <div className="w-0.5 h-6 bg-slate-300 dark:bg-slate-700 group-hover:bg-brand-mint mx-auto rounded-full mt-[45vh]" />
+            <PanelResizeHandle className="w-1.5 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group">
+              <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
             </PanelResizeHandle>
           )}
 
@@ -868,6 +1044,7 @@ export const App: React.FC = () => {
             <Panel
               ref={pdfPanelRef}
               id="pdf-panel"
+              order={3}
               defaultSize={viewMode === 'pdf' ? 100 : 40}
               minSize={20}
               collapsible={true}
@@ -876,6 +1053,7 @@ export const App: React.FC = () => {
               className="h-full overflow-hidden"
             >
               <PDFViewer
+                ref={pdfViewerRef}
                 pdfUrl={pdfUrl}
                 lastValidPdfUrl={lastValidPdfUrl}
                 compileDuration={compileDuration}
@@ -890,8 +1068,14 @@ export const App: React.FC = () => {
                 }}
                 onToggleCollapse={() => setPdfCollapsed(true)}
                 synctexTarget={synctexTarget}
+                onSyncTexHandled={handleSyncTexHandled}
                 onSyncTexBackward={handleSyncTexBackward}
                 isSyncingBackward={isSyncingBackward}
+                downloadFileName={
+                  docTitle
+                    ? `${docTitle}.pdf`
+                    : getLatexPdfFilename(editorContent, projectName)
+                }
               />
             </Panel>
           )}
@@ -899,17 +1083,19 @@ export const App: React.FC = () => {
 
         {/* Collapsed PDF Rail (when collapsed in split mode) */}
         {viewMode === 'split' && pdfCollapsed && (
-          <div className="w-10 h-full border-l border-surface-lightSubtle dark:border-surface-darkSubtle bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col items-center py-3 space-y-3 z-10 flex-shrink-0 select-none">
+          <div className="w-10 h-full border-l border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col items-center py-3 space-y-3 z-10 flex-shrink-0 select-none transition-colors">
             <button
               onClick={() => setPdfCollapsed(false)}
               title="Expand PDF Preview"
-              className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-mint transition"
+              className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
             >
               <PanelLeftOpen className="w-4 h-4 rotate-180" />
             </button>
           </div>
         )}
       </div>
+    </div>
+  )}
 
       {/* Live KaTeX Equation Tooltip */}
       {isLiveMathEnabled && (
@@ -953,11 +1139,11 @@ export const App: React.FC = () => {
             if (res.ok) {
               const newProj = await res.json();
               await loadProjects();
-              setProjectId(newProj.id);
-              setProjectName(newProj.name);
+              handleOpenProject(newProj.id);
+              setIsNewProjectModalOpen(false);
             }
           } catch (e: any) {
-            alert(`Could not create project: ${e.message}`);
+            addToast(`Could not create project: ${e.message}`, 'error');
           }
         }}
       />
@@ -1006,6 +1192,18 @@ export const App: React.FC = () => {
         onInsert={handleInsertSnippet}
         onCitationAdded={() => loadCitations(projectId)}
       />
+
+      {/* New File / Folder Modal (replaces window.prompt) */}
+      <NewItemModal
+        isOpen={newItemModal !== null}
+        mode={newItemModal?.mode ?? 'file'}
+        parentFolder={newItemModal?.parentFolder}
+        onConfirm={handleCreateNewItem}
+        onClose={() => setNewItemModal(null)}
+      />
+
+      {/* Toast Notifications (replaces window.alert) */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 };

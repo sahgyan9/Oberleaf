@@ -42,19 +42,19 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 select-none animate-in fade-in duration-150">
-      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightSubtle dark:border-surface-darkSubtle w-full max-w-lg rounded-xl p-5 shadow-2xl space-y-4 flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none animate-in fade-in duration-150">
+      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder w-full max-w-lg rounded-xl p-5 shadow-2xl space-y-4 flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 flex-shrink-0">
-          <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-semibold text-sm">
-            <Upload className="w-4 h-4 text-brand-mint" />
+        <div className="flex items-center justify-between border-b border-surface-lightBorder dark:border-surface-darkBorder pb-3 flex-shrink-0">
+          <div className="flex items-center space-x-2 text-stone-900 dark:text-stone-100 font-semibold text-sm">
+            <Upload className="w-4 h-4 text-scholarly-green dark:text-scholarly-greenDark" />
             <span>Importing Files ({importedCount}/{totalFiles})</span>
           </div>
           <button
             onClick={onClose}
             disabled={!isAllFinished}
             title={isAllFinished ? 'Close' : 'Waiting for uploads to finish'}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded disabled:opacity-30"
+            className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 rounded disabled:opacity-30 transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -62,17 +62,17 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({
 
         {/* Progress Bar */}
         <div className="flex-shrink-0 space-y-1.5">
-          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-brand-mint h-full transition-all duration-300 rounded-full"
+              className="bg-scholarly-green dark:bg-scholarly-greenDark h-full transition-all duration-300 rounded-full"
               style={{ width: `${(importedCount / totalFiles) * 100}%` }}
             />
           </div>
-          <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="flex justify-between text-[11px] text-stone-500 dark:text-stone-400">
             <span>
               {isAllFinished
                 ? `Import complete: ${importedCount} succeeded${failedCount > 0 ? `, ${failedCount} failed` : ''}`
-                : 'Processing files in background...'}
+                : 'Processing files locally...'}
             </span>
             <span>{Math.round((importedCount / totalFiles) * 100)}%</span>
           </div>
@@ -83,42 +83,42 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({
           {files.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between p-2.5 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-slate-200 dark:border-slate-800 text-xs"
+              className="flex items-center justify-between p-2.5 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-xs"
             >
               <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
                 {/* Status Icon */}
                 <div className="flex-shrink-0">
                   {item.status === 'uploading' && (
-                    <Loader2 className="w-4 h-4 text-brand-cyan animate-spin" />
+                    <Loader2 className="w-4 h-4 text-scholarly-blue animate-spin" />
                   )}
                   {item.status === 'imported' && (
-                    <CheckCircle2 className="w-4 h-4 text-brand-mint" />
+                    <CheckCircle2 className="w-4 h-4 text-scholarly-green dark:text-scholarly-greenDark" />
                   )}
                   {item.status === 'failed' && (
-                    <AlertCircle className="w-4 h-4 text-rose-400" />
+                    <AlertCircle className="w-4 h-4 text-rose-500" />
                   )}
                   {item.status === 'waiting' && (
-                    <div className="w-4 h-4 rounded-full border border-slate-400 border-dashed" />
+                    <div className="w-4 h-4 rounded-full border border-stone-400 border-dashed" />
                   )}
                   {item.status === 'cancelled' && (
-                    <Ban className="w-4 h-4 text-slate-400" />
+                    <Ban className="w-4 h-4 text-stone-400" />
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                    <span className="font-medium text-stone-800 dark:text-stone-200 truncate">
                       {item.name}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
+                    <span className="text-[10px] text-stone-400 font-mono flex-shrink-0">
                       {formatBytes(item.size)}
                     </span>
                   </div>
                   {item.error && (
-                    <p className="text-[11px] text-rose-400 mt-0.5 truncate">{item.error}</p>
+                    <p className="text-[11px] text-rose-500 mt-0.5 truncate">{item.error}</p>
                   )}
                   {item.relativePath && (
-                    <p className="text-[10px] text-brand-cyan mt-0.5 font-mono truncate">
+                    <p className="text-[10px] text-scholarly-blue mt-0.5 font-mono truncate">
                       {item.relativePath}
                     </p>
                   )}
@@ -130,7 +130,7 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({
                 <button
                   onClick={() => onCancelItem(item.id)}
                   title="Cancel this upload"
-                  className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                  className="p-1 rounded text-stone-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -140,22 +140,22 @@ export const UploadProgressModal: React.FC<UploadProgressModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+        <div className="flex items-center justify-between pt-3 border-t border-surface-lightBorder dark:border-surface-darkBorder flex-shrink-0">
           {!isAllFinished ? (
             <button
               onClick={onCancelAll}
-              className="text-xs text-rose-500 hover:text-rose-600 font-medium transition"
+              className="text-xs text-rose-600 hover:text-rose-700 dark:text-rose-400 font-medium transition"
             >
               Cancel All Pending
             </button>
           ) : (
-            <span className="text-xs text-brand-mint font-medium">All operations finished</span>
+            <span className="text-xs text-scholarly-green dark:text-scholarly-greenDark font-medium">All operations finished</span>
           )}
 
           <button
             onClick={onClose}
             disabled={!isAllFinished}
-            className="px-4 py-1.5 rounded-md bg-brand-mint text-slate-950 hover:brightness-110 disabled:opacity-50 text-xs font-semibold shadow-md shadow-brand-mint/20 transition"
+            className="px-4 py-1.5 rounded-lg bg-scholarly-green hover:bg-scholarly-greenDark text-white disabled:opacity-50 text-xs font-semibold shadow-xs transition btn-tactile"
           >
             {isAllFinished ? 'Done' : 'Uploading...'}
           </button>

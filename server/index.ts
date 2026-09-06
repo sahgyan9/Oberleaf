@@ -7,6 +7,11 @@ import { compileDocument } from './compiler.js';
 import {
   listProjects,
   createProject,
+  deleteProject,
+  duplicateProject,
+  toggleArchiveProject,
+  createProjectZip,
+  seedScreenshotProjects,
   listProjectFiles,
   getProjectsRoot,
   getUniqueFilename,
@@ -19,6 +24,7 @@ import {
 } from './git.js';
 import { getProjectSyncTex } from './synctex.js';
 import { getProjectCitations, addProjectCitation } from './bibtex.js';
+import { getProjectPdfFilename, sanitizeFilename } from './latexTitle.js';
 
 const app = express();
 const PORT = 3001;
@@ -96,6 +102,11 @@ function resolveProjectPath(projectId: string, targetPath: string = ''): string 
   return resolved;
 }
 
+// 0. Health-check endpoint (used by launch.ps1 to confirm the daemon is ready)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // 1. Dependency Doctor Endpoint
 app.get('/api/doctor', async (_req, res) => {
   try {
@@ -122,6 +133,68 @@ app.post('/api/projects', (req, res) => {
     if (!name) return res.status(400).json({ error: 'Project name is required' });
     const project = createProject(name, template || 'blank');
     res.json(project);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/projects/:id', (req, res) => {
+  try {
+    deleteProject(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/:id/clone', (req, res) => {
+  try {
+    const cloned = duplicateProject(req.params.id);
+    res.json(cloned);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/projects/:id/archive', (req, res) => {
+  try {
+    const isArchived = toggleArchiveProject(req.params.id);
+    res.json({ success: true, isArchived });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/projects/:id/zip', (req, res) => {
+  try {
+    const zipPath = createProjectZip(req.params.id);
+    res.download(zipPath, `${req.params.id}.zip`, (err) => {
+      if (!err && fs.existsSync(zipPath)) {
+        try {
+          fs.unlinkSync(zipPath);
+        } catch {}
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/projects/:id/download-pdf', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const pdfCandidates = [
+      path.join(projectDir, 'main.pdf'),
+      path.join(projectDir, 'output.pdf'),
+      path.join(projectDir, '.build', 'output.pdf'),
+      path.join(projectDir, `${req.params.id}.pdf`),
+    ];
+    const foundPdf = pdfCandidates.find((p) => fs.existsSync(p));
+    if (!foundPdf) {
+      return res.status(404).json({ error: 'PDF has not been compiled yet for this project.' });
+    }
+    const pdfFilename = getProjectPdfFilename(projectDir, req.params.id);
+    res.download(foundPdf, pdfFilename);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -199,16 +272,21 @@ app.post('/api/projects/:id/file', (req, res) => {
   }
 });
 
-// 3. Single Asset Upload Endpoint (with auto-deduplication)
+// 3. Single Asset Upload Endpoint (overwrites existing files by default)
 app.post('/api/projects/:id/upload', (req, res) => {
   try {
-    const { fileName, base64Data, targetDir } = req.body;
+    const { fileName, base64Data, targetDir, overwrite = true } = req.body;
     if (!fileName || !base64Data) {
       return res.status(400).json({ error: 'fileName and base64Data required' });
     }
 
+    const safeFileName = path.basename(String(fileName)).trim();
+    if (!safeFileName || safeFileName === '.' || safeFileName === '..') {
+      return res.status(400).json({ error: 'Invalid fileName' });
+    }
+
     const projectDir = getProjectDir(req.params.id);
-    const ext = path.extname(fileName).toLowerCase();
+    const ext = path.extname(safeFileName).toLowerCase();
     const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.eps'].includes(ext);
     const defaultFolder = isImage ? path.join(projectDir, 'figures') : projectDir;
     const targetFolder = targetDir ? resolveProjectPath(req.params.id, targetDir) : defaultFolder;
@@ -217,25 +295,26 @@ app.post('/api/projects/:id/upload', (req, res) => {
       fs.mkdirSync(targetFolder, { recursive: true });
     }
 
-    // Auto-rename if duplicate exists (e.g. image.png -> image_1.png)
-    const uniqueFileName = getUniqueFilename(targetFolder, path.basename(String(fileName)));
-    const filePath = path.join(targetFolder, uniqueFileName);
+    const targetFileName = overwrite
+      ? safeFileName
+      : getUniqueFilename(targetFolder, safeFileName);
+    const filePath = path.join(targetFolder, targetFileName);
 
     const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
     const buffer = Buffer.from(base64Clean, 'base64');
     fs.writeFileSync(filePath, buffer);
 
     const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
-    res.json({ success: true, fileName: uniqueFileName, relativePath: relPath });
+    res.json({ success: true, fileName: targetFileName, relativePath: relPath });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 4. Batch Upload Endpoint
+// 4. Batch Upload Endpoint (overwrites existing files by default)
 app.post('/api/projects/:id/upload-batch', (req, res) => {
   try {
-    const { files, targetDir } = req.body;
+    const { files, targetDir, overwrite = true } = req.body;
     if (!Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ error: 'Files array required' });
     }
@@ -245,7 +324,12 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
     const results = files.map((fileObj: { fileName: string; base64Data: string }) => {
       try {
         const { fileName, base64Data } = fileObj;
-        const ext = path.extname(fileName).toLowerCase();
+        const safeFileName = path.basename(String(fileName)).trim();
+        if (!safeFileName || safeFileName === '.' || safeFileName === '..') {
+          throw new Error('Invalid fileName');
+        }
+
+        const ext = path.extname(safeFileName).toLowerCase();
         const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.eps'].includes(ext);
         const defaultFolder = isImage ? path.join(projectDir, 'figures') : projectDir;
         const targetFolder = targetDir ? resolveProjectPath(req.params.id, targetDir) : defaultFolder;
@@ -254,8 +338,10 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
           fs.mkdirSync(targetFolder, { recursive: true });
         }
 
-        const uniqueFileName = getUniqueFilename(targetFolder, path.basename(String(fileName)));
-        const filePath = path.join(targetFolder, uniqueFileName);
+        const targetFileName = overwrite
+          ? safeFileName
+          : getUniqueFilename(targetFolder, safeFileName);
+        const filePath = path.join(targetFolder, targetFileName);
 
         const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
         const buffer = Buffer.from(base64Clean, 'base64');
@@ -263,7 +349,7 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
 
         const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
         return {
-          fileName: uniqueFileName,
+          fileName: targetFileName,
           originalName: fileName,
           relativePath: relPath,
           success: true,
@@ -309,6 +395,7 @@ app.get('/api/projects/:id/preview-image', (req, res) => {
 
     const contentType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     fs.createReadStream(filePath).pipe(res);
   } catch (error: any) {
     res.status(500).send(error.message);
@@ -534,6 +621,8 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
     const y = parseFloat(query.y as string) || 100;
     const text = typeof query.text === 'string' ? query.text.trim() : '';
 
+    const parser = getProjectSyncTex(projectDir);
+
     // If user provided selected text, search source files for a high-confidence match
     if (text && text.length > 2) {
       const cleanSnippet = text.replace(/[\r\n]+/g, ' ').trim();
@@ -542,29 +631,62 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
         const fileContent = fs.readFileSync(mainPath, 'utf-8');
         const lines = fileContent.split('\n');
 
-        // 1. Direct line substring match
-        for (let i = 0; i < lines.length; i++) {
-          const lineText = lines[i];
-          if (lineText.toLowerCase().includes(cleanSnippet.toLowerCase())) {
-            return res.json({ file: 'main.tex', line: i + 1, page, matchedText: cleanSnippet });
+        // The searched word/phrase can appear more than once in the source
+        // (e.g. a term used in the intro AND as a later section heading).
+        // Picking the first occurrence in the file would ignore where the
+        // user actually double-clicked, so when there are multiple
+        // candidates we disambiguate using the SyncTeX-mapped page/position
+        // of each candidate line, preferring the one closest to the click.
+        const pickBest = (candidateLines: number[]): number => {
+          if (candidateLines.length <= 1 || !parser) return candidateLines[0];
+          let best = candidateLines[0];
+          let bestScore = Infinity;
+          for (const lineIdx of candidateLines) {
+            const fwd = parser.forward('main.tex', lineIdx + 1);
+            if (!fwd) continue;
+            const score =
+              fwd.page === page
+                ? (fwd.x - x) ** 2 + (fwd.y - y) ** 2
+                : 1e8 + Math.abs(fwd.page - page) * 1e6;
+            if (score < bestScore) {
+              bestScore = score;
+              best = lineIdx;
+            }
           }
+          return best;
+        };
+
+        // 1. Direct line substring match
+        const directMatches: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().includes(cleanSnippet.toLowerCase())) {
+            directMatches.push(i);
+          }
+        }
+        if (directMatches.length > 0) {
+          const bestLine = pickBest(directMatches);
+          return res.json({ file: 'main.tex', line: bestLine + 1, page, matchedText: cleanSnippet });
         }
 
         // 2. Multi-word match
         const words = cleanSnippet.split(/\s+/).filter((w: string) => w.length > 3);
         if (words.length >= 2) {
+          const multiMatches: number[] = [];
           for (let i = 0; i < lines.length; i++) {
             const lineText = lines[i].toLowerCase();
             const allWordsPresent = words.slice(0, 3).every((w: string) => lineText.includes(w.toLowerCase()));
             if (allWordsPresent) {
-              return res.json({ file: 'main.tex', line: i + 1, page, matchedText: cleanSnippet });
+              multiMatches.push(i);
             }
+          }
+          if (multiMatches.length > 0) {
+            const bestLine = pickBest(multiMatches);
+            return res.json({ file: 'main.tex', line: bestLine + 1, page, matchedText: cleanSnippet });
           }
         }
       }
     }
 
-    const parser = getProjectSyncTex(projectDir);
     if (!parser) {
       return res.status(404).json({ error: 'SyncTeX data not available. Recompile document first.' });
     }
@@ -610,7 +732,7 @@ app.post('/api/projects/:id/citations', (req, res) => {
   }
 });
 
-// 8. PDF Serving
+// 11. PDF Serving
 // Only serves .pdf files that live inside the projects root. Without these two
 // checks this endpoint hands out any file on disk that the user can read.
 app.get('/api/pdf', (req, res) => {
@@ -630,58 +752,26 @@ app.get('/api/pdf', (req, res) => {
     return res.status(404).send('PDF not found');
   }
 
+  const downloadRequested = req.query.download === '1' || req.query.download === 'true';
+  const customFilename = req.query.filename as string;
+  if (downloadRequested || customFilename) {
+    const baseFallback = path.basename(filePath);
+    const resolvedName = customFilename
+      ? sanitizeFilename(customFilename.replace(/\.pdf$/i, '')) + '.pdf'
+      : baseFallback;
+    const asciiName = resolvedName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(resolvedName)}`
+    );
+  }
+
   res.setHeader('Content-Type', 'application/pdf');
   fs.createReadStream(filePath).pipe(res);
 });
 
-// Ensure default project exists on startup
-function ensureDefaultProjects() {
-  const root = getProjectsRoot();
-  const sampleDir = path.join(root, 'sample-project');
-  if (!fs.existsSync(sampleDir)) {
-    createProject('Sample Project', 'blank');
-  } else {
-    // If sample-project exists but has no main.tex, create main.tex
-    const mainTex = path.join(sampleDir, 'main.tex');
-    if (!fs.existsSync(mainTex)) {
-      fs.writeFileSync(
-        mainTex,
-        `\\documentclass{article}
-\\usepackage{amsmath}
-\\usepackage{graphicx}
-
-\\title{Exploring Quantum Limits Without Timeouts}
-\\author{Overleaf Copy User}
-\\date{\\today}
-
-\\begin{document}
-
-\\maketitle
-
-\\begin{abstract}
-This document demonstrates local LaTeX compiling with instant equation preview.
-\\end{abstract}
-
-\\section{Instant Equation Preview}
-Type any equation to see it render live beneath your cursor:
-\\begin{equation}
-  \\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
-\\end{equation}
-
-And inline mathematics: $E = \\hbar \\omega$ with zero latency.
-
-\\section{Figures and Images}
-Insert scientific figures seamlessly from your figures directory.
-
-\\end{document}
-`,
-        'utf-8'
-      );
-    }
-  }
-}
-
-ensureDefaultProjects();
+// Seed initial projects matching Overleaf landing screenshot
+seedScreenshotProjects();
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[Overleaf Copy] Server daemon running at http://127.0.0.1:${PORT}`);
@@ -689,16 +779,14 @@ const server = app.listen(PORT, '127.0.0.1', () => {
 
 server.on('error', (err: any) => {
   if (err.code === 'EADDRINUSE') {
-    console.log(`[Overleaf Copy] Port ${PORT} busy, retrying in 1.5s...`);
-    setTimeout(() => {
-      try {
-        if (server.listening) {
-          server.close();
-        }
-      } catch {}
-      server.listen(PORT, '127.0.0.1');
-    }, 1500);
+    console.error(
+      `[Overleaf Copy] Port ${PORT} is already in use.\n` +
+      `  → Run: npx kill-port ${PORT}   (or restart your terminal)\n` +
+      `  → Then run: npm start`
+    );
+    process.exit(1);
   } else {
     console.error('[Overleaf Copy] Server error:', err);
+    process.exit(1);
   }
 });

@@ -8,3 +8,7 @@ dist/
 texput.log
 launch_test.log
 projects/
+logs/
+.tmp/
+.claude/
+*.lnk

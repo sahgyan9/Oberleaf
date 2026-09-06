@@ -121,15 +121,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
       case '.jpeg':
       case '.svg':
       case '.webp':
-        return <ImageIcon className="w-3.5 h-3.5 text-brand-mint flex-shrink-0" />;
+        return <ImageIcon className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />;
       case '.tex':
-        return <FileCode className="w-3.5 h-3.5 text-brand-cyan flex-shrink-0" />;
+        return <FileCode className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark flex-shrink-0" />;
       case '.bib':
-        return <FileCheck className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />;
+        return <FileCheck className="w-3.5 h-3.5 text-citation dark:text-citation-dark flex-shrink-0" />;
       case '.pdf':
-        return <FileText className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />;
+        return <FileText className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 flex-shrink-0" />;
       default:
-        return <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />;
+        return <FileText className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />;
     }
   };
 
@@ -154,33 +154,33 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <div
               onClick={(e) => toggleFolder(item.relativePath, e)}
               onContextMenu={(e) => handleContextMenu(e, item)}
-              className="group flex items-center justify-between px-2 py-1.5 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 cursor-pointer transition"
+              className="group flex items-center justify-between px-2 py-1.5 rounded text-xs text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle cursor-pointer transition btn-tactile"
               style={{ paddingLeft: `${Math.max(8, depth * 14 + 8)}px` }}
             >
               <div className="flex items-center space-x-1.5 truncate">
                 {isOpen ? (
-                  <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                  <ChevronDown className="w-3 h-3 text-stone-400 flex-shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                  <ChevronRight className="w-3 h-3 text-stone-400 flex-shrink-0" />
                 )}
                 {isOpen ? (
-                  <FolderOpen className="w-3.5 h-3.5 text-brand-ocean flex-shrink-0" />
+                  <FolderOpen className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 flex-shrink-0" />
                 ) : (
-                  <Folder className="w-3.5 h-3.5 text-brand-ocean flex-shrink-0" />
+                  <Folder className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 flex-shrink-0" />
                 )}
                 <span className="font-medium truncate">{item.name}</span>
               </div>
 
               <button
                 onClick={(e) => handleContextMenu(e, item)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-white rounded"
+                className="opacity-0 group-hover:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
               >
                 <MoreVertical className="w-3 h-3" />
               </button>
             </div>
 
             {isOpen && item.children && (
-              <div className="border-l border-slate-200 dark:border-slate-800/80 ml-3">
+              <div className="border-l border-surface-lightBorder dark:border-surface-darkBorder ml-3">
                 {renderTree(item.children, depth + 1)}
               </div>
             )}
@@ -193,10 +193,10 @@ export const FileTree: React.FC<FileTreeProps> = ({
           key={item.path}
           onContextMenu={(e) => handleContextMenu(e, item)}
           onClick={() => onSelectFile(item.relativePath || item.name)}
-          className={`group flex items-center justify-between px-2.5 py-1.5 rounded text-xs cursor-pointer transition select-none ${
+          className={`group flex items-center justify-between px-2.5 py-1.5 rounded text-xs cursor-pointer transition select-none btn-tactile ${
             isSelected
-              ? 'bg-brand-indigo/15 dark:bg-brand-indigo/35 text-brand-indigo dark:text-brand-mint font-medium shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+              ? 'bg-stone-200/70 dark:bg-stone-800 text-[#1C1917] dark:text-[#F5F5F4] font-medium border-l-2 border-scholarly dark:border-scholarly-dark shadow-xs'
+              : 'text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
           }`}
           style={{ paddingLeft: `${Math.max(10, depth * 14 + 10)}px` }}
         >
@@ -207,7 +207,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
 
           <button
             onClick={(e) => handleContextMenu(e, item)}
-            className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-white rounded"
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
           >
             <MoreVertical className="w-3 h-3" />
           </button>
@@ -221,8 +221,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`h-full w-full bg-surface-lightPanel dark:bg-surface-darkPanel border-r border-surface-lightSubtle dark:border-surface-darkSubtle flex flex-col select-none relative transition-colors ${
-        isDragOver ? 'ring-2 ring-brand-mint ring-inset bg-brand-mint/5' : ''
+      className={`h-full w-full bg-surface-lightPanel dark:bg-surface-darkPanel border-r border-surface-lightBorder dark:border-surface-darkBorder flex flex-col select-none relative transition-colors ${
+        isDragOver ? 'ring-2 ring-scholarly dark:ring-scholarly-dark ring-inset bg-scholarly-subtle/30 dark:bg-scholarly-darkSubtle/30' : ''
       }`}
     >
       {/* Hidden Multi-file input */}
@@ -236,29 +236,29 @@ export const FileTree: React.FC<FileTreeProps> = ({
       />
 
       {/* Header */}
-      <div className="p-3 border-b border-surface-lightSubtle dark:border-surface-darkSubtle flex items-center justify-between flex-shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <div className="p-3 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between flex-shrink-0">
+        <span className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 font-sans">
           Files
         </span>
         <div className="flex items-center space-x-0.5">
           <button
             onClick={() => fileInputRef.current?.click()}
             title="Import Files (or Drag & Drop multiple)"
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-mint transition"
+            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
           >
             <Upload className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onNewFile()}
             title="New File"
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-mint transition"
+            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onNewFolder()}
             title="New Folder"
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-mint transition"
+            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
           >
             <FolderPlus className="w-3.5 h-3.5" />
           </button>
@@ -266,7 +266,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <button
               onClick={onToggleCollapse}
               title="Collapse Sidebar (Ctrl+B)"
-              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-200 transition ml-0.5"
+              className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition ml-0.5 btn-tactile"
             >
               <PanelLeftClose className="w-3.5 h-3.5" />
             </button>
@@ -277,25 +277,25 @@ export const FileTree: React.FC<FileTreeProps> = ({
       {/* File List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {files.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-400">No files found</div>
+          <div className="p-4 text-center text-xs text-stone-400">No files found</div>
         ) : (
           renderTree(files)
         )}
       </div>
 
       {/* Drag & Drop Hint */}
-      <div className="p-2 border-t border-slate-200 dark:border-slate-800 text-[11px] text-center text-slate-400 dark:text-slate-500 flex-shrink-0">
-        Drop multiple files here
+      <div className="p-2 border-t border-surface-lightBorder dark:border-surface-darkBorder text-[11px] text-center text-stone-400 dark:text-stone-500 flex-shrink-0">
+        Drop files here to upload
       </div>
 
       {/* Context Menu Floating Portal */}
       {contextMenu && (
         <div
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          className="fixed z-50 w-44 rounded-lg bg-surface-lightPanel dark:bg-surface-darkPanel border border-slate-200 dark:border-slate-800 shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-50 w-44 rounded-lg bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl py-1 text-xs text-stone-700 dark:text-stone-200 animate-in fade-in zoom-in-95 duration-100"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800/80 font-semibold text-[11px] text-slate-400 truncate">
+          <div className="px-3 py-1.5 border-b border-surface-lightBorder dark:border-surface-darkBorder font-semibold text-[11px] text-stone-400 truncate">
             {contextMenu.item.name}
           </div>
 
@@ -307,9 +307,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
               }
               setContextMenu(null);
             }}
-            className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition"
+            className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
           >
-            <Edit2 className="w-3.5 h-3.5 text-brand-cyan" />
+            <Edit2 className="w-3.5 h-3.5 text-stone-500" />
             <span>Rename</span>
           </button>
 
@@ -319,9 +319,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
                 onDuplicateItem(contextMenu.item.relativePath || contextMenu.item.name);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition"
+              className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
             >
-              <Copy className="w-3.5 h-3.5 text-brand-mint" />
+              <Copy className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
               <span>Duplicate</span>
             </button>
           )}
@@ -333,9 +333,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
                   onNewFile(contextMenu.item.relativePath);
                   setContextMenu(null);
                 }}
-                className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition"
+                className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
               >
-                <Plus className="w-3.5 h-3.5 text-brand-mint" />
+                <Plus className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
                 <span>New File Here</span>
               </button>
               <button
@@ -343,15 +343,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
                   onNewFolder(contextMenu.item.relativePath);
                   setContextMenu(null);
                 }}
-                className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition"
+                className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
               >
-                <FolderPlus className="w-3.5 h-3.5 text-brand-ocean" />
+                <FolderPlus className="w-3.5 h-3.5 text-stone-500" />
                 <span>New Folder Here</span>
               </button>
             </>
           )}
 
-          <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-1" />
+          <div className="h-[1px] bg-surface-lightBorder dark:border-surface-darkBorder my-1" />
 
           <button
             onClick={() => {
@@ -369,7 +369,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
               }
               setContextMenu(null);
             }}
-            className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-rose-500/10 text-rose-500 text-left transition"
+            className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-left transition"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
