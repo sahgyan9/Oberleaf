@@ -18,6 +18,19 @@ function Update-SessionEnvironment {
     $env:Path    = "$machinePath;$userPath"
 }
 
+# Anonymous telemetry ping (non-blocking, best-effort)
+try {
+    $telemetryBody = @{
+        p_app_name = "oberleaf"
+        p_download_type = "powershell_installer"
+        p_platform = "windows"
+    } | ConvertTo-Json
+    $telemetryHeaders = @{
+        "apikey" = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1YXBka3JnY2Jxcmh2c2F5dnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA4ODU5NzMsImV4cCI6MjA1NjQ2MTk3M30.V5jQfO-__C1gSbX33c2M-iBouFVWbO1bSPnRlc9iw1s"
+    }
+    Invoke-RestMethod -Uri "https://ruapdkrgcbqrhvsayvpf.supabase.co/rest/v1/rpc/record_app_download" -Method Post -Body $telemetryBody -ContentType "application/json" -Headers $telemetryHeaders -TimeoutSec 2 -ErrorAction SilentlyContinue | Out-Null
+} catch {}
+
 # Determine installation directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRootCandidate = Split-Path -Parent $ScriptDir
