@@ -640,3 +640,21 @@ overleaf-copy/
   - CREATED: `server/tunnel.ts`, `scripts/test_collab.ts`
   - MODIFIED: `server/index.ts`, `vite.config.ts`, `src/utils/yjsCollab.ts`, `src/components/Collaboration/CollabModal.tsx`, `src/components/Editor/Editor.tsx`, `src/App.tsx`, `ARCHITECTURE.md`, `PROJECT_LOG.md`
 - **Status at end**: Complete, tested, and verified.
+
+---
+
+### Session 014 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "my friend downloaded my software. And by default our website appears in local host http://localhost:5173/ but in terminal he killed it. And then he searched for oberleaf and he got message saying its opening but it never opened ... taskkill /PID 10708 /F ... Do RCA and tell and why is there Gemini AI Enabled. I hope you come up with the solutions such that I am able to open it again and even my friend can open"
+- **RCA Findings**:
+  1. **"Gemini AI enabled" Toast Origin**: In Session 008, the notification text was hardcoded to `Show-Notification "Oberleaf" "Opening in Google Chrome (Gemini AI enabled)..."` to highlight Chrome's native "Ask Gemini" button on the toolbar. There was no background AI service; it was simply notification text.
+  2. **Orphaned Process & StrictPort Conflict**: When running in a terminal and killed via Ctrl+C / window close, Windows terminates the shell while child Node.js processes (`vite` on port 5173, `tsx` on port 3001) remain orphaned in the background (e.g. PID 10708). Because `vite.config.ts` sets `strictPort: true`, subsequent starts fail instantly if port 5173 is occupied. The previous `Stop-Process` routine failed to terminate child process trees.
+  3. **Silent Parser Crash in `scripts/launch.ps1`**: The commit `f4a62e6` introduced Unicode em-dashes (`—`) in a BOM-less `.ps1` file. On Windows PowerShell 5.1, BOM-less files are read as ANSI (Windows-1252), causing `—` to decode as a double quote `”`, triggering 6 fatal parser syntax errors and silently crashing `launch.ps1` inside the hidden window.
+- **Fixes Applied**:
+  - Replaced all Unicode em-dashes `—` with clean ASCII hyphens `-` in `scripts/launch.ps1`. Verified 0 AST parser errors.
+  - Replaced `Stop-Process` with `taskkill.exe /F /T /PID` process tree termination across both `Get-NetTCPConnection` and `netstat -ano` fallback.
+  - Updated `package.json` `"stop"` script to also execute tree-kill via `taskkill /F /T`.
+  - Refreshed system `PATH` from registry on launch.
+- **Verification**:
+  - `[System.Management.Automation.Language.Parser]::ParseFile('scripts\launch.ps1')`: 0 syntax errors.
+  - `npm run typecheck`: Passed cleanly with 0 errors.
+- **Status at end**: Resolved and verified.

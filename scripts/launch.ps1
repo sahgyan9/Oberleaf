@@ -6,6 +6,9 @@ if (-not (Test-Path $LogDir)) {
 }
 $LogFile = [System.IO.Path]::Combine($LogDir, "project.log")
 
+# Refresh environment PATH from registry in case Node or npm was recently installed
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
 function Show-Notification {
     param([string]$Title, [string]$Message)
     try {
@@ -29,7 +32,6 @@ function Show-Notification {
 
 function Show-ErrorDialog {
     param([string]$Title, [string]$Message)
-    # Show a visible blocking message box so the user cannot miss the error
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
     [System.Windows.Forms.MessageBox]::Show(
         $Message,
@@ -39,10 +41,39 @@ function Show-ErrorDialog {
     ) | Out-Null
 }
 
+function Stop-PortProcesses {
+    param([int[]]$Ports)
+    foreach ($port in $Ports) {
+        # 1. Try Get-NetTCPConnection
+        try {
+            $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+            foreach ($conn in $conns) {
+                if ($conn.OwningProcess -and $conn.OwningProcess -gt 4) {
+                    Start-Process -FilePath "taskkill.exe" -ArgumentList "/F /T /PID $($conn.OwningProcess)" -NoNewWindow -Wait -ErrorAction SilentlyContinue
+                }
+            }
+        } catch {}
+
+        # 2. Netstat fallback for orphaned or half-closed sockets
+        try {
+            $netstatMatches = netstat -ano | Select-String ":$port\s+"
+            foreach ($match in $netstatMatches) {
+                $cols = ($match.ToString().Trim() -split '\s+')
+                if ($cols.Length -ge 5) {
+                    $pidToKill = [int]$cols[-1]
+                    if ($pidToKill -gt 4) {
+                        Start-Process -FilePath "taskkill.exe" -ArgumentList "/F /T /PID $pidToKill" -NoNewWindow -Wait -ErrorAction SilentlyContinue
+                    }
+                }
+            }
+        } catch {}
+    }
+}
+
 function Open-InChrome {
     param([string]$Url)
 
-    # 1. Prioritize Google Chrome so Gemini AI Agent, side panel, and extensions are fully accessible
+    # 1. Prioritize Google Chrome
     $chromeCandidates = @(
         (Get-Command chrome.exe -ErrorAction SilentlyContinue).Source,
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
@@ -53,12 +84,11 @@ function Open-InChrome {
     $chromePath = $chromeCandidates | Select-Object -First 1
 
     if ($chromePath) {
-        # Open in standard Chrome window so the Gemini AI Agent button and extensions are available
         Start-Process -FilePath $chromePath -ArgumentList $Url
         return
     }
 
-    # 2. Fallback to Edge if Chrome is not installed
+    # 2. Fallback to Edge
     $edgeCandidates = @(
         (Get-Command msedge.exe -ErrorAction SilentlyContinue).Source,
         "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
@@ -77,17 +107,14 @@ function Open-InChrome {
 }
 
 # ------------------------------------------------------------------
-# STEP 0: Dependency checks — fail loud and early so the user knows
-# exactly what to fix before wasting 20 seconds on a doomed startup.
+# STEP 0: Dependency checks - fail loud and early
 # ------------------------------------------------------------------
 
 # Check Node.js
 $nodeCmd = Get-Command node.exe -ErrorAction SilentlyContinue
+if (-not $nodeCmd) { $nodeCmd = Get-Command node -ErrorAction SilentlyContinue }
 if (-not $nodeCmd) {
-    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-}
-if (-not $nodeCmd) {
-    Show-ErrorDialog "Oberleaf — Node.js Not Found" (
+    Show-ErrorDialog "Oberleaf - Node.js Not Found" (
         "Oberleaf needs Node.js to run, but it was not found on this computer.`n`n" +
         "Fix: Run 'Oberleaf-Setup.bat' (in the Oberleaf folder) to install everything automatically.`n`n" +
         "Or install Node.js manually from: https://nodejs.org`n`n" +
@@ -100,7 +127,7 @@ if (-not $nodeCmd) {
 $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
 if (-not $npmCmd) { $npmCmd = Get-Command npm -ErrorAction SilentlyContinue }
 if (-not $npmCmd) {
-    Show-ErrorDialog "Oberleaf — npm Not Found" (
+    Show-ErrorDialog "Oberleaf - npm Not Found" (
         "npm (Node package manager) was not found on this computer.`n`n" +
         "Fix: Run 'Oberleaf-Setup.bat' to install everything automatically.`n`n" +
         "If Node.js is installed, try restarting your computer so PATH updates take effect."
@@ -108,7 +135,7 @@ if (-not $npmCmd) {
     exit 1
 }
 
-# Check node_modules — install them if they are missing
+# Check node_modules - install them if they are missing
 $nodeModulesPath = Join-Path $ProjectRoot "node_modules"
 if (-not (Test-Path $nodeModulesPath)) {
     Show-Notification "Oberleaf" "First-time setup: installing dependencies (1-2 min)..."
@@ -121,7 +148,7 @@ if (-not (Test-Path $nodeModulesPath)) {
         -WorkingDirectory $ProjectRoot -Wait -PassThru -WindowStyle Hidden
     
     if ($npmInstall.ExitCode -ne 0 -or -not (Test-Path $nodeModulesPath)) {
-        Show-ErrorDialog "Oberleaf — Dependency Install Failed" (
+        Show-ErrorDialog "Oberleaf - Dependency Install Failed" (
             "npm install failed. Oberleaf cannot start without its dependencies.`n`n" +
             "What to try:`n" +
             "  1. Make sure you have an internet connection.`n" +
@@ -134,7 +161,7 @@ if (-not (Test-Path $nodeModulesPath)) {
 }
 
 # ------------------------------------------------------------------
-# STEP 1: Warm check — if both servers are already up, open instantly
+# STEP 1: Warm check - if both servers are already running, open instantly
 # ------------------------------------------------------------------
 try {
     $checkVite   = Invoke-WebRequest -Uri "http://127.0.0.1:5173" -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
@@ -146,20 +173,18 @@ try {
 } catch {}
 
 # ------------------------------------------------------------------
-# STEP 2: Cold start — show toast so user knows startup has begun
+# STEP 2: Cold start - notify user that startup has begun
 # ------------------------------------------------------------------
-Show-Notification "Oberleaf" "Starting Oberleaf, please wait..."
+Show-Notification "Oberleaf" "Starting Oberleaf LaTeX Studio, please wait..."
 
 # ------------------------------------------------------------------
 # STEP 3: Free up ports 3001 and 5173 if orphaned processes are stuck
 # ------------------------------------------------------------------
-Get-NetTCPConnection -LocalPort 3001, 5173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
-    Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
-}
-Start-Sleep -Milliseconds 500
+Stop-PortProcesses @(3001, 5173)
+Start-Sleep -Milliseconds 600
 
 # ------------------------------------------------------------------
-# STEP 4: Launch npm start — stream full output to logs/project.log
+# STEP 4: Launch npm start - stream full output to logs/project.log
 # ------------------------------------------------------------------
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 "`n========================================`n[Oberleaf] Session started at $timestamp`n========================================" | Out-File -FilePath $LogFile -Encoding utf8 -Append
@@ -168,7 +193,7 @@ Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm start >> `"$LogFile`" 2>
 
 # ------------------------------------------------------------------
 # STEP 5: Poll until BOTH Vite (5173) AND Express (3001) are ready
-#         Timeout extended to 60 seconds (120 x 500ms) for slow machines
+#         Timeout 60 seconds (120 x 500ms)
 # ------------------------------------------------------------------
 $viteReady   = $false
 $serverReady = $false
@@ -188,7 +213,7 @@ for ($i = 0; $i -lt 120; $i++) {
     }
     if ($viteReady -and $serverReady) { break }
 
-    # Check for early crash after 10 seconds (20 polls) — read the last few log lines
+    # Check for early crash after 10 seconds (20 polls)
     if ($i -eq 20 -and (Test-Path $LogFile)) {
         $recentLog = Get-Content -Path $LogFile -Tail 20 -ErrorAction SilentlyContinue
         $crashSignals = $recentLog | Where-Object {
@@ -196,7 +221,7 @@ for ($i = 0; $i -lt 120; $i++) {
         }
         if ($crashSignals) {
             $crashText = ($crashSignals | Select-Object -First 5) -join "`n"
-            Show-ErrorDialog "Oberleaf — Startup Failed" (
+            Show-ErrorDialog "Oberleaf - Startup Failed" (
                 "Oberleaf crashed shortly after starting.`n`n" +
                 "Error details:`n$crashText`n`n" +
                 "Full log: $LogFile`n`n" +
@@ -208,7 +233,7 @@ for ($i = 0; $i -lt 120; $i++) {
 }
 
 # ------------------------------------------------------------------
-# STEP 6: If servers never came up — show a clear error dialog
+# STEP 6: If servers never came up - show a clear error dialog
 # ------------------------------------------------------------------
 if (-not ($viteReady -and $serverReady)) {
     $missingParts = @()
@@ -216,13 +241,12 @@ if (-not ($viteReady -and $serverReady)) {
     if (-not $serverReady) { $missingParts += "Backend (port 3001)" }
     $missingText = $missingParts -join " and "
 
-    # Pull last 10 lines from log for the error message
     $logTail = ""
     if (Test-Path $LogFile) {
         $logTail = "`n`nLast log lines:`n" + ((Get-Content -Path $LogFile -Tail 10 -ErrorAction SilentlyContinue) -join "`n")
     }
 
-    Show-ErrorDialog "Oberleaf — Could Not Start" (
+    Show-ErrorDialog "Oberleaf - Could Not Start" (
         "$missingText did not start within 60 seconds.`n`n" +
         "To diagnose:`n" +
         "  1. Open a terminal in the Oberleaf folder`n" +
@@ -234,6 +258,6 @@ if (-not ($viteReady -and $serverReady)) {
 }
 
 # ------------------------------------------------------------------
-# STEP 7: Both servers are up — open in Google Chrome
+# STEP 7: Both servers are verified up - open in browser
 # ------------------------------------------------------------------
 Open-InChrome "http://localhost:5173"
