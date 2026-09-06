@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "SilentlyContinue"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = [System.IO.Path]::Combine($ProjectRoot, "logs")
 if (-not (Test-Path $LogDir)) {
@@ -25,6 +25,18 @@ function Show-Notification {
         $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Oberleaf")
         $notifier.Show($toast)
     } catch {}
+}
+
+function Show-ErrorDialog {
+    param([string]$Title, [string]$Message)
+    # Show a visible blocking message box so the user cannot miss the error
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+    [System.Windows.Forms.MessageBox]::Show(
+        $Message,
+        $Title,
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
 }
 
 function Open-InChrome {
@@ -64,7 +76,66 @@ function Open-InChrome {
     Start-Process $Url
 }
 
-# 1. Warm check: if both Vite (5173) AND Express (3001) are already running, open in Chrome immediately
+# ------------------------------------------------------------------
+# STEP 0: Dependency checks — fail loud and early so the user knows
+# exactly what to fix before wasting 20 seconds on a doomed startup.
+# ------------------------------------------------------------------
+
+# Check Node.js
+$nodeCmd = Get-Command node.exe -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+}
+if (-not $nodeCmd) {
+    Show-ErrorDialog "Oberleaf — Node.js Not Found" (
+        "Oberleaf needs Node.js to run, but it was not found on this computer.`n`n" +
+        "Fix: Run 'Oberleaf-Setup.bat' (in the Oberleaf folder) to install everything automatically.`n`n" +
+        "Or install Node.js manually from: https://nodejs.org`n`n" +
+        "After installing, open Oberleaf again."
+    )
+    exit 1
+}
+
+# Check npm
+$npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
+if (-not $npmCmd) { $npmCmd = Get-Command npm -ErrorAction SilentlyContinue }
+if (-not $npmCmd) {
+    Show-ErrorDialog "Oberleaf — npm Not Found" (
+        "npm (Node package manager) was not found on this computer.`n`n" +
+        "Fix: Run 'Oberleaf-Setup.bat' to install everything automatically.`n`n" +
+        "If Node.js is installed, try restarting your computer so PATH updates take effect."
+    )
+    exit 1
+}
+
+# Check node_modules — install them if they are missing
+$nodeModulesPath = Join-Path $ProjectRoot "node_modules"
+if (-not (Test-Path $nodeModulesPath)) {
+    Show-Notification "Oberleaf" "First-time setup: installing dependencies (1-2 min)..."
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    "`n========================================`n[Oberleaf] npm install started at $timestamp`n========================================" |
+        Out-File -FilePath $LogFile -Encoding utf8 -Append
+
+    $npmInstall = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c npm install >> `"$LogFile`" 2>&1" `
+        -WorkingDirectory $ProjectRoot -Wait -PassThru -WindowStyle Hidden
+    
+    if ($npmInstall.ExitCode -ne 0 -or -not (Test-Path $nodeModulesPath)) {
+        Show-ErrorDialog "Oberleaf — Dependency Install Failed" (
+            "npm install failed. Oberleaf cannot start without its dependencies.`n`n" +
+            "What to try:`n" +
+            "  1. Make sure you have an internet connection.`n" +
+            "  2. Open a terminal in the Oberleaf folder and run:  npm install`n" +
+            "  3. Check the log for errors: $LogFile`n`n" +
+            "If the problem persists, run 'Oberleaf-Setup.bat' again."
+        )
+        exit 1
+    }
+}
+
+# ------------------------------------------------------------------
+# STEP 1: Warm check — if both servers are already up, open instantly
+# ------------------------------------------------------------------
 try {
     $checkVite   = Invoke-WebRequest -Uri "http://127.0.0.1:5173" -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
     $checkServer = Invoke-WebRequest -Uri "http://127.0.0.1:3001/health" -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
@@ -74,24 +145,34 @@ try {
     }
 } catch {}
 
-# 2. Cold start: Show immediate feedback so the user knows startup has begun
-Show-Notification "Oberleaf" "Opening in Google Chrome (Gemini AI enabled)..."
+# ------------------------------------------------------------------
+# STEP 2: Cold start — show toast so user knows startup has begun
+# ------------------------------------------------------------------
+Show-Notification "Oberleaf" "Starting Oberleaf, please wait..."
 
-# 3. Free up ports 3001 and 5173 if any orphaned processes are stuck
+# ------------------------------------------------------------------
+# STEP 3: Free up ports 3001 and 5173 if orphaned processes are stuck
+# ------------------------------------------------------------------
 Get-NetTCPConnection -LocalPort 3001, 5173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
     Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
 }
+Start-Sleep -Milliseconds 500
 
-# 4. Launch npm start and stream full output to logs/project.log
+# ------------------------------------------------------------------
+# STEP 4: Launch npm start — stream full output to logs/project.log
+# ------------------------------------------------------------------
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 "`n========================================`n[Oberleaf] Session started at $timestamp`n========================================" | Out-File -FilePath $LogFile -Encoding utf8 -Append
 
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm start >> `"$LogFile`" 2>&1" -WorkingDirectory $ProjectRoot -WindowStyle Hidden
 
-# 5. Poll until BOTH Vite (5173) AND Express (3001) are ready (up to 20 seconds)
+# ------------------------------------------------------------------
+# STEP 5: Poll until BOTH Vite (5173) AND Express (3001) are ready
+#         Timeout extended to 60 seconds (120 x 500ms) for slow machines
+# ------------------------------------------------------------------
 $viteReady   = $false
 $serverReady = $false
-for ($i = 0; $i -lt 40; $i++) {
+for ($i = 0; $i -lt 120; $i++) {
     Start-Sleep -Milliseconds 500
     if (-not $viteReady) {
         try {
@@ -106,10 +187,53 @@ for ($i = 0; $i -lt 40; $i++) {
         } catch {}
     }
     if ($viteReady -and $serverReady) { break }
+
+    # Check for early crash after 10 seconds (20 polls) — read the last few log lines
+    if ($i -eq 20 -and (Test-Path $LogFile)) {
+        $recentLog = Get-Content -Path $LogFile -Tail 20 -ErrorAction SilentlyContinue
+        $crashSignals = $recentLog | Where-Object {
+            $_ -match "Error:|EADDRINUSE|Cannot find module|SyntaxError|npm ERR!"
+        }
+        if ($crashSignals) {
+            $crashText = ($crashSignals | Select-Object -First 5) -join "`n"
+            Show-ErrorDialog "Oberleaf — Startup Failed" (
+                "Oberleaf crashed shortly after starting.`n`n" +
+                "Error details:`n$crashText`n`n" +
+                "Full log: $LogFile`n`n" +
+                "To fix: Open a terminal in the Oberleaf folder and run:  npm start"
+            )
+            exit 1
+        }
+    }
 }
 
-# 6. Open in Google Chrome (with full toolbar, extensions, and Gemini AI Agent)
+# ------------------------------------------------------------------
+# STEP 6: If servers never came up — show a clear error dialog
+# ------------------------------------------------------------------
+if (-not ($viteReady -and $serverReady)) {
+    $missingParts = @()
+    if (-not $viteReady)   { $missingParts += "Frontend (port 5173)" }
+    if (-not $serverReady) { $missingParts += "Backend (port 3001)" }
+    $missingText = $missingParts -join " and "
+
+    # Pull last 10 lines from log for the error message
+    $logTail = ""
+    if (Test-Path $LogFile) {
+        $logTail = "`n`nLast log lines:`n" + ((Get-Content -Path $LogFile -Tail 10 -ErrorAction SilentlyContinue) -join "`n")
+    }
+
+    Show-ErrorDialog "Oberleaf — Could Not Start" (
+        "$missingText did not start within 60 seconds.`n`n" +
+        "To diagnose:`n" +
+        "  1. Open a terminal in the Oberleaf folder`n" +
+        "  2. Run:  npm start`n" +
+        "  3. Look for any red error messages`n`n" +
+        "Full log: $LogFile" + $logTail
+    )
+    exit 1
+}
+
+# ------------------------------------------------------------------
+# STEP 7: Both servers are up — open in Google Chrome
+# ------------------------------------------------------------------
 Open-InChrome "http://localhost:5173"
-
-
-
