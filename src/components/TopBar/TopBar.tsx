@@ -22,6 +22,7 @@ import {
   Users,
   Eraser,
   MonitorUp,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -93,7 +94,9 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
   const [isAddingShortcut, setIsAddingShortcut] = useState(false);
   const [shortcutAdded, setShortcutAdded] = useState(false);
 
@@ -121,6 +124,9 @@ export const TopBar: React.FC<TopBarProps> = ({
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsProjectsDropdownOpen(false);
       }
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
+        setIsToolsOpen(false);
+      }
     };
     window.addEventListener('mousedown', handleClickOutside);
     return () => window.removeEventListener('mousedown', handleClickOutside);
@@ -136,65 +142,52 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className="h-14 border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel px-4 flex items-center justify-between select-none relative z-30 transition-colors">
-      {/* Left: Back to Projects, Brand, Project Switcher, and Save Status */}
-      <div className="flex items-center space-x-3">
+    <header className="h-14 border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel px-3 sm:px-4 flex items-center justify-between select-none relative z-30 transition-colors gap-2">
+      {/* Left: Back to Projects, Brand / Project Switcher, and Save Status */}
+      <div className="flex items-center space-x-2.5 flex-shrink-0">
         {onBackToProjects && (
           <button
             onClick={onBackToProjects}
             title="Back to All Projects"
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 border border-surface-lightBorder dark:border-surface-darkBorder transition text-xs font-semibold btn-tactile mr-1"
+            className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 border border-surface-lightBorder dark:border-surface-darkBorder transition text-xs font-semibold btn-tactile flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Projects</span>
           </button>
         )}
 
-        {/* Archival Paper & Scholarly Logo */}
-        <div
-          onClick={onBackToProjects}
-          className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 border border-surface-lightBorder dark:border-surface-darkBorder shadow-xs flex-shrink-0 cursor-pointer"
-          style={{ width: '32px', height: '32px' }}
-        >
-          <img
-            src="/assets/icon.svg?v=4"
-            alt="Oberleaf Logo"
-            width={32}
-            height={32}
-            className="w-full h-full object-contain"
-          />
-        </div>
-
         {/* Brand & Project Switcher Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsProjectsDropdownOpen((prev) => !prev)}
             title="Switch or Browse Projects"
-            className="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition text-left group border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+            className="flex items-center space-x-2 h-8 px-2.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition text-left group border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
           >
-            <div className="flex flex-col">
-              <div className="flex items-center space-x-1.5">
-                <span className="font-serif font-semibold text-sm tracking-tight text-[#1C1917] dark:text-[#F5F5F4]">
-                  Ober<span className="text-scholarly dark:text-scholarly-dark italic font-normal">leaf</span>
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 font-sans font-medium border border-stone-200 dark:border-stone-700">
-                  Fast Engine
-                </span>
-              </div>
-              <div className="flex items-center space-x-1 text-xs text-stone-500 dark:text-stone-400 font-medium truncate max-w-[180px]">
-                <span className="truncate group-hover:text-[#1C1917] dark:group-hover:text-white transition">
-                  {projectName || 'Select Project'}
-                </span>
-                <ChevronDown className="w-3 h-3 text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-200 flex-shrink-0" />
-              </div>
+            <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img
+                src="/assets/icon.svg?v=4"
+                alt="Oberleaf"
+                className="w-full h-full object-contain"
+              />
             </div>
+            <span className="font-serif font-semibold text-sm tracking-tight text-[#1C1917] dark:text-[#F5F5F4] whitespace-nowrap">
+              Ober<span className="text-scholarly dark:text-scholarly-dark italic font-normal">leaf</span>
+            </span>
+            <span className="text-stone-300 dark:text-stone-600 font-light text-xs select-none">/</span>
+            <span className="text-xs font-medium text-stone-700 dark:text-stone-300 group-hover:text-[#1C1917] dark:group-hover:text-white transition truncate max-w-[150px]">
+              {projectName || 'Select Project'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-200 flex-shrink-0" />
           </button>
 
           {/* Project List Dropdown Menu */}
           {isProjectsDropdownOpen && (
-            <div className="absolute left-0 top-full mt-1.5 w-72 rounded-xl bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl p-2 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute left-0 top-full mt-1.5 w-72 rounded-xl bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl p-2 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100 z-50">
               <div className="px-2.5 py-1 text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wider flex items-center justify-between font-sans">
                 <span>Your Projects ({projects.length})</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 font-medium border border-stone-200 dark:border-stone-700">
+                  Fast Engine
+                </span>
               </div>
 
               <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
@@ -239,45 +232,31 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   <span>Create New Project</span>
                 </button>
-                <button
-                  onClick={handleAddShortcut}
-                  disabled={isAddingShortcut}
-                  className="w-full flex items-center justify-center space-x-1.5 p-2 rounded-lg bg-surface-lightSubtle hover:bg-stone-200/60 dark:bg-surface-darkSubtle dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 font-medium transition border border-surface-lightBorder dark:border-surface-darkBorder btn-tactile disabled:opacity-50"
-                >
-                  {isAddingShortcut ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly" />
-                  ) : shortcutAdded ? (
-                    <Check className="w-3.5 h-3.5 text-scholarly" />
-                  ) : (
-                    <MonitorUp className="w-3.5 h-3.5 text-stone-500" />
-                  )}
-                  <span>{shortcutAdded ? 'Shortcut Added!' : 'Add Desktop Shortcut'}</span>
-                </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Unsaved / Saved State Indicator */}
-        <div className="hidden lg:flex items-center space-x-1.5 pl-2 border-l border-surface-lightBorder dark:border-surface-darkBorder text-xs">
+        {/* Active File & Save Status */}
+        <div className="hidden lg:flex items-center space-x-2 pl-3 border-l border-surface-lightBorder dark:border-surface-darkBorder text-xs h-5">
           <span className="font-mono text-stone-500 dark:text-stone-400 truncate max-w-[120px]">
             {activeFilePath}
           </span>
           {saveStatus === 'unsaved' && (
-            <span className="flex items-center space-x-1 text-diagnostic dark:text-diagnostic-dark text-[11px] font-medium">
-              <span>●</span>
+            <span className="flex items-center space-x-1 text-diagnostic dark:text-diagnostic-dark text-[11px] font-medium whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-diagnostic dark:bg-diagnostic-dark" />
               <span>Unsaved</span>
             </span>
           )}
           {saveStatus === 'saving' && (
-            <span className="flex items-center space-x-1 text-stone-500 dark:text-stone-400 text-[11px] font-medium">
-              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+            <span className="flex items-center space-x-1 text-stone-500 dark:text-stone-400 text-[11px] font-medium whitespace-nowrap">
+              <Loader2 className="w-3 h-3 animate-spin" />
               <span>Saving...</span>
             </span>
           )}
           {saveStatus === 'saved' && (
-            <span className="flex items-center space-x-1 text-stone-500 dark:text-stone-400 text-[11px]">
-              <CheckCircle2 className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
+            <span className="flex items-center space-x-1 text-stone-400 dark:text-stone-500 text-[11px] whitespace-nowrap">
+              <CheckCircle2 className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
               <span>Saved</span>
             </span>
           )}
@@ -285,12 +264,12 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Center Actions: Tactile Oxford Green Recompile Button */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 flex-shrink-0 px-2">
         <button
           onClick={onCompile}
           disabled={isCompiling}
           title="Compile LaTeX (Ctrl+Enter)"
-          className="flex items-center space-x-2 bg-[#1B5E20] dark:bg-[#2EA043] hover:bg-[#164E1B] dark:hover:bg-[#278638] text-white px-3.5 py-1.5 rounded-md font-semibold text-xs transition shadow-sm active:translate-y-[0.5px] active:scale-[0.99] disabled:opacity-50 btn-tactile cursor-pointer"
+          className="flex items-center space-x-2 bg-[#1B5E20] dark:bg-[#2EA043] hover:bg-[#164E1B] dark:hover:bg-[#278638] text-white px-3.5 h-8 rounded-lg font-semibold text-xs transition shadow-sm active:translate-y-[0.5px] active:scale-[0.99] disabled:opacity-50 btn-tactile cursor-pointer whitespace-nowrap"
         >
           {isCompiling ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -298,28 +277,28 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Play className="w-3.5 h-3.5 fill-current" />
           )}
           <span>{isCompiling ? 'Compiling...' : 'Recompile'}</span>
-          <kbd className="hidden sm:inline-flex items-center ml-1 text-[10px] bg-black/25 text-white/95 px-1.5 py-0.2 rounded font-mono font-normal">
+          <kbd className="hidden sm:inline-flex items-center ml-1 text-[10px] bg-black/25 text-white/95 px-1.5 py-0.5 rounded font-mono font-normal">
             Ctrl+↵
           </kbd>
         </button>
 
         {compileDuration !== null && !isCompiling && (
-          <span className="text-xs text-stone-500 dark:text-stone-400 font-mono hidden md:inline">
+          <span className="text-xs text-stone-500 dark:text-stone-400 font-mono hidden xl:inline whitespace-nowrap">
             {(compileDuration / 1000).toFixed(1)}s local
           </span>
         )}
       </div>
 
-      {/* Right Controls: View Mode, Dependency Doctor, Dark/Light */}
-      <div className="flex items-center space-x-1.5">
+      {/* Right Controls: View Mode, Collaboration, Tools & System */}
+      <div className="flex items-center space-x-1.5 flex-shrink-0">
         {/* Layout Switchers */}
-        <div className="flex items-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder">
+        <div className="flex items-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder h-8">
           <button
             onClick={() => onViewModeChange('code')}
             title="Full Code Mode (Ctrl+7)"
-            className={`p-1.5 rounded-md text-xs transition btn-tactile ${
+            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
               viewMode === 'code'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs'
+                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
                 : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
             }`}
           >
@@ -328,9 +307,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             onClick={() => onViewModeChange('split')}
             title="Split Mode (Ctrl+8)"
-            className={`p-1.5 rounded-md text-xs transition btn-tactile ${
+            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
               viewMode === 'split'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs'
+                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
                 : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
             }`}
           >
@@ -338,10 +317,10 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
           <button
             onClick={() => onViewModeChange('pdf')}
-            title="Full PDF Mode (Ctrl+9, double/triple to toggle)"
-            className={`p-1.5 rounded-md text-xs transition btn-tactile ${
+            title="Full PDF Mode (Ctrl+9)"
+            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
               viewMode === 'pdf'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs'
+                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
                 : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
             }`}
           >
@@ -349,15 +328,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
+        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1 hidden sm:block" />
+
         {/* Comments Button */}
         {onOpenComments && (
           <button
             onClick={onOpenComments}
             title="Review Comments (Alt+M)"
-            className="relative flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+            className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
           >
             <MessageSquare className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-            <span className="hidden sm:inline">Comments</span>
+            <span className="hidden md:inline">Comments</span>
             {openCommentsCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-scholarly dark:bg-scholarly-dark text-white text-[10px] font-bold">
                 {openCommentsCount}
@@ -371,33 +352,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             onClick={onOpenCollab}
             title="Live Peer-to-Peer Collaboration"
-            className={`relative flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition border btn-tactile ${
+            className={`flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition border btn-tactile whitespace-nowrap ${
               isCollabActive
                 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                : 'text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder'
+                : 'text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder'
             }`}
           >
             <Users className={`w-3.5 h-3.5 ${isCollabActive ? 'text-emerald-500 animate-pulse' : ''}`} />
-            <span className="hidden sm:inline">
+            <span className="hidden md:inline">
               {isCollabActive ? `Live (${collabPeersCount})` : 'Collab'}
             </span>
-          </button>
-        )}
-
-        {/* GitHub Remote Sync Button */}
-        {onOpenSyncModal && (
-          <button
-            onClick={onOpenSyncModal}
-            title="GitHub Remote Sync (Push/Pull)"
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
-          >
-            <Github className="w-3.5 h-3.5 text-stone-800 dark:text-stone-200" />
-            <span className="hidden sm:inline">GitHub</span>
-            {gitSyncStatus && gitSyncStatus.ahead > 0 && (
-              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
-                ↑{gitSyncStatus.ahead}
-              </span>
-            )}
           </button>
         )}
 
@@ -406,65 +370,118 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             onClick={onOpenHistory}
             title="Version History & Git Checkpoints"
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+            className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
           >
             <History className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
-            <span className="hidden sm:inline">History</span>
+            <span className="hidden md:inline">History</span>
           </button>
         )}
 
-        {/* Clean Build Cache Button */}
-        {onCleanBuild && (
+        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1 hidden sm:block" />
+
+        {/* Workspace Tools Dropdown */}
+        <div className="relative" ref={toolsRef}>
           <button
-            onClick={onCleanBuild}
-            title="Clean Build Cache (.build/)"
-            className="p-2 rounded-md text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
+            onClick={() => setIsToolsOpen((prev) => !prev)}
+            title="Workspace Tools & Diagnostics"
+            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
           >
-            <Eraser className="w-4 h-4" />
+            <MoreHorizontal className="w-4 h-4" />
+            {((isDoctorHealthy !== null && !isDoctorHealthy) || (gitSyncStatus && gitSyncStatus.ahead > 0)) && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-diagnostic dark:bg-diagnostic-dark" />
+            )}
           </button>
-        )}
 
-        {/* Add Desktop Shortcut Button */}
-        <button
-          onClick={handleAddShortcut}
-          disabled={isAddingShortcut}
-          title={shortcutAdded ? 'Shortcut added to Desktop & Start Menu!' : 'Add Oberleaf Shortcut to Desktop & Start Menu'}
-          className={`p-2 rounded-md transition btn-tactile ${
-            shortcutAdded
-              ? 'text-scholarly dark:text-scholarly-dark bg-scholarly-subtle dark:bg-scholarly-darkSubtle'
-              : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
-          }`}
-        >
-          {isAddingShortcut ? (
-            <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
-          ) : shortcutAdded ? (
-            <Check className="w-4 h-4 text-scholarly" />
-          ) : (
-            <MonitorUp className="w-4 h-4" />
-          )}
-        </button>
+          {isToolsOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100 z-50">
+              <div className="px-2.5 py-1 text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wider font-sans">
+                Workspace Tools
+              </div>
 
-        {/* Dependency Doctor Button */}
-        <button
-          onClick={onOpenDoctor}
-          title="Dependency Doctor & TeX Diagnostics"
-          className="relative p-2 rounded-md text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
-        >
-          <Activity className="w-4 h-4" />
-          {isDoctorHealthy !== null && (
-            <span
-              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
-                isDoctorHealthy ? 'bg-scholarly dark:bg-scholarly-dark' : 'bg-diagnostic dark:bg-diagnostic-dark'
-              }`}
-            />
+              {/* GitHub Remote Sync */}
+              {onOpenSyncModal && (
+                <button
+                  onClick={() => {
+                    setIsToolsOpen(false);
+                    onOpenSyncModal();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Github className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                    <span>GitHub Remote Sync</span>
+                  </div>
+                  {gitSyncStatus && gitSyncStatus.ahead > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
+                      ↑{gitSyncStatus.ahead}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Dependency Doctor */}
+              <button
+                onClick={() => {
+                  setIsToolsOpen(false);
+                  onOpenDoctor();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+              >
+                <div className="flex items-center space-x-2">
+                  <Activity className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                  <span>TeX Diagnostics & Doctor</span>
+                </div>
+                {isDoctorHealthy !== null && (
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isDoctorHealthy ? 'bg-scholarly dark:bg-scholarly-dark' : 'bg-diagnostic dark:bg-diagnostic-dark'
+                    }`}
+                  />
+                )}
+              </button>
+
+              {/* Clean Build Cache */}
+              {onCleanBuild && (
+                <button
+                  onClick={() => {
+                    setIsToolsOpen(false);
+                    onCleanBuild();
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                >
+                  <Eraser className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                  <span>Clean Build Cache</span>
+                </button>
+              )}
+
+              {/* Add Desktop Shortcut */}
+              <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">
+                <button
+                  onClick={handleAddShortcut}
+                  disabled={isAddingShortcut}
+                  className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left disabled:opacity-50"
+                >
+                  {isAddingShortcut ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
+                  ) : shortcutAdded ? (
+                    <Check className="w-4 h-4 text-scholarly" />
+                  ) : (
+                    <MonitorUp className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                  )}
+                  <span>{shortcutAdded ? 'Shortcut Added!' : 'Add Desktop Shortcut'}</span>
+                </button>
+              </div>
+            </div>
           )}
-        </button>
+        </div>
+
+        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1" />
 
         {/* Dark/Light Toggle */}
         <button
           onClick={toggleTheme}
           title="Toggle Light / Dark Mode"
-          className="p-2 rounded-md text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile"
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-stone-700" />}
         </button>
@@ -478,10 +495,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 ? 'Exit Full Screen Zen Mode (F11, Ctrl+Shift+F, or Esc)'
                 : 'Enter Full Screen Zen Mode (F11 or Ctrl+Shift+F)'
             }
-            className={`p-2 rounded-md transition btn-tactile ${
+            className={`flex items-center justify-center w-8 h-8 rounded-lg transition border btn-tactile ${
               isFullscreen
-                ? 'bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark shadow-xs border border-scholarly/20 dark:border-scholarly-dark/30'
-                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
+                ? 'bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark shadow-xs border-scholarly/20 dark:border-scholarly-dark/30'
+                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder'
             }`}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
