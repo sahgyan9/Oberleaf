@@ -1,4 +1,4 @@
-$ErrorActionPreference = "SilentlyContinue"
+﻿$ErrorActionPreference = "SilentlyContinue"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = [System.IO.Path]::Combine($ProjectRoot, "logs")
 if (-not (Test-Path $LogDir)) {

@@ -1,4 +1,4 @@
-# Oberleaf - Windows Integration Script
+﻿# Oberleaf - Windows Integration Script
 # Creates Start Menu and Desktop shortcuts with custom icon
 
 $ErrorActionPreference = "Stop"
@@ -74,9 +74,12 @@ try {
     [Win32.ShellNotification]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero) # SHCNE_ASSOCCHANGED
 } catch {}
 
-# Restart SearchApp so Windows Search UI immediately displays the updated icon
-Get-Process -Name "SearchApp" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name "SearchHost" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# Windows Search caches the old icon until SearchApp restarts on its own. We
+# used to force-kill SearchApp/SearchHost here to make the new icon appear
+# instantly, but a downloaded script that terminates system processes is a
+# textbook behaviour-monitoring trigger and Defender was quarantining the whole
+# installer over it. SHChangeNotify above is enough for Desktop and Start Menu;
+# the search result catches up by itself after a sign-out.
 
 Write-Host ""
 Write-Host "ALL SET!" -ForegroundColor Green

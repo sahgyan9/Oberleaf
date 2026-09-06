@@ -1,0 +1,8 @@
+# The Windows installer is fetched over HTTP and executed byte-for-byte, from
+# raw.githubusercontent.com and from the site's /downloads. Git must not touch
+# these files: an end-of-line rewrite reflows a batch file whose control flow is
+# built out of goto labels, and any re-encoding risks the UTF-8 BOM that Windows
+# PowerShell 5.1 needs in order not to read the script as Windows-1252.
+*.bat -text
+*.ps1 -text
+*.vbs -text
