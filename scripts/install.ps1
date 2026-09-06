@@ -210,6 +210,40 @@ if ($latexCmd) {
 }
 
 # -------------------------------------------------------------
+# Teach MiKTeX to install packages without asking
+# -------------------------------------------------------------
+# A basic MiKTeX ships with very few packages, so the first real document asks
+# for titlesec, geometry, hyperref and a dozen more. Out of the box MiKTeX
+# answers that by opening a modal "Package Installation" dialog per package.
+# Oberleaf compiles by spawning pdflatex from the local server, so nobody is
+# looking at that window: the compile just sits there until the ten minute
+# timeout kills it, which reads to the user as a hang. -interaction=nonstopmode
+# does not help, because this is MiKTeX's package manager rather than TeX
+# waiting on input. Setting AutoInstall=1 makes it fetch quietly instead.
+Update-SessionEnvironment
+$initexmf = Get-Tool @("initexmf.exe", "initexmf")
+if ($initexmf) {
+    Write-Host "      Configuring MiKTeX to install missing packages automatically..." -ForegroundColor Cyan
+    & $initexmf.Source --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
+    if ($IsElevated) {
+        # A machine-wide MiKTeX keeps a separate admin configuration, and the
+        # user-scope value above does not reach it.
+        & $initexmf.Source --admin --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
+    }
+    $verify = (& $initexmf.Source --show-config-value="[MPM]AutoInstall" 2>&1 | Out-String).Trim()
+    if ($verify -eq "1") {
+        Write-Host "      MiKTeX will now install packages silently." -ForegroundColor Green
+    } else {
+        Write-Host "      Could not confirm the setting (got '$verify')." -ForegroundColor Yellow
+        Write-Host "      If a 'Package Installation' dialog appears while compiling, tick" -ForegroundColor Yellow
+        Write-Host "      Install and untick 'Always show this dialog'." -ForegroundColor Yellow
+    }
+} elseif ($latexCmd) {
+    Write-Host "      initexmf not found - if a 'Package Installation' dialog appears" -ForegroundColor Yellow
+    Write-Host "      while compiling, click Install and untick 'Always show this dialog'." -ForegroundColor Yellow
+}
+
+# -------------------------------------------------------------
 # Step 5: Fetch Oberleaf
 # -------------------------------------------------------------
 Write-Host "[5/5] Syncing the Oberleaf codebase..." -ForegroundColor Cyan
