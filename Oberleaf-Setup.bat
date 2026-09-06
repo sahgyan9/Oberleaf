@@ -12,7 +12,17 @@ echo.
 if exist "%~dp0scripts\install.ps1" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1"
 ) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $script = (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/sahgyan9/Oberleaf/main/scripts/install.ps1'); Invoke-Expression $script"
+    :: Download install.ps1 to a temp file first, then run it with -File.
+    :: This avoids Invoke-Expression quote/encoding parse errors.
+    set "TMPSCRIPT=%TEMP%\oberleaf_install_%RANDOM%.ps1"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/sahgyan9/Oberleaf/main/scripts/install.ps1', '%TMPSCRIPT%')"
+    if exist "%TMPSCRIPT%" (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%TMPSCRIPT%"
+        del /f /q "%TMPSCRIPT%" 2>nul
+    ) else (
+        echo [!] Failed to download Oberleaf installer. Check your internet connection.
+        echo     Try manually visiting: https://github.com/sahgyan9/Oberleaf
+    )
 )
 
 if %ERRORLEVEL% neq 0 (
