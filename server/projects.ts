@@ -117,12 +117,38 @@ Prior work in the domain.
 };
 
 export function getProjectsRoot(): string {
-  const root = path.join(process.cwd(), 'projects');
-  if (!fs.existsSync(root)) {
-    fs.mkdirSync(root, { recursive: true });
+  // 1. Explicit override via environment variable
+  if (process.env.OBERLEAF_PROJECTS_DIR && process.env.OBERLEAF_PROJECTS_DIR.trim()) {
+    const custom = path.resolve(process.env.OBERLEAF_PROJECTS_DIR.trim());
+    if (!fs.existsSync(custom)) {
+      fs.mkdirSync(custom, { recursive: true });
+    }
+    return custom;
   }
-  return root;
+
+  // 2. If running inside a checkout or directory that has a local `projects` folder with content
+  const localProjects = path.join(process.cwd(), 'projects');
+  if (fs.existsSync(localProjects)) {
+    return localProjects;
+  }
+
+  // 3. For installed desktop application, default to user's visible Documents folder
+  const userHome = process.env.USERPROFILE || process.env.HOME || process.cwd();
+  const docsProjects = path.join(userHome, 'Documents', 'Oberleaf Projects');
+  try {
+    if (!fs.existsSync(docsProjects)) {
+      fs.mkdirSync(docsProjects, { recursive: true });
+    }
+    return docsProjects;
+  } catch {
+    // Fallback to local directory if Documents is inaccessible
+    if (!fs.existsSync(localProjects)) {
+      fs.mkdirSync(localProjects, { recursive: true });
+    }
+    return localProjects;
+  }
 }
+
 
 function formatRelativeTime(date: Date): string {
   const now = new Date();

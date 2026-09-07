@@ -66,6 +66,7 @@ interface TopBarProps {
   hasUpdate?: boolean;
   onOpenUpdateModal?: () => void;
   onCheckForUpdates?: () => void;
+  onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -98,6 +99,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   hasUpdate = false,
   onOpenUpdateModal,
   onCheckForUpdates,
+  onShowToast,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
@@ -115,12 +117,15 @@ export const TopBar: React.FC<TopBarProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         setShortcutAdded(true);
+        onShowToast?.('Desktop & Start Menu shortcut added.', 'success');
         setTimeout(() => setShortcutAdded(false), 3500);
       } else {
-        alert(data.error || 'Could not create shortcut.');
+        if (onShowToast) onShowToast(data.error || 'Could not create shortcut.', 'error');
+        else alert(data.error || 'Could not create shortcut.');
       }
     } catch (err: any) {
-      alert(`Error connecting to server: ${err.message}`);
+      if (onShowToast) onShowToast(`Error connecting to server: ${err.message}`, 'error');
+      else alert(`Error connecting to server: ${err.message}`);
     } finally {
       setIsAddingShortcut(false);
     }
@@ -489,6 +494,32 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <span>Clean Build Cache</span>
                 </button>
               )}
+
+              {/* Reveal in File Explorer */}
+              <button
+                onClick={async () => {
+                  setIsToolsOpen(false);
+                  try {
+                    const res = await fetch('/api/system/reveal-in-explorer', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ projectId }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                      onShowToast?.(`Opened in File Explorer: ${data.path}`, 'info');
+                    } else {
+                      onShowToast?.(data.error || 'Failed to open File Explorer.', 'error');
+                    }
+                  } catch (err: any) {
+                    onShowToast?.(`Connection error: ${err.message}`, 'error');
+                  }
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+              >
+                <FolderOpen className="w-4 h-4 text-scholarly-teal dark:text-scholarly-tealDark" />
+                <span>Reveal in File Explorer</span>
+              </button>
 
               {/* Add Desktop Shortcut */}
               <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">

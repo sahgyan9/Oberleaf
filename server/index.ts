@@ -1161,6 +1161,71 @@ app.post('/api/collab/tunnel/stop', (_req, res) => {
   }
 });
 
+// 15. Windows File Explorer & Workspace Observability Endpoints
+app.post('/api/system/reveal-in-explorer', (req, res) => {
+  try {
+    const { projectId, filePath, folderPath } = req.body;
+    let targetPath = '';
+
+    if (projectId) {
+      const cleanProjectId = sanitizeProjectId(projectId);
+      const projectDir = path.resolve(getProjectsRoot(), cleanProjectId);
+      if (!isInside(getProjectsRoot(), projectDir)) {
+        return res.status(400).json({ error: 'Invalid project path' });
+      }
+
+      if (filePath) {
+        const cleanFile = path.resolve(projectDir, filePath.trim());
+        if (!isInside(projectDir, cleanFile)) {
+          return res.status(400).json({ error: 'Invalid file path' });
+        }
+        targetPath = cleanFile;
+      } else {
+        targetPath = projectDir;
+      }
+    } else if (folderPath) {
+      targetPath = path.resolve(folderPath);
+    } else {
+      targetPath = getProjectsRoot();
+    }
+
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ error: 'Target path does not exist on disk', path: targetPath });
+    }
+
+    if (process.platform === 'win32') {
+      const isFile = fs.statSync(targetPath).isFile();
+      if (isFile) {
+        spawn('explorer.exe', [`/select,${targetPath}`], { detached: true, stdio: 'ignore' }).unref();
+      } else {
+        spawn('explorer.exe', [targetPath], { detached: true, stdio: 'ignore' }).unref();
+      }
+    } else if (process.platform === 'darwin') {
+      spawn('open', ['-R', targetPath], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      const dirToOpen = fs.statSync(targetPath).isDirectory() ? targetPath : path.dirname(targetPath);
+      spawn('xdg-open', [dirToOpen], { detached: true, stdio: 'ignore' }).unref();
+    }
+
+    return res.json({ success: true, path: targetPath });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/system/workspace-info', (_req, res) => {
+  try {
+    const root = getProjectsRoot();
+    return res.json({
+      projectsRoot: root,
+      platform: process.platform,
+      isWindows: process.platform === 'win32',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Seed initial projects matching Overleaf landing screenshot
 seedScreenshotProjects();
 

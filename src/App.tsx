@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle, ImperativePanelHandle } from 'react-resizable-panels';
 import { TopBar, ViewMode, ProjectInfo } from './components/TopBar/TopBar';
+import { StatusBar } from './components/StatusBar/StatusBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor } from './components/Editor/Editor';
@@ -151,6 +152,7 @@ export const App: React.FC = () => {
   const [isLiveMathEnabled, setIsLiveMathEnabled] = useState<boolean>(() => {
     return localStorage.getItem('overleaf-copy:live-math-enabled') !== 'false';
   });
+  const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number }>({ line: 1, column: 1 });
 
   // Modals State
   const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
@@ -1057,6 +1059,27 @@ export const App: React.FC = () => {
   };
 
   // File Tree Actions
+  const handleRevealInExplorer = useCallback(async (filePath?: string) => {
+    try {
+      const res = await fetch('/api/system/reveal-in-explorer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: projectId || undefined,
+          filePath: filePath || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addToast(`Opened in File Explorer: ${data.path}`, 'info');
+      } else {
+        addToast(data.error || 'Failed to open File Explorer.', 'error');
+      }
+    } catch (err: any) {
+      addToast(`Explorer connection error: ${err.message}`, 'error');
+    }
+  }, [projectId, addToast]);
+
   const handleSelectFile = useCallback((relPath: string) => {
     const ext = '.' + relPath.split('.').pop()?.toLowerCase();
     const textExts = ['.tex', '.bib', '.txt', '.sty', '.cls', '.md'];
@@ -1319,6 +1342,7 @@ export const App: React.FC = () => {
             hasUpdate={!!updateInfo?.hasUpdate}
             onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
             onCheckForUpdates={() => handleCheckForUpdates(true, true)}
+            onShowToast={addToast}
           />
         </div>
       ) : (
@@ -1373,6 +1397,7 @@ export const App: React.FC = () => {
                   hasUpdate={!!updateInfo?.hasUpdate}
                   onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
                   onCheckForUpdates={() => handleCheckForUpdates(true, true)}
+                  onShowToast={addToast}
                 />
               </div>
             </div>
@@ -1407,6 +1432,7 @@ export const App: React.FC = () => {
               hasUpdate={!!updateInfo?.hasUpdate}
               onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
               onCheckForUpdates={() => handleCheckForUpdates(true, true)}
+              onShowToast={addToast}
             />
           )}
 
@@ -1462,6 +1488,8 @@ export const App: React.FC = () => {
                   onDeleteItem={handleDeleteItem}
                   onDuplicateItem={handleDuplicateItem}
                   onToggleCollapse={() => setFileTreeCollapsed(true)}
+                  onRevealInExplorer={handleRevealInExplorer}
+                  onShowToast={addToast}
                 />
               </Panel>
 
@@ -1532,6 +1560,7 @@ export const App: React.FC = () => {
                     setIsCommentsDrawerOpen(true);
                   }}
                   collabSession={collabSession ? { ...collabSession, filePath: activeFilePath } : null}
+                  onCursorChange={setCursorPosition}
                 />
               </div>
             </Panel>
@@ -1631,6 +1660,20 @@ export const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Runtime Observability & File Explorer Status Bar */}
+      <StatusBar
+        projectId={projectId}
+        projectName={projectName}
+        activeFilePath={activeFilePath}
+        isCompiling={isCompiling}
+        compileDuration={compileDuration}
+        cursorLine={cursorPosition.line}
+        cursorColumn={cursorPosition.column}
+        isDoctorHealthy={isDoctorHealthy}
+        onOpenDoctor={() => setIsDoctorOpen(true)}
+        onShowToast={addToast}
+      />
     </div>
   )}
 
@@ -1720,6 +1763,7 @@ export const App: React.FC = () => {
         activeFilePath={activeFilePath}
         onRevertSuccess={handleRevertSuccess}
         onOpenSyncModal={() => setIsGitSyncModalOpen(true)}
+        onShowToast={addToast}
       />
 
       {/* Git Remote Sync Modal */}

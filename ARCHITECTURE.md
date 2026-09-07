@@ -24,6 +24,26 @@ This document provides a fast-lookup guide for human contributors and AI coding 
 | **Live Host-Share & P2P Collaboration** (LAN Wi-Fi discovery, Cloudflare Quick Tunnel, character-level `y-monaco` delta CRDTs, multi-file channel awareness, synchronized compilation) | [`server/tunnel.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/tunnel.ts)<br>[`server/index.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/index.ts)<br>[`src/utils/yjsCollab.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/utils/yjsCollab.ts)<br>[`src/components/Collaboration/CollabModal.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/Collaboration/CollabModal.tsx)<br>[`src/App.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/App.tsx) | `getCollabNetworkStatus()`, `startCloudflareTunnel()`, `setupMonacoCollab()`, `broadcastRemoteCompile()`, `?project=&room=` auto-mount |
 | **Clean Build & Cache Reset** (Auxiliary file cleanup, `--shell-escape` toggle) | [`server/compiler.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/compiler.ts)<br>[`server/index.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/index.ts)<br>[`src/components/TopBar/TopBar.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/TopBar/TopBar.tsx) | `cleanBuildCache()`, `POST /api/projects/:id/clean` |
 | **AI Style Guide & Anti-Slop Policy** (Zero emojis, senior engineering tone, TeX line unwrap) | [`AI_STYLE_GUIDE.md`](file:///c:/Users/sahgy/Downloads/overleaf-copy/AI_STYLE_GUIDE.md) | Standard for agents: no decorative emojis, professional UI copy, cascade handling |
+| **Windows Explorer Discovery & Project Location** (Reveal in Explorer, safe workspace folder) | [`server/index.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/index.ts)<br>[`server/projects.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/projects.ts)<br>[`src/components/Dashboard/ProjectsDashboard.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/Dashboard/ProjectsDashboard.tsx)<br>[`src/components/FileTree/FileTree.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/FileTree/FileTree.tsx) | `POST /api/system/reveal-in-explorer`, `getProjectsRoot()`, `Reveal in File Explorer` action |
+| **Runtime Observability Status Bar** (Daemon heartbeat, compiler state, path chip, editor telemetry) | [`src/components/StatusBar/StatusBar.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/StatusBar/StatusBar.tsx)<br>[`src/App.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/App.tsx) | Live server port indicator, compile progress indicator, active document path |
+| **Windows Setup Wizard & Uninstallation** (Interactive GUI, shortcut toggles, Windows Settings registration) | [`scripts/install.ps1`](file:///c:/Users/sahgy/Downloads/overleaf-copy/scripts/install.ps1)<br>[`scripts/uninstall.ps1`](file:///c:/Users/sahgy/Downloads/overleaf-copy/scripts/uninstall.ps1)<br>[`Oberleaf-Setup.bat`](file:///c:/Users/sahgy/Downloads/overleaf-copy/Oberleaf-Setup.bat)<br>[`Uninstall-Oberleaf.bat`](file:///c:/Users/sahgy/Downloads/overleaf-copy/Uninstall-Oberleaf.bat) | Inno/WinForms setup wizard, uninstaller with project retention safety, registry uninstall key |
+
+---
+
+## 🌐 Distribution & Download Hosting Architecture
+
+> [!IMPORTANT]
+> **Production Download Host**:
+> Oberleaf's web landing page and downloadable binaries are hosted and deployed from:
+> **`C:\Users\sahgy\Downloads\friendly-learning-srmap`**
+> - **Landing Page**: `src/pages/OberleafLanding.tsx` (accessible at `/oberleaf`)
+> - **Download Artifacts**: `public/downloads/`
+>   - `Oberleaf-Setup.bat` (bootstrap launcher)
+>   - `install.ps1` (automated PowerShell installer & setup wizard)
+>   - `Oberleaf-Setup.zip` (offline setup bundle containing batch launcher, script, and readme)
+>   - `oberleaf-icon.svg` (high-res vector brand logo)
+>
+> Whenever changes are made to installer scripts (`scripts/install.ps1`, `Oberleaf-Setup.bat`, or uninstaller logic), the files inside `friendly-learning-srmap/public/downloads/` must be updated and `Oberleaf-Setup.zip` rebuilt to maintain parity.
 
 ---
 
@@ -45,3 +65,4 @@ When an AI agent is tasked with modifying this codebase:
    - Searching for shortcuts or hotkeys? Go straight to [`src/hooks/useKeyboardShortcuts.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/hooks/useKeyboardShortcuts.ts).
    - Searching for viewport sizing or split layout? Go straight to [`src/App.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/App.tsx) and [`src/components/TopBar/TopBar.tsx`](file:///c:/Users/sahgy/Downloads/overleaf-copy/src/components/TopBar/TopBar.tsx).
    - Searching for LaTeX errors or build flags? Go straight to [`server/compiler.ts`](file:///c:/Users/sahgy/Downloads/overleaf-copy/server/compiler.ts).
+   - Searching for download hosting or web installer? Check [`C:\Users\sahgy\Downloads\friendly-learning-srmap\public\downloads`](file:///c:/Users/sahgy/Downloads/friendly-learning-srmap/public/downloads).

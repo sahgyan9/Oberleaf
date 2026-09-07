@@ -45,6 +45,8 @@ interface FileTreeProps {
   onDeleteItem: (path: string) => void;
   onDuplicateItem: (path: string) => void;
   onToggleCollapse?: () => void;
+  onRevealInExplorer?: (path?: string) => void;
+  onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export const FileTree: React.FC<FileTreeProps> = ({
@@ -58,6 +60,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onDeleteItem,
   onDuplicateItem,
   onToggleCollapse,
+  onRevealInExplorer,
+  onShowToast,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -262,6 +266,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
           >
             <FolderPlus className="w-3.5 h-3.5" />
           </button>
+          {onRevealInExplorer && (
+            <button
+              onClick={() => onRevealInExplorer()}
+              title="Reveal Project in Windows File Explorer"
+              className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
+          )}
           {onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
@@ -351,12 +364,29 @@ export const FileTree: React.FC<FileTreeProps> = ({
             </>
           )}
 
+          {onRevealInExplorer && (
+            <button
+              onClick={() => {
+                onRevealInExplorer(contextMenu.item.relativePath || contextMenu.item.name);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-scholarly-teal dark:text-scholarly-tealDark" />
+              <span>Reveal in Explorer</span>
+            </button>
+          )}
+
           <div className="h-[1px] bg-surface-lightBorder dark:border-surface-darkBorder my-1" />
 
           <button
             onClick={() => {
               if (contextMenu.item.name === 'main.tex') {
-                alert('main.tex cannot be deleted.');
+                if (onShowToast) {
+                  onShowToast('main.tex cannot be deleted as it is the project root document.', 'warning');
+                } else {
+                  alert('main.tex cannot be deleted.');
+                }
                 setContextMenu(null);
                 return;
               }

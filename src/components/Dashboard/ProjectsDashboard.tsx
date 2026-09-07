@@ -43,6 +43,7 @@ interface ProjectsDashboardProps {
   hasUpdate?: boolean;
   onOpenUpdateModal?: () => void;
   onCheckForUpdates?: () => void;
+  onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
@@ -55,8 +56,36 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   hasUpdate = false,
   onOpenUpdateModal,
   onCheckForUpdates,
+  onShowToast,
 }) => {
   const { theme, toggleTheme } = useTheme();
+
+  const notify = (msg: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    if (onShowToast) {
+      onShowToast(msg, type);
+    } else {
+      console.log(`[${type}] ${msg}`);
+    }
+  };
+
+  const handleRevealInExplorer = async (projectId?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const res = await fetch('/api/system/reveal-in-explorer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify(`Opened in File Explorer: ${data.path}`, 'info');
+      } else {
+        notify(data.error || 'Failed to open File Explorer.', 'error');
+      }
+    } catch (err: any) {
+      notify(`Could not connect to local server: ${err.message}`, 'error');
+    }
+  };
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,12 +110,13 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         setShortcutMessage('Shortcut Added!');
+        notify('Shortcut added to Desktop and Start Menu.', 'success');
         setTimeout(() => setShortcutMessage(null), 3500);
       } else {
-        alert(data.error || 'Failed to create shortcut.');
+        notify(data.error || 'Failed to create shortcut.', 'error');
       }
     } catch (err: any) {
-      alert(`Could not connect to local server: ${err.message}`);
+      notify(`Could not connect to local server: ${err.message}`, 'error');
     } finally {
       setIsAddingShortcut(false);
     }
@@ -162,11 +192,12 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       const res = await fetch(`/api/projects/${projectId}/clone`, { method: 'POST' });
       if (res.ok) {
         await onRefreshProjects();
+        notify('Project duplicated successfully.', 'success');
       } else {
-        alert('Could not duplicate project.');
+        notify('Could not duplicate project.', 'error');
       }
     } catch (err: any) {
-      alert(`Error duplicating: ${err.message}`);
+      notify(`Error duplicating: ${err.message}`, 'error');
     } finally {
       setIsCloning(null);
     }
@@ -183,7 +214,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       const res = await fetch(`/api/projects/${project.id}/download-pdf`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || 'PDF has not been compiled yet for this project.');
+        notify(data.error || 'PDF has not been compiled yet for this project.', 'warning');
         return;
       }
       let filename = `${project.id}.pdf`;
@@ -217,11 +248,12 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
         await onRefreshProjects();
         setSelectedProjectIds((prev) => prev.filter((id) => id !== deleteConfirmProject.id));
         setDeleteConfirmProject(null);
+        notify('Project deleted successfully.', 'info');
       } else {
-        alert('Failed to delete project.');
+        notify('Failed to delete project.', 'error');
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      notify(`Error: ${err.message}`, 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -425,6 +457,14 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
             </div>
           </div>
           <div className="hidden sm:flex items-center space-x-2">
+            <button
+              onClick={() => handleRevealInExplorer()}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-surface-lightBorder dark:border-surface-darkBorder text-xs font-medium transition cursor-pointer"
+              title="Open Oberleaf projects root directory in Windows File Explorer"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-scholarly-teal dark:text-scholarly-tealDark" />
+              <span>Open in Explorer</span>
+            </button>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-600 dark:text-stone-400 border border-surface-lightBorder dark:border-surface-darkBorder">
               Offline Fast Engine
             </span>
@@ -629,6 +669,15 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                       {/* Actions */}
                       <td className="py-3 px-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end space-x-1 text-stone-400">
+                          {/* Reveal in File Explorer */}
+                          <button
+                            onClick={(e) => handleRevealInExplorer(project.id, e)}
+                            title="Reveal project folder in Windows File Explorer"
+                            className="p-1.5 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Duplicate / Clone */}
                           <button
                             onClick={(e) => handleDuplicate(project.id, e)}

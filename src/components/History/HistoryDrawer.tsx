@@ -35,6 +35,7 @@ export interface HistoryDrawerProps {
   activeFilePath: string;
   onRevertSuccess: () => void;
   onOpenSyncModal?: () => void;
+  onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
@@ -44,6 +45,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   activeFilePath,
   onRevertSuccess,
   onOpenSyncModal,
+  onShowToast,
 }) => {
   const { theme } = useTheme();
   const [commits, setCommits] = useState<HistoryCommit[]>([]);
@@ -308,14 +310,17 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
       if (res.ok) {
         setShowConfirmRevert(false);
         onRevertSuccess();
+        onShowToast?.(`Restored checkpoint ${selectedCommit.shortHash} successfully.`, 'success');
         await fetchHistory();
         await fetchSyncStatus();
       } else {
         const err = await res.json();
-        alert(`Restore failed: ${err.error}`);
+        if (onShowToast) onShowToast(`Restore failed: ${err.error}`, 'error');
+        else alert(`Restore failed: ${err.error}`);
       }
     } catch (e: any) {
-      alert(`Restore error: ${e.message}`);
+      if (onShowToast) onShowToast(`Restore error: ${e.message}`, 'error');
+      else alert(`Restore error: ${e.message}`);
     } finally {
       setIsReverting(false);
     }

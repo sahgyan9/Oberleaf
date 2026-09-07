@@ -10,9 +10,17 @@
 # Windows PowerShell 5.1, which is what ships with Windows 10 and 11, reads a
 # BOM-less .ps1 as Windows-1252. An em dash then decodes to three characters,
 # one of which is a double quote, and that stray quote swallows the rest of the
-# script as a string literal. This installer shipped with em dashes in its
-# banner for exactly that reason and every student who ran it got a wall of
-# parse errors instead of an install.
+# script as a string literal.
+
+param(
+    [string]$DestinationPath,
+    [switch]$Silent = $false,
+    [switch]$NoGui = $false,
+    [switch]$NoLaunch = $false,
+    [switch]$NoDesktop = $false,
+    [switch]$NoStartMenu = $false,
+    [switch]$NoContextMenu = $false
+)
 
 $ErrorActionPreference = "Continue"
 $ProgressPreference    = "SilentlyContinue"
@@ -57,10 +65,6 @@ function Get-Tool {
 
 $IsElevated = Test-IsAdmin
 
-# winget defaults to the machine scope, which needs elevation. When the student
-# is not an admin that used to fail while the rest of setup carried on as if
-# everything had installed, so try the user scope first and fall back to the
-# elevating path only if the package has no user-scope build.
 function Install-Package {
     param([string]$Id)
 
@@ -71,14 +75,10 @@ function Install-Package {
                         "--silent", "--disable-interactivity")
         if ($scope) { $wingetArgs += @("--scope", $scope) }
 
-        Write-Host ("   winget " + ($wingetArgs -join " ")) -ForegroundColor DarkGray
-        & winget.exe @wingetArgs 2>&1 | Out-String | Write-Host
+        Write-Log ("   winget " + ($wingetArgs -join " ")) "DarkGray"
+        & winget.exe @wingetArgs 2>&1 | Out-String | ForEach-Object { Write-Log $_ "DarkGray" }
         Update-SessionEnvironment
 
-        # winget returns 0 both for a fresh install and for "already installed",
-        # and a pile of different codes otherwise. The answer that actually
-        # matters is whether the command is on PATH afterwards, which the caller
-        # re-checks; here just stop retrying once winget is happy.
         if ($LASTEXITCODE -eq 0) { return $true }
     }
     return $false
@@ -110,221 +110,472 @@ try {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRootCandidate = Split-Path -Parent $ScriptDir
 
-if ((Test-Path (Join-Path $RepoRootCandidate "package.json")) -and (Test-Path (Join-Path $RepoRootCandidate "server"))) {
-    # Running from inside an existing Oberleaf clone
+if ($DestinationPath -and (Test-Path (Split-Path -Parent $DestinationPath))) {
+    $InstallDir = $DestinationPath
+} elseif ((Test-Path (Join-Path $RepoRootCandidate "package.json")) -and (Test-Path (Join-Path $RepoRootCandidate "server"))) {
     $InstallDir = $RepoRootCandidate
 } else {
-    # Running from the standalone downloader (e.g. the Downloads folder)
     $InstallDir = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Oberleaf")
+}
+
+# UI state variables
+$script:CreateDesktopShortcut = -not $NoDesktop
+$script:CreateStartMenuShortcut = -not $NoStartMenu
+$script:AddContextMenu = -not $NoContextMenu
+$script:LaunchOnFinish = -not $NoLaunch
+$script:LogTextBox = $null
+$script:ProgressBar = $null
+$script:StatusLabel = $null
+
+function Write-Log {
+    param([string]$Message, [string]$Color = "White")
+    Write-Host $Message -ForegroundColor $Color
+    if ($script:LogTextBox) {
+        try {
+            $script:LogTextBox.AppendText($Message + "`r`n")
+            $script:LogTextBox.SelectionStart = $script:LogTextBox.Text.Length
+            $script:LogTextBox.ScrollToCaret()
+            [System.Windows.Forms.Application]::DoEvents()
+        } catch {}
+    }
+}
+
+function Set-ProgressStep {
+    param([int]$Percent, [string]$Status)
+    if ($script:ProgressBar) {
+        try {
+            $script:ProgressBar.Value = [Math]::Min(100, [Math]::Max(0, $Percent))
+        } catch {}
+    }
+    if ($script:StatusLabel) {
+        try {
+            $script:StatusLabel.Text = $Status
+        } catch {}
+    }
+    [System.Windows.Forms.Application]::DoEvents()
+}
+
+# -------------------------------------------------------------
+# Optional Interactive Setup Wizard Dialog
+# -------------------------------------------------------------
+$isInteractive = [Environment]::UserInteractive -and -not $Silent -and -not $NoGui
+
+if ($isInteractive) {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        [System.Windows.Forms.Application]::EnableVisualStyles()
+
+        $setupForm = New-Object System.Windows.Forms.Form
+        $setupForm.Text = "Oberleaf Setup"
+        $setupForm.Size = New-Object System.Drawing.Size(560, 440)
+        $setupForm.StartPosition = "CenterScreen"
+        $setupForm.FormBorderStyle = "FixedDialog"
+        $setupForm.MaximizeBox = $false
+        $setupForm.MinimizeBox = $false
+
+        # Header panel
+        $pnlHeader = New-Object System.Windows.Forms.Panel
+        $pnlHeader.Location = New-Object System.Drawing.Point(0, 0)
+        $pnlHeader.Size = New-Object System.Drawing.Size(560, 70)
+        $pnlHeader.BackColor = [System.Drawing.Color]::FromArgb(47, 57, 169) # Deep Indigo brand
+
+        $lblHeaderTitle = New-Object System.Windows.Forms.Label
+        $lblHeaderTitle.Text = "Oberleaf - Scholarly TeX Studio Setup"
+        $lblHeaderTitle.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+        $lblHeaderTitle.ForeColor = [System.Drawing.Color]::White
+        $lblHeaderTitle.Location = New-Object System.Drawing.Point(20, 15)
+        $lblHeaderTitle.Size = New-Object System.Drawing.Size(480, 25)
+        $pnlHeader.Controls.Add($lblHeaderTitle)
+
+        $lblHeaderSub = New-Object System.Windows.Forms.Label
+        $lblHeaderSub.Text = "Fast, Local-First LaTeX Without Cloud Timeouts"
+        $lblHeaderSub.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $lblHeaderSub.ForeColor = [System.Drawing.Color]::FromArgb(200, 220, 255)
+        $lblHeaderSub.Location = New-Object System.Drawing.Point(22, 40)
+        $lblHeaderSub.Size = New-Object System.Drawing.Size(480, 20)
+        $pnlHeader.Controls.Add($lblHeaderSub)
+
+        $setupForm.Controls.Add($pnlHeader)
+
+        # Page 1 Panel: Options & Destination
+        $pnlOptions = New-Object System.Windows.Forms.Panel
+        $pnlOptions.Location = New-Object System.Drawing.Point(20, 80)
+        $pnlOptions.Size = New-Object System.Drawing.Size(510, 270)
+
+        $lblDest = New-Object System.Windows.Forms.Label
+        $lblDest.Text = "Destination Folder:"
+        $lblDest.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+        $lblDest.Location = New-Object System.Drawing.Point(0, 10)
+        $lblDest.Size = New-Object System.Drawing.Size(200, 20)
+        $pnlOptions.Controls.Add($lblDest)
+
+        $txtDest = New-Object System.Windows.Forms.TextBox
+        $txtDest.Text = $InstallDir
+        $txtDest.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $txtDest.Location = New-Object System.Drawing.Point(0, 32)
+        $txtDest.Size = New-Object System.Drawing.Size(400, 24)
+        $pnlOptions.Controls.Add($txtDest)
+
+        $btnBrowse = New-Object System.Windows.Forms.Button
+        $btnBrowse.Text = "Browse..."
+        $btnBrowse.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
+        $btnBrowse.Location = New-Object System.Drawing.Point(410, 30)
+        $btnBrowse.Size = New-Object System.Drawing.Size(85, 27)
+        $btnBrowse.Add_Click({
+            $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
+            $fbd.SelectedPath = $txtDest.Text
+            $fbd.Description = "Select Destination Folder for Oberleaf"
+            if ($fbd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                $txtDest.Text = $fbd.SelectedPath
+            }
+        })
+        $pnlOptions.Controls.Add($btnBrowse)
+
+        $lblSpace = New-Object System.Windows.Forms.Label
+        $driveLetter = [System.IO.Path]::GetPathRoot($txtDest.Text)
+        $freeGB = ""
+        try {
+            $drive = Get-PSDrive ($driveLetter.TrimEnd('\').TrimEnd(':')) -ErrorAction SilentlyContinue
+            if ($drive) { $freeGB = [Math]::Round($drive.Free / 1GB, 1) }
+        } catch {}
+        $lblSpace.Text = "Space required: ~250 MB" + $(if ($freeGB) { " | Available on drive $driveLetter : $freeGB GB" } else { "" })
+        $lblSpace.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+        $lblSpace.ForeColor = [System.Drawing.Color]::DarkSlateGray
+        $lblSpace.Location = New-Object System.Drawing.Point(0, 60)
+        $lblSpace.Size = New-Object System.Drawing.Size(450, 18)
+        $pnlOptions.Controls.Add($lblSpace)
+
+        # Shortcuts group
+        $lblTasks = New-Object System.Windows.Forms.Label
+        $lblTasks.Text = "Shortcuts & Integration:"
+        $lblTasks.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+        $lblTasks.Location = New-Object System.Drawing.Point(0, 95)
+        $lblTasks.Size = New-Object System.Drawing.Size(200, 20)
+        $pnlOptions.Controls.Add($lblTasks)
+
+        $chkDesktop = New-Object System.Windows.Forms.CheckBox
+        $chkDesktop.Text = "Create a Desktop shortcut"
+        $chkDesktop.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $chkDesktop.Checked = $true
+        $chkDesktop.Location = New-Object System.Drawing.Point(5, 120)
+        $chkDesktop.Size = New-Object System.Drawing.Size(450, 22)
+        $pnlOptions.Controls.Add($chkDesktop)
+
+        $chkStartMenu = New-Object System.Windows.Forms.CheckBox
+        $chkStartMenu.Text = "Add to Start Menu (searchable via Windows Search)"
+        $chkStartMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $chkStartMenu.Checked = $true
+        $chkStartMenu.Location = New-Object System.Drawing.Point(5, 145)
+        $chkStartMenu.Size = New-Object System.Drawing.Size(450, 22)
+        $pnlOptions.Controls.Add($chkStartMenu)
+
+        $chkContext = New-Object System.Windows.Forms.CheckBox
+        $chkContext.Text = "Add 'Open with Oberleaf' to File Explorer right-click menu"
+        $chkContext.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $chkContext.Checked = $true
+        $chkContext.Location = New-Object System.Drawing.Point(5, 170)
+        $chkContext.Size = New-Object System.Drawing.Size(450, 22)
+        $pnlOptions.Controls.Add($chkContext)
+
+        $setupForm.Controls.Add($pnlOptions)
+
+        # Page 2 Panel: Progress & Details Log
+        $pnlProgress = New-Object System.Windows.Forms.Panel
+        $pnlProgress.Location = New-Object System.Drawing.Point(20, 80)
+        $pnlProgress.Size = New-Object System.Drawing.Size(510, 270)
+        $pnlProgress.Visible = $false
+
+        $script:StatusLabel = New-Object System.Windows.Forms.Label
+        $script:StatusLabel.Text = "Ready to install..."
+        $script:StatusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+        $script:StatusLabel.Location = New-Object System.Drawing.Point(0, 10)
+        $script:StatusLabel.Size = New-Object System.Drawing.Size(480, 20)
+        $pnlProgress.Controls.Add($script:StatusLabel)
+
+        $script:ProgressBar = New-Object System.Windows.Forms.ProgressBar
+        $script:ProgressBar.Location = New-Object System.Drawing.Point(0, 35)
+        $script:ProgressBar.Size = New-Object System.Drawing.Size(500, 20)
+        $pnlProgress.Controls.Add($script:ProgressBar)
+
+        $script:LogTextBox = New-Object System.Windows.Forms.TextBox
+        $script:LogTextBox.Multiline = $true
+        $script:LogTextBox.ReadOnly = $true
+        $script:LogTextBox.ScrollBars = "Vertical"
+        $script:LogTextBox.Font = New-Object System.Drawing.Font("Consolas", 8)
+        $script:LogTextBox.Location = New-Object System.Drawing.Point(0, 65)
+        $script:LogTextBox.Size = New-Object System.Drawing.Size(500, 190)
+        $pnlProgress.Controls.Add($script:LogTextBox)
+
+        $setupForm.Controls.Add($pnlProgress)
+
+        # Bottom Buttons
+        $btnInstall = New-Object System.Windows.Forms.Button
+        $btnInstall.Text = "Install"
+        $btnInstall.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+        $btnInstall.Location = New-Object System.Drawing.Point(330, 360)
+        $btnInstall.Size = New-Object System.Drawing.Size(95, 30)
+
+        $btnCancel = New-Object System.Windows.Forms.Button
+        $btnCancel.Text = "Cancel"
+        $btnCancel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $btnCancel.Location = New-Object System.Drawing.Point(435, 360)
+        $btnCancel.Size = New-Object System.Drawing.Size(85, 30)
+        $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+
+        $setupForm.Controls.Add($btnInstall)
+        $setupForm.Controls.Add($btnCancel)
+        $setupForm.AcceptButton = $btnInstall
+        $setupForm.CancelButton = $btnCancel
+
+        $script:InstallTriggered = $false
+
+        $btnInstall.Add_Click({
+            if (-not $script:InstallTriggered) {
+                $script:InstallTriggered = $true
+                $InstallDir = $txtDest.Text.Trim()
+                $script:CreateDesktopShortcut = $chkDesktop.Checked
+                $script:CreateStartMenuShortcut = $chkStartMenu.Checked
+                $script:AddContextMenu = $chkContext.Checked
+
+                $pnlOptions.Visible = $false
+                $pnlProgress.Visible = $true
+                $btnInstall.Enabled = $false
+                $btnCancel.Enabled = $false
+                $setupForm.ControlBox = $false
+
+                [System.Windows.Forms.Application]::DoEvents()
+                # Run the installation pipeline inside GUI
+                Start-InstallationPipeline
+                $btnInstall.Text = "Finish"
+                $btnInstall.Enabled = $true
+                $setupForm.ControlBox = $true
+            } else {
+                $setupForm.Close()
+            }
+        })
+
+        $setupForm.ShowDialog() | Out-Null
+        if (-not $script:InstallTriggered) {
+            Write-Host "Setup was closed before installing."
+            exit 0
+        }
+    } catch {
+        Write-Warning "GUI wizard encountered an issue: $_. Continuing in console mode."
+        $isInteractive = $false
+    }
+}
+
+function Start-InstallationPipeline {
     if (-not (Test-Path $InstallDir)) {
         New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     }
-}
 
-Write-Host "Target Directory: $InstallDir" -ForegroundColor Gray
-Write-Host "Setup log:        $LogFile" -ForegroundColor Gray
-Write-Host ""
+    Write-Log "Target Directory: $InstallDir" "Gray"
+    Write-Log "Setup log:        $LogFile" "Gray"
+    Write-Log ""
 
-# -------------------------------------------------------------
-# Step 1: Windows Package Manager (winget)
-# -------------------------------------------------------------
-$hasWinget = [bool](Get-Command winget.exe -ErrorAction SilentlyContinue)
-if (-not $hasWinget) {
-    Write-Host "[1/5] Windows Package Manager (winget) was not found." -ForegroundColor Yellow
-    Write-Host "      Install 'App Installer' from the Microsoft Store, then run setup again:" -ForegroundColor Yellow
-    Write-Host "      https://apps.microsoft.com/detail/9nblggh4nns1" -ForegroundColor Yellow
-} else {
-    Write-Host "[1/5] winget detected." -ForegroundColor Green
-}
+    # -------------------------------------------------------------
+    # Step 1: Windows Package Manager (winget)
+    # -------------------------------------------------------------
+    Set-ProgressStep 10 "Checking Windows Package Manager..."
+    $hasWinget = [bool](Get-Command winget.exe -ErrorAction SilentlyContinue)
+    if (-not $hasWinget) {
+        Write-Log "[1/5] Windows Package Manager (winget) was not found." "Yellow"
+        Write-Log "      Install 'App Installer' from the Microsoft Store, then run setup again:" "Yellow"
+        Write-Log "      https://apps.microsoft.com/detail/9nblggh4nns1" "Yellow"
+    } else {
+        Write-Log "[1/5] winget detected." "Green"
+    }
 
-# -------------------------------------------------------------
-# Step 2: Git
-# -------------------------------------------------------------
-Update-SessionEnvironment
-$gitCmd = Get-Tool @("git.exe", "git")
-if (-not $gitCmd) {
-    Write-Host "[2/5] Installing Git..." -ForegroundColor Yellow
-    if ($hasWinget) { Install-Package -Id "Git.Git" | Out-Null }
+    # -------------------------------------------------------------
+    # Step 2: Git
+    # -------------------------------------------------------------
+    Set-ProgressStep 25 "Checking Git..."
+    Update-SessionEnvironment
     $gitCmd = Get-Tool @("git.exe", "git")
     if (-not $gitCmd) {
-        # winget drops Git in one of these even when PATH has not caught up.
-        foreach ($p in @("$env:ProgramFiles\Git\cmd\git.exe",
-                         "${env:ProgramFiles(x86)}\Git\cmd\git.exe",
-                         "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe")) {
-            if (Test-Path $p) { $env:Path = (Split-Path $p) + ";" + $env:Path; break }
-        }
+        Write-Log "[2/5] Installing Git..." "Yellow"
+        if ($hasWinget) { Install-Package -Id "Git.Git" | Out-Null }
         $gitCmd = Get-Tool @("git.exe", "git")
+        if (-not $gitCmd) {
+            foreach ($p in @("$env:ProgramFiles\Git\cmd\git.exe",
+                             "${env:ProgramFiles(x86)}\Git\cmd\git.exe",
+                             "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe")) {
+                if (Test-Path $p) { $env:Path = (Split-Path $p) + ";" + $env:Path; break }
+            }
+            $gitCmd = Get-Tool @("git.exe", "git")
+        }
     }
-}
-if ($gitCmd) {
-    Write-Host "[2/5] Git ready: $($gitCmd.Source)" -ForegroundColor Green
-} else {
-    Write-Host "[2/5] Git could not be installed automatically." -ForegroundColor Red
-    Write-Host "      Install it from https://git-scm.com and run this setup again." -ForegroundColor Red
-    $Failures.Add("Git")
-}
+    if ($gitCmd) {
+        Write-Log "[2/5] Git ready: $($gitCmd.Source)" "Green"
+    } else {
+        Write-Log "[2/5] Git could not be installed automatically." "Red"
+        Write-Log "      Install it from https://git-scm.com and run this setup again." "Red"
+        $Failures.Add("Git")
+    }
 
-# -------------------------------------------------------------
-# Step 3: Node.js LTS
-# -------------------------------------------------------------
-Update-SessionEnvironment
-$nodeCmd = Get-Tool @("node.exe", "node")
-if (-not $nodeCmd) {
-    Write-Host "[3/5] Installing Node.js LTS..." -ForegroundColor Yellow
-    if ($hasWinget) { Install-Package -Id "OpenJS.NodeJS.LTS" | Out-Null }
+    # -------------------------------------------------------------
+    # Step 3: Node.js LTS
+    # -------------------------------------------------------------
+    Set-ProgressStep 40 "Checking Node.js LTS..."
+    Update-SessionEnvironment
     $nodeCmd = Get-Tool @("node.exe", "node")
     if (-not $nodeCmd) {
-        foreach ($p in @("$env:ProgramFiles\nodejs\node.exe",
-                         "$env:LOCALAPPDATA\Programs\nodejs\node.exe")) {
-            if (Test-Path $p) { $env:Path = (Split-Path $p) + ";" + $env:Path; break }
-        }
+        Write-Log "[3/5] Installing Node.js LTS..." "Yellow"
+        if ($hasWinget) { Install-Package -Id "OpenJS.NodeJS.LTS" | Out-Null }
         $nodeCmd = Get-Tool @("node.exe", "node")
+        if (-not $nodeCmd) {
+            foreach ($p in @("$env:ProgramFiles\nodejs\node.exe",
+                             "$env:LOCALAPPDATA\Programs\nodejs\node.exe")) {
+                if (Test-Path $p) { $env:Path = (Split-Path $p) + ";" + $env:Path; break }
+            }
+            $nodeCmd = Get-Tool @("node.exe", "node")
+        }
     }
-}
-if ($nodeCmd) {
-    Write-Host "[3/5] Node.js ready: $($nodeCmd.Source)" -ForegroundColor Green
-} else {
-    Write-Host "[3/5] Node.js could not be installed automatically." -ForegroundColor Red
-    Write-Host "      Install the LTS build from https://nodejs.org and run setup again." -ForegroundColor Red
-    $Failures.Add("Node.js")
-}
+    if ($nodeCmd) {
+        Write-Log "[3/5] Node.js ready: $($nodeCmd.Source)" "Green"
+    } else {
+        Write-Log "[3/5] Node.js could not be installed automatically." "Red"
+        Write-Log "      Install the LTS build from https://nodejs.org and run setup again." "Red"
+        $Failures.Add("Node.js")
+    }
 
-# -------------------------------------------------------------
-# Step 4: LaTeX (MiKTeX)
-# -------------------------------------------------------------
-Update-SessionEnvironment
-$latexCmd = Get-Tool @("pdflatex.exe", "latexmk.exe", "pdflatex")
-if (-not $latexCmd) {
-    Write-Host "[4/5] No LaTeX compiler found. Installing MiKTeX - this is the slow part..." -ForegroundColor Cyan
-    if ($hasWinget) { Install-Package -Id "MiKTeX.MiKTeX" | Out-Null }
+    # -------------------------------------------------------------
+    # Step 4: LaTeX (MiKTeX)
+    # -------------------------------------------------------------
+    Set-ProgressStep 55 "Checking LaTeX distribution (MiKTeX)..."
+    Update-SessionEnvironment
     $latexCmd = Get-Tool @("pdflatex.exe", "latexmk.exe", "pdflatex")
-}
-if ($latexCmd) {
-    Write-Host "[4/5] LaTeX ready: $($latexCmd.Source)" -ForegroundColor Green
-} else {
-    # Deliberately not a failure: MiKTeX very often needs one sign-out before
-    # it lands on PATH, and Oberleaf can still install and open without it.
-    Write-Host "[4/5] MiKTeX is not on PATH yet." -ForegroundColor Yellow
-    Write-Host "      That is usually just a pending restart - Oberleaf's Dependency" -ForegroundColor Yellow
-    Write-Host "      Doctor will finish configuring it on first launch." -ForegroundColor Yellow
-}
-
-# -------------------------------------------------------------
-# Teach MiKTeX to install packages without asking
-# -------------------------------------------------------------
-# A basic MiKTeX ships with very few packages, so the first real document asks
-# for titlesec, geometry, hyperref and a dozen more. Out of the box MiKTeX
-# answers that by opening a modal "Package Installation" dialog per package.
-# Oberleaf compiles by spawning pdflatex from the local server, so nobody is
-# looking at that window: the compile just sits there until the ten minute
-# timeout kills it, which reads to the user as a hang. -interaction=nonstopmode
-# does not help, because this is MiKTeX's package manager rather than TeX
-# waiting on input. Setting AutoInstall=1 makes it fetch quietly instead.
-Update-SessionEnvironment
-$initexmf = Get-Tool @("initexmf.exe", "initexmf")
-if ($initexmf) {
-    Write-Host "      Configuring MiKTeX to install missing packages automatically..." -ForegroundColor Cyan
-    & $initexmf.Source --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
-    if ($IsElevated) {
-        # A machine-wide MiKTeX keeps a separate admin configuration, and the
-        # user-scope value above does not reach it.
-        & $initexmf.Source --admin --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
+    if (-not $latexCmd) {
+        Write-Log "[4/5] No LaTeX compiler found. Installing MiKTeX - this may take several minutes..." "Cyan"
+        if ($hasWinget) { Install-Package -Id "MiKTeX.MiKTeX" | Out-Null }
+        $latexCmd = Get-Tool @("pdflatex.exe", "latexmk.exe", "pdflatex")
     }
-    $verify = (& $initexmf.Source --show-config-value="[MPM]AutoInstall" 2>&1 | Out-String).Trim()
-    if ($verify -eq "1") {
-        Write-Host "      MiKTeX will now install packages silently." -ForegroundColor Green
+    if ($latexCmd) {
+        Write-Log "[4/5] LaTeX ready: $($latexCmd.Source)" "Green"
     } else {
-        Write-Host "      Could not confirm the setting (got '$verify')." -ForegroundColor Yellow
-        Write-Host "      If a 'Package Installation' dialog appears while compiling, tick" -ForegroundColor Yellow
-        Write-Host "      Install and untick 'Always show this dialog'." -ForegroundColor Yellow
+        Write-Log "[4/5] MiKTeX is not on PATH yet." "Yellow"
+        Write-Log "      That is usually just a pending restart - Oberleaf's Dependency" "Yellow"
+        Write-Log "      Doctor will finish configuring it on first launch." "Yellow"
     }
-} elseif ($latexCmd) {
-    Write-Host "      initexmf not found - if a 'Package Installation' dialog appears" -ForegroundColor Yellow
-    Write-Host "      while compiling, click Install and untick 'Always show this dialog'." -ForegroundColor Yellow
-}
 
-# -------------------------------------------------------------
-# Step 5: Fetch Oberleaf
-# -------------------------------------------------------------
-Write-Host "[5/5] Syncing the Oberleaf codebase..." -ForegroundColor Cyan
-
-$RepoUrl = "https://github.com/sahgyan9/Oberleaf.git"
-$repoReady = $false
-
-if (Test-Path (Join-Path $InstallDir ".git")) {
-    Set-Location $InstallDir
-    & git pull origin main
-    $repoReady = $true
-} elseif (Test-Path (Join-Path $InstallDir "package.json")) {
-    Set-Location $InstallDir
-    $repoReady = $true
-} elseif (-not $gitCmd) {
-    Write-Host "      Skipped - Git is not available." -ForegroundColor Red
-    $Failures.Add("repository download")
-} else {
-    # git clone refuses a destination that already contains files, and the
-    # directory was created a few lines above, so clone into a scratch path and
-    # move the contents across when the target is not empty.
-    $existing = @(Get-ChildItem -LiteralPath $InstallDir -Force -ErrorAction SilentlyContinue)
-    if ($existing.Count -gt 0) {
-        $staging = Join-Path $env:TEMP ("oberleaf_clone_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
-        & git clone --depth 1 $RepoUrl $staging
-        if (Test-Path (Join-Path $staging ".git")) {
-            Get-ChildItem -LiteralPath $staging -Force |
-                Move-Item -Destination $InstallDir -Force -ErrorAction SilentlyContinue
-            Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
-            $repoReady = Test-Path (Join-Path $InstallDir "package.json")
+    # Configure MiKTeX AutoInstall
+    Update-SessionEnvironment
+    $initexmf = Get-Tool @("initexmf.exe", "initexmf")
+    if ($initexmf) {
+        Write-Log "      Configuring MiKTeX to install missing packages automatically..." "Cyan"
+        & $initexmf.Source --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
+        if ($IsElevated) {
+            & $initexmf.Source --admin --set-config-value="[MPM]AutoInstall=1" 2>&1 | Out-Null
         }
-    } else {
-        & git clone --depth 1 $RepoUrl $InstallDir
-        $repoReady = Test-Path (Join-Path $InstallDir ".git")
+        $verify = (& $initexmf.Source --show-config-value="[MPM]AutoInstall" 2>&1 | Out-String).Trim()
+        if ($verify -eq "1") {
+            Write-Log "      MiKTeX will now install packages silently." "Green"
+        } else {
+            Write-Log "      Could not confirm setting (got '$verify')." "Yellow"
+        }
     }
 
-    if ($repoReady) {
+    # -------------------------------------------------------------
+    # Step 5: Fetch Oberleaf
+    # -------------------------------------------------------------
+    Set-ProgressStep 70 "Syncing Oberleaf repository..."
+    Write-Log "[5/5] Syncing the Oberleaf codebase..." "Cyan"
+
+    $RepoUrl = "https://github.com/sahgyan9/Oberleaf.git"
+    $repoReady = $false
+
+    if (Test-Path (Join-Path $InstallDir ".git")) {
         Set-Location $InstallDir
-    } else {
-        Write-Host "      Could not download Oberleaf from GitHub." -ForegroundColor Red
+        & git pull origin main
+        $repoReady = $true
+    } elseif (Test-Path (Join-Path $InstallDir "package.json")) {
+        Set-Location $InstallDir
+        $repoReady = $true
+    } elseif (-not $gitCmd) {
+        Write-Log "      Skipped - Git is not available." "Red"
         $Failures.Add("repository download")
-    }
-}
-
-# -------------------------------------------------------------
-# Node packages
-# -------------------------------------------------------------
-if ($repoReady -and $nodeCmd) {
-    Write-Host ""
-    Write-Host "Installing Oberleaf dependencies (npm install)..." -ForegroundColor Cyan
-    $npm = Get-Tool @("npm.cmd", "npm")
-    if ($npm) {
-        & $npm.Source install
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "npm install reported errors - see $LogFile" -ForegroundColor Yellow
-            $Failures.Add("npm install")
-        }
     } else {
-        Write-Host "npm was not found on PATH. Restart Windows and run this setup again." -ForegroundColor Yellow
-        $Failures.Add("npm")
+        $existing = @(Get-ChildItem -LiteralPath $InstallDir -Force -ErrorAction SilentlyContinue)
+        if ($existing.Count -gt 0) {
+            $staging = Join-Path $env:TEMP ("oberleaf_clone_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+            & git clone --depth 1 $RepoUrl $staging
+            if (Test-Path (Join-Path $staging ".git")) {
+                Get-ChildItem -LiteralPath $staging -Force |
+                    Move-Item -Destination $InstallDir -Force -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+                $repoReady = Test-Path (Join-Path $InstallDir "package.json")
+            }
+        } else {
+            & git clone --depth 1 $RepoUrl $InstallDir
+            $repoReady = Test-Path (Join-Path $InstallDir ".git")
+        }
+
+        if ($repoReady) {
+            Set-Location $InstallDir
+        } else {
+            Write-Log "      Could not download Oberleaf from GitHub." "Red"
+            $Failures.Add("repository download")
+        }
+    }
+
+    # Node packages
+    if ($repoReady -and $nodeCmd) {
+        Set-ProgressStep 82 "Installing dependencies (npm install)..."
+        Write-Log ""
+        Write-Log "Installing Oberleaf dependencies (npm install)..." "Cyan"
+        $npm = Get-Tool @("npm.cmd", "npm")
+        if ($npm) {
+            & $npm.Source install
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "npm install reported errors - see $LogFile" "Yellow"
+                $Failures.Add("npm install")
+            }
+        } else {
+            Write-Log "npm was not found on PATH. Restart Windows and run this setup again." "Yellow"
+            $Failures.Add("npm")
+        }
+    }
+
+    # Warm LaTeX Packages
+    if ($latexCmd -and -not $env:OBERLEAF_SKIP_PACKAGE_WARMUP) {
+        Set-ProgressStep 92 "Pre-downloading LaTeX template packages..."
+        Write-Log ""
+        Write-Log "Pre-downloading the LaTeX packages the templates need..." "Cyan"
+        try { Initialize-LatexPackages } catch {
+            Write-Log "      Warm-up skipped: $_" "Yellow"
+        }
+    }
+
+    # Desktop, Start Menu, Context Menu, and Uninstaller Registration
+    Set-ProgressStep 97 "Registering shortcuts and uninstaller..."
+    $SetupScript = Join-Path $InstallDir "scripts\setup-windows.ps1"
+    if ($repoReady -and (Test-Path $SetupScript)) {
+        Write-Log ""
+        Write-Log "Registering Oberleaf Desktop, Start Menu, and System integrations..." "Cyan"
+        $setupArgs = @()
+        if (-not $script:CreateDesktopShortcut) { $setupArgs += "-NoDesktop" }
+        if (-not $script:CreateStartMenuShortcut) { $setupArgs += "-NoStartMenu" }
+        if (-not $script:AddContextMenu) { $setupArgs += "-NoContextMenu" }
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SetupScript @setupArgs
+    }
+
+    Set-ProgressStep 100 "Setup Complete!"
+    Write-Log ""
+    if ($Failures.Count -gt 0) {
+        Write-Log "==========================================================" "Yellow"
+        Write-Log " Setup finished with non-critical warnings:" "Yellow"
+        foreach ($f in $Failures) { Write-Log "   - $f" "Yellow" }
+        Write-Log " Log: $LogFile" "Yellow"
+        Write-Log "==========================================================" "Yellow"
+    } else {
+        Write-Log "==========================================================" "Green"
+        Write-Log "  Setup complete! Oberleaf is ready to use.              " "Green"
+        Write-Log "==========================================================" "Green"
     }
 }
 
-# -------------------------------------------------------------
-# Warm the LaTeX package cache
-# -------------------------------------------------------------
-# AutoInstall stops MiKTeX interrupting a compile, but the download still
-# happens during that compile, so the first document a student opens sits there
-# for a minute or two fetching a dozen packages. Compiling a throwaway file
-# that loads everything the shipped templates and seeded projects use pulls all
-# of it now, while they are already waiting on an installer.
-#
-# The probes below are generated from server/projects.ts - one document class
-# per probe, loading the packages used with that class. They cannot be read
-# from there at runtime, because this script is downloaded and run before the
-# repository exists, so the list is baked in and regenerated by
-# scripts/generate-latex-probes.mjs. npm run build verifies it is current.
-#
-# Deliberately best-effort and last: by this point Oberleaf is installed and
-# usable, so closing this window only means falling back to on-demand fetching.
-# Set OBERLEAF_SKIP_PACKAGE_WARMUP=1 to skip it.
 function Initialize-LatexPackages {
     # BEGIN GENERATED PROBES
     # Generated from server/projects.ts. Do not edit by hand - run
@@ -373,18 +624,14 @@ function Initialize-LatexPackages {
 
     $work = Join-Path $env:TEMP ("oberleaf_warmup_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
     New-Item -ItemType Directory -Path $work -Force | Out-Null
-
     $warmupLog = Join-Path $env:TEMP "oberleaf-warmup.log"
 
     try {
         foreach ($name in $probes.Keys) {
             $file = Join-Path $work $name
             Set-Content -LiteralPath $file -Value $probes[$name] -Encoding ASCII
+            Write-Log "      $name..." "DarkGray"
 
-            Write-Host "      $name..." -ForegroundColor DarkGray
-
-            # pdflatex is extremely chatty and none of it is the user's problem,
-            # so it goes to a log rather than over the setup output.
             $out = Join-Path $work "$name.out"
             $err = Join-Path $work "$name.err"
             $p = Start-Process -FilePath "pdflatex.exe" `
@@ -392,76 +639,43 @@ function Initialize-LatexPackages {
                 -WorkingDirectory $work -NoNewWindow -PassThru `
                 -RedirectStandardOutput $out -RedirectStandardError $err
 
-            # A bounded wait: a warm-up must never be the reason setup hangs.
             if (-not $p.WaitForExit(300000)) {
                 try { $p.Kill() } catch {}
                 Copy-Item $out $warmupLog -Force -ErrorAction SilentlyContinue
-                Write-Host "      Timed out on $name. Remaining packages install on" -ForegroundColor Yellow
-                Write-Host "      first use instead. Log: $warmupLog" -ForegroundColor Yellow
+                Write-Log "      Timed out on $name. Log: $warmupLog" "Yellow"
                 return
             }
 
-            # Whether a PDF came out, rather than $p.ExitCode: a process from
-            # Start-Process -PassThru does not reliably carry an exit code once
-            # the timeout overload of WaitForExit has been used, and "did it
-            # actually produce a document" is the thing we care about anyway.
             $pdf = Join-Path $work ([IO.Path]::ChangeExtension($name, ".pdf"))
             if (-not (Test-Path $pdf)) {
                 Copy-Item $out $warmupLog -Force -ErrorAction SilentlyContinue
-                Write-Host "      $name did not produce a PDF." -ForegroundColor Yellow
-                Write-Host "      Not fatal - packages install on first use. Log: $warmupLog" -ForegroundColor Yellow
+                Write-Log "      $name did not produce a PDF. Log: $warmupLog" "Yellow"
                 return
             }
         }
-        Write-Host "      Package cache ready - the first compile will be fast." -ForegroundColor Green
+        Write-Log "      Package cache ready - first compile will be fast." "Green"
     } finally {
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
-if ($latexCmd -and -not $env:OBERLEAF_SKIP_PACKAGE_WARMUP) {
-    Write-Host ""
-    Write-Host "Pre-downloading the LaTeX packages the templates need..." -ForegroundColor Cyan
-    Write-Host "      This is the last step and takes a few minutes. Oberleaf already" -ForegroundColor Gray
-    Write-Host "      works - closing this window just means packages arrive later." -ForegroundColor Gray
-    try { Initialize-LatexPackages } catch {
-        Write-Host "      Warm-up skipped: $_" -ForegroundColor Yellow
+# If not interactive (e.g. called from command line with -Silent or -NoGui), run directly
+if (-not $isInteractive) {
+    Start-InstallationPipeline
+}
+
+# -------------------------------------------------------------
+# Launch
+# -------------------------------------------------------------
+if ($script:LaunchOnFinish -and ($Failures.Count -eq 0 -or -not ($Failures -contains "repository download"))) {
+    $Launcher = Join-Path $InstallDir "scripts\launch.vbs"
+    if (Test-Path $Launcher) {
+        Write-Host "Starting Oberleaf..." -ForegroundColor Green
+        Start-Process -FilePath "wscript.exe" -ArgumentList ('"' + $Launcher + '"') -WorkingDirectory $InstallDir
     }
 }
 
-# -------------------------------------------------------------
-# Desktop and Start Menu shortcuts
-# -------------------------------------------------------------
-$SetupScript = Join-Path $InstallDir "scripts\setup-windows.ps1"
-if ($repoReady -and (Test-Path $SetupScript)) {
-    Write-Host ""
-    Write-Host "Registering Oberleaf Desktop and Start Menu shortcuts..." -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SetupScript
-}
-
-# -------------------------------------------------------------
-# Result
-# -------------------------------------------------------------
-Write-Host ""
-if ($Failures.Count -gt 0) {
-    Write-Host "==========================================================" -ForegroundColor Yellow
-    Write-Host " Setup finished, but these steps did not complete:" -ForegroundColor Yellow
-    foreach ($f in $Failures) { Write-Host "   - $f" -ForegroundColor Yellow }
-    Write-Host " Log: $LogFile" -ForegroundColor Yellow
-    Write-Host "==========================================================" -ForegroundColor Yellow
-    try { Stop-Transcript | Out-Null } catch {}
-    if ($Failures -contains "repository download") { exit 3 } else { exit 2 }
-}
-
-$Launcher = Join-Path $InstallDir "scripts\launch.vbs"
-if (Test-Path $Launcher) {
-    Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "  Setup complete! Starting Oberleaf...                    " -ForegroundColor Green
-    Write-Host "==========================================================" -ForegroundColor Green
-    Start-Process -FilePath "wscript.exe" -ArgumentList ('"' + $Launcher + '"') -WorkingDirectory $InstallDir
-} else {
-    Write-Host "Setup finished. Launch Oberleaf anytime with 'npm start' in $InstallDir." -ForegroundColor Green
-}
-
 try { Stop-Transcript | Out-Null } catch {}
+if ($Failures -contains "repository download") { exit 3 }
+if ($Failures.Count -gt 0) { exit 2 }
 exit 0

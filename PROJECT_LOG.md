@@ -658,3 +658,57 @@ overleaf-copy/
   - `[System.Management.Automation.Language.Parser]::ParseFile('scripts\launch.ps1')`: 0 syntax errors.
   - `npm run typecheck`: Passed cleanly with 0 errors.
 - **Status at end**: Resolved and verified.
+
+---
+
+### Session 015 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "Imagine, you are downloading an app in you windows 10 or 11. What are the touch point you will go through. It could be first going to a website where you could download the program (there the website should be minimalist yet well designed so that I should know what exactly to do), after I download it should pop up different windows where to install, and I want to see the processing thats happening while installed, a button to add short cut while installing itself, then finish. Also come a post installation experience, I should be able to find my project location easily in app as well as file explorer, I should be able uninstall, and I should be able to see what app actually doing. I like it, now ready this entire codebase and see if all of these exist for us. I know there is serious bugs as well. Lets make this perfect.. and note the download is hosted in C:\Users\sahgy\Downloads\friendly-learning-srmap (document this as well here so that future agents knows about this)"
+- **Core Problems Identified**:
+  1. **Download Hosting Disconnect**: The public website and download distribution files are hosted in a separate repository at `C:\Users\sahgy\Downloads\friendly-learning-srmap` (deployed at `friendly-learning-srmap.vercel.app/oberleaf`). Changes to `install.ps1` or setup scripts were previously desynchronized.
+  2. **Non-Interactive Silent Installer**: `scripts/install.ps1` ran silently in console without letting users select an installation directory, choose desktop/start-menu shortcuts, or observe granular installation phases.
+  3. **Vulnerable Project Storage**: User LaTeX projects were stored directly inside the code repository at `overleaf-copy/projects/`. Reinstalling, updating, or deleting the app would destroy the user's research papers.
+  4. **Zero Windows File Explorer Discovery**: Users could not open their project folders in File Explorer from within the app.
+  5. **Lack of Runtime Observability**: No visual indicator showed the user whether the local backend daemon was running, compiler duration, or active document cursor position.
+  6. **Missing Uninstallation Protocol**: No entry in Windows Settings > Installed Apps (`Add/Remove Programs`), leaving users unable to uninstall cleanly.
+  7. **Blocking UI Bugs**: 8 native blocking browser `alert()` dialogs in `ProjectsDashboard`, `FileTree`, `TopBar`, and `HistoryDrawer` froze the UI loop.
+- **What Was Done**:
+  - **Download Hosting Architecture & Sync (`C:\Users\sahgy\Downloads\friendly-learning-srmap`)**:
+    - Documented relationship in `ARCHITECTURE.md` and `README.md`.
+    - Enforced Windows PowerShell 5.1 compatibility: ensured UTF-8 BOM (`[0xef, 0xbb, 0xbf]`) and 100% pure ASCII byte stream on all `.ps1` files.
+    - Updated `scripts/install.ps1` in `friendly-learning-srmap/public/downloads/install.ps1`.
+    - Re-bundled `Oberleaf-Setup.zip` containing `Oberleaf-Setup.bat`, `install.ps1`, and `README.txt`.
+    - Enhanced `src/pages/OberleafLanding.tsx` with updated setup instructions and Explorer discovery highlights. Verified full pre-render and static build passed with exit code 0.
+  - **Interactive Windows Setup Wizard (`scripts/install.ps1`)**:
+    - Implemented a WinForms GUI with dark academic styling (#1c1917 / #10b981).
+    - Added interactive Destination Folder picker with `[ Browse... ]` dialog and live free disk space calculation.
+    - Added checkboxes for Desktop Shortcut, Start Menu Shortcut, and File Explorer Context Menu ("Open LaTeX Folder with Oberleaf").
+    - Added live ProgressBar and streaming RichTextBox console log displaying real-time Winget/Git/MiKTeX package steps.
+    - Added Windows Settings Uninstallation registration (`HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Oberleaf`).
+  - **Safe Project Storage Architecture (`server/projects.ts`)**:
+    - Moved default project directory from the repository folder to `Documents\Oberleaf Projects` (`$env:USERPROFILE\Documents\Oberleaf Projects`) for desktop installations.
+    - Added `OBERLEAF_PROJECTS_DIR` environment variable support for custom locations.
+  - **In-App Explorer Integration & Observability**:
+    - Added `POST /api/system/reveal-in-explorer` and `GET /api/system/workspace-info` in `server/index.ts`.
+    - Created `src/components/StatusBar/StatusBar.tsx` mounted at the bottom of the workspace showing:
+      - Backend daemon indicator (green dot `:3001` with link to health check)
+      - Compiler state badge (Compiling spinner, Idle, or compilation duration in seconds)
+      - Active project chip with 1-click `Reveal in Explorer` button
+      - Real-time Monaco cursor position (`Ln X, Col Y`)
+      - Quick shortcut button to TeX Doctor diagnostics
+    - Added "Reveal in File Explorer" buttons in `ProjectsDashboard.tsx` (on each project card and top banner), `FileTree.tsx` (header button and context menu), and `TopBar.tsx` (Tools dropdown).
+  - **Bug Fixes (Browser `alert()` Elimination)**:
+    - Replaced all 8 native blocking `alert()` popups with non-blocking Scholarly Atelier toasts in `ProjectsDashboard.tsx`, `FileTree.tsx`, `TopBar.tsx`, and `HistoryDrawer.tsx`.
+  - **Windows Settings Uninstaller (`scripts/uninstall.ps1` & `Uninstall-Oberleaf.bat`)**:
+    - Built interactive WinForms uninstaller prompting user with a checkbox to preserve user papers in `Documents\Oberleaf Projects`.
+    - Terminated port 3001 and 5173 process trees cleanly, deleted shortcuts and context menus, wiped app folder safely in a detached process, and deleted registry keys.
+- **Verification**:
+  - `PowerShell AST check`: 0 syntax errors on `install.ps1`, `setup-windows.ps1`, `uninstall.ps1`.
+  - `npm run check:latex-probes`: 100% up to date with `server/projects.ts`.
+  - `npm run typecheck`: 0 TypeScript errors.
+  - `npm run build` (`overleaf-copy`): Production build passed in 12.74s.
+  - `npm run build` (`friendly-learning-srmap`): Passed and pre-rendered cleanly with 0 errors.
+- **Files changed**:
+  - CREATED: `scripts/uninstall.ps1`, `Uninstall-Oberleaf.bat`, `src/components/StatusBar/StatusBar.tsx`, `src/components/StatusBar/StatusBar.css`
+  - MODIFIED: `ARCHITECTURE.md`, `README.md`, `PROJECT_LOG.md`, `scripts/install.ps1`, `scripts/setup-windows.ps1`, `server/index.ts`, `server/projects.ts`, `src/App.tsx`, `src/components/Dashboard/ProjectsDashboard.tsx`, `src/components/Editor/Editor.tsx`, `src/components/FileTree/FileTree.tsx`, `src/components/History/HistoryDrawer.tsx`, `src/components/TopBar/TopBar.tsx`, `C:\Users\sahgy\Downloads\friendly-learning-srmap\src\pages\OberleafLanding.tsx`, `C:\Users\sahgy\Downloads\friendly-learning-srmap\public\downloads\install.ps1`, `C:\Users\sahgy\Downloads\friendly-learning-srmap\public\downloads\Oberleaf-Setup.zip`
+- **Status at end**: Complete, verified, and fully synchronized.
+

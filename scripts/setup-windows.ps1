@@ -1,5 +1,10 @@
 ﻿# Oberleaf - Windows Integration Script
-# Creates Start Menu and Desktop shortcuts with custom icon
+# Creates Start Menu, Desktop shortcuts, File Explorer context menu, and Uninstaller registration
+param(
+    [switch]$NoDesktop = $false,
+    [switch]$NoStartMenu = $false,
+    [switch]$NoContextMenu = $false
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -27,13 +32,18 @@ Write-Host "Setting up Oberleaf shortcuts with custom icon..." -ForegroundColor 
 $WshShell = New-Object -ComObject WScript.Shell
 
 $TargetLocations = @(
-    @{ Name = "Start Menu (Windows Search)"; Path = [System.IO.Path]::Combine($StartMenuPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($StartMenuPath, "Overleaf Copy.lnk") },
-    @{ Name = "Desktop"; Path = [System.IO.Path]::Combine($DesktopPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($DesktopPath, "Overleaf Copy.lnk") },
     @{ Name = "Project Folder"; Path = [System.IO.Path]::Combine($ProjectRoot, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($ProjectRoot, "Overleaf Copy.lnk") }
 )
 
-if ($AltDesktopPath -ne $DesktopPath -and (Test-Path $AltDesktopPath)) {
-    $TargetLocations += @{ Name = "User Desktop"; Path = [System.IO.Path]::Combine($AltDesktopPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($AltDesktopPath, "Overleaf Copy.lnk") }
+if (-not $NoStartMenu) {
+    $TargetLocations += @{ Name = "Start Menu (Windows Search)"; Path = [System.IO.Path]::Combine($StartMenuPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($StartMenuPath, "Overleaf Copy.lnk") }
+}
+
+if (-not $NoDesktop) {
+    $TargetLocations += @{ Name = "Desktop"; Path = [System.IO.Path]::Combine($DesktopPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($DesktopPath, "Overleaf Copy.lnk") }
+    if ($AltDesktopPath -ne $DesktopPath -and (Test-Path $AltDesktopPath)) {
+        $TargetLocations += @{ Name = "User Desktop"; Path = [System.IO.Path]::Combine($AltDesktopPath, "Oberleaf.lnk"); LegacyPath = [System.IO.Path]::Combine($AltDesktopPath, "Overleaf Copy.lnk") }
+    }
 }
 
 foreach ($loc in $TargetLocations) {
@@ -61,7 +71,60 @@ foreach ($loc in $TargetLocations) {
     Write-Host "[+] Created shortcut in $($loc.Name): $($loc.Path)" -ForegroundColor Green
 }
 
-# Invalidate Windows Shell icon cache
+# 2. File Explorer Context Menu Integration
+if (-not $NoContextMenu) {
+    try {
+        Write-Host "Registering File Explorer context menu..." -ForegroundColor Cyan
+        $vbsArg = "wscript.exe `"$VbsLauncher`""
+
+        $regKey1 = "HKCU:\Software\Classes\Directory\shell\Oberleaf"
+        New-Item -Path $regKey1 -Force | Out-Null
+        Set-ItemProperty -Path $regKey1 -Name "(Default)" -Value "Open with Oberleaf"
+        if (Test-Path $IconPath) { Set-ItemProperty -Path $regKey1 -Name "Icon" -Value "$IconPath,0" }
+        $cmdKey1 = Join-Path $regKey1 "command"
+        New-Item -Path $cmdKey1 -Force | Out-Null
+        Set-ItemProperty -Path $cmdKey1 -Name "(Default)" -Value $vbsArg
+
+        $regKey2 = "HKCU:\Software\Classes\Directory\Background\shell\Oberleaf"
+        New-Item -Path $regKey2 -Force | Out-Null
+        Set-ItemProperty -Path $regKey2 -Name "(Default)" -Value "Open with Oberleaf"
+        if (Test-Path $IconPath) { Set-ItemProperty -Path $regKey2 -Name "Icon" -Value "$IconPath,0" }
+        $cmdKey2 = Join-Path $regKey2 "command"
+        New-Item -Path $cmdKey2 -Force | Out-Null
+        Set-ItemProperty -Path $cmdKey2 -Name "(Default)" -Value $vbsArg
+        Write-Host "[+] Registered 'Open with Oberleaf' in File Explorer right-click menu" -ForegroundColor Green
+    } catch {
+        Write-Warning "Could not register File Explorer context menu: $_"
+    }
+}
+
+# 3. Register Uninstaller in Windows Settings -> Installed Apps
+try {
+    Write-Host "Registering in Windows Installed Apps..." -ForegroundColor Cyan
+    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Oberleaf"
+    if (-not (Test-Path $uninstallKey)) {
+        New-Item -Path $uninstallKey -Force | Out-Null
+    }
+    $uninstallBat = Join-Path $ProjectRoot "Uninstall-Oberleaf.bat"
+    $uninstallPs1 = Join-Path $ProjectRoot "scripts\uninstall.ps1"
+
+    Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Oberleaf - Scholarly TeX Studio"
+    Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.0.0"
+    Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "Oberleaf"
+    Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $ProjectRoot
+    if (Test-Path $IconPath) { Set-ItemProperty -Path $uninstallKey -Name "DisplayIcon" -Value "$IconPath,0" }
+    Set-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$uninstallBat`""
+    Set-ItemProperty -Path $uninstallKey -Name "QuietUninstallString" -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$uninstallPs1`" -Silent"
+    Set-ItemProperty -Path $uninstallKey -Name "EstimatedSize" -Value 250000 -Type DWord
+    Set-ItemProperty -Path $uninstallKey -Name "URLInfoAbout" -Value "https://friendly-learning-srmap.vercel.app/oberleaf"
+    Set-ItemProperty -Path $uninstallKey -Name "NoModify" -Value 1 -Type DWord
+    Set-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -Type DWord
+    Write-Host "[+] Registered in Windows Settings Installed Apps" -ForegroundColor Green
+} catch {
+    Write-Warning "Could not register uninstaller in registry: $_"
+}
+
+# 4. Invalidate Windows Shell icon cache
 Write-Host "Refreshing Windows icon cache..." -ForegroundColor Cyan
 try {
     if (-not ([System.Management.Automation.PSTypeName]'Win32.ShellNotification').Type) {
@@ -74,18 +137,7 @@ try {
     [Win32.ShellNotification]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero) # SHCNE_ASSOCCHANGED
 } catch {}
 
-# Windows Search caches the old icon until SearchApp restarts on its own. We
-# used to force-kill SearchApp/SearchHost here to make the new icon appear
-# instantly, but a downloaded script that terminates system processes is a
-# textbook behaviour-monitoring trigger and Defender was quarantining the whole
-# installer over it. SHChangeNotify above is enough for Desktop and Start Menu;
-# the search result catches up by itself after a sign-out.
-
 Write-Host ""
 Write-Host "ALL SET!" -ForegroundColor Green
 Write-Host "1. Press Windows Key and search 'oberleaf' or 'Oberleaf' to find and open it." -ForegroundColor Cyan
 Write-Host "2. Or double-click the 'Oberleaf' shortcut on your Desktop or project folder." -ForegroundColor Cyan
-
-
-
-

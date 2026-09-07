@@ -19,6 +19,7 @@ interface EditorProps {
   commentLines?: number[];
   onOpenCommentAtCursor?: (line: number, selectedText: string) => void;
   collabSession?: CollabSessionConfig | null;
+  onCursorChange?: (pos: { line: number; column: number }) => void;
 }
 
 // Module-level cache to restore cursor & scroll when editor unmounts/remounts across view modes
@@ -36,6 +37,7 @@ export const Editor: React.FC<EditorProps> = ({
   commentLines,
   onOpenCommentAtCursor,
   collabSession,
+  onCursorChange,
 }) => {
   const { theme } = useTheme();
   const editorInstance = useRef<any>(null);
@@ -48,6 +50,7 @@ export const Editor: React.FC<EditorProps> = ({
   const onEquationChangeRef = useRef(onEquationChange);
   const getProjectContextRef = useRef(getProjectContext);
   const onOpenCommentAtCursorRef = useRef(onOpenCommentAtCursor);
+  const onCursorChangeRef = useRef(onCursorChange);
 
   useEffect(() => {
     onCompileRef.current = onCompile;
@@ -55,6 +58,7 @@ export const Editor: React.FC<EditorProps> = ({
     onEquationChangeRef.current = onEquationChange;
     getProjectContextRef.current = getProjectContext;
     onOpenCommentAtCursorRef.current = onOpenCommentAtCursor;
+    onCursorChangeRef.current = onCursorChange;
   });
 
   // Dynamically sync Monaco theme when user toggles light/dark mode
@@ -208,6 +212,13 @@ export const Editor: React.FC<EditorProps> = ({
     registerLatexCompletions(monaco, () =>
       getProjectContextRef.current?.() ?? { citations: [], files: [] }
     );
+
+    // Track cursor movement for status bar telemetry
+    editor.onDidChangeCursorPosition((e: any) => {
+      if (e && e.position) {
+        onCursorChangeRef.current?.({ line: e.position.lineNumber, column: e.position.column });
+      }
+    });
 
     // Add Keybinding: Ctrl+Enter / Cmd+Enter to compile
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {

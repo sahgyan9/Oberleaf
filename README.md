@@ -97,23 +97,15 @@ Oberleaf is built around a distinct, modern 4-color palette designed for high le
 
 ---
 
-## 🪟 Windows Search Integration
+## 🪟 Windows Integration & User Experience
 
-You can launch **Oberleaf** directly from your Windows Start Menu just like a native desktop app:
-
-1. In the project folder, run:
-   ```powershell
-   npm run setup:windows
-   ```
-2. Press the **Windows Key** and type:
-   ```
-   oberleaf
-   ```
-   or
-   ```
-   Oberleaf
-   ```
-3. Hit **Enter** — Oberleaf will launch in the background with its custom icon and open your browser automatically.
+Oberleaf provides first-class Windows 10 & 11 integration:
+- **Interactive Setup Wizard**: Allows selecting install destination and toggling Desktop & Start Menu shortcuts.
+- **Windows Search & Start Menu**: Press the **Windows Key** and type `oberleaf` to launch with custom icon.
+- **Projects Location Discovery**: Your documents stay 100% private in `Documents\Oberleaf Projects` (or local `projects/`), with 1-click **Reveal in File Explorer** available in the Dashboard, File Tree, and bottom Status Bar.
+- **App Observability**: The bottom Status Bar gives continuous visibility into the local server daemon (`:3001`), compiler status, active file path, and diagnostic health.
+- **Clean Uninstallation**: Fully registered in **Windows Settings > Installed Apps** (`ms-settings:appsfeatures`) with an uninstaller that protects and preserves your research documents.
+- **Web Download Host**: The official download portal is hosted via [`friendly-learning-srmap`](https://friendly-learning-srmap.vercel.app/oberleaf) (repository located at `C:\Users\sahgy\Downloads\friendly-learning-srmap`).
 
 ---
 
