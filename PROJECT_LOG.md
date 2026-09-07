@@ -775,5 +775,40 @@ overleaf-copy/
   - MODIFIED (`friendly-learning-srmap`): `public/downloads/Oberleaf-Setup.bat`, `public/downloads/Oberleaf-Setup.zip`, `scripts/build-oberleaf-bundle.mjs`
 - **Status at end**: Complete, verified, and pushed.
 
+---
+
+### Session 018 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "why are these by default and everyone who download this get this. Just keep create new CV with tempelate as default ... why not save by default to onedrive because that is most acessible to everyone so the finding it become easier later"
+- **RCA & Architectural Audit**:
+  1. **Dummy Screenshot Projects**: `server/projects.ts` had a function `seedScreenshotProjects()` originally created to match a mock Overleaf dashboard screenshot during UI development. It populated 5 dummy academic papers (`Quantum_Computing_For_Everyone`, `MoS2_Thin_Film`, `CV_Sydney`, `CLA2_OE_Data_Analytics`, `CdSe_GQD`) on every boot into the user's Documents.
+  2. **OneDrive vs Local Documents Mismatch**: On Windows 10/11, Microsoft OneDrive is the default active Documents library (`C:\Users\<user>\OneDrive\Documents`), pinned in the File Explorer sidebar and automatically backed up to cloud. `server/projects.ts` was hardcoding `userHome\Documents` (`C:\Users\<user>\Documents`), which bypassed OneDrive and caused the uninstaller (which checked `[Environment]::GetFolderPath('MyDocuments')`) to report a folder location mismatch.
+- **What Was Done**:
+  - **Eliminated Dummy Physics Seeding**:
+    - Removed `seedScreenshotProjects()` and all 5 dummy paper definitions from `server/projects.ts` and `server/index.ts`.
+    - Cleaned up residual dummy project folders from the user's workspace.
+  - **CV Template as Default Everywhere**:
+    - Added modern, ATS-friendly, single-page `cv` template to `TEMPLATES` in `server/projects.ts`.
+    - Implemented `ensureStarterCVProject()`: on a fresh install with 0 projects, seeds a single clean starter project (`My_CV`).
+    - Defaulted `createProject()` in `server/projects.ts` and `POST /api/projects` in `server/index.ts` to `'cv'`.
+    - Updated `src/components/Modals/NewProjectModal.tsx` to set "Curriculum Vitae / Resume (Default)" as the first, pre-selected template option.
+    - Updated `src/components/Dashboard/ProjectsDashboard.tsx` with a direct "New CV" button in the toolbar and a prominent "Create New CV" call-to-action in the empty state.
+  - **OneDrive Documents as Primary Workspace (`server/projects.ts` & `scripts/uninstall.ps1`)**:
+    - Updated `getProjectsRoot()` to automatically detect and prioritize `OneDrive\Documents\Oberleaf Projects` on Windows 10/11, matching Windows File Explorer's default library and providing automatic cloud backup.
+    - Added seamless auto-migration: if projects existed in legacy `userHome\Documents\Oberleaf Projects`, they are automatically copied into the primary `OneDrive\Documents\Oberleaf Projects` folder.
+    - Synchronized `scripts/uninstall.ps1` to prioritize `[System.Environment]::GetFolderPath('MyDocuments')` (`OneDrive\Documents`) to guarantee 100% path alignment between runtime and uninstaller.
+  - **Rebuilt & Synchronized Distribution Bundle**:
+    - Re-synced LaTeX warmup probes with `scripts/generate-latex-probes.mjs`.
+    - Re-bundled `public/downloads/Oberleaf-Setup.zip` in `friendly-learning-srmap`.
+- **Verification**:
+  - `pdflatex compile test`: `My_CV` compiled cleanly with 0 errors and 0 missing packages in 1.4s.
+  - `Auto-migration test`: Confirmed `My_CV` seamlessly migrated to `C:\Users\sahgy\OneDrive\Documents\Oberleaf Projects\my-cv`.
+  - `Build test`: `npm run build` passed with 0 errors.
+  - `UTF-8 BOM / ASCII test`: Verified all PowerShell scripts (`install.ps1`, `uninstall.ps1`) have pure ASCII + BOM.
+- **Files changed**:
+  - MODIFIED (`overleaf-copy`): `server/projects.ts`, `server/index.ts`, `scripts/install.ps1`, `scripts/uninstall.ps1`, `src/components/Modals/NewProjectModal.tsx`, `src/components/Dashboard/ProjectsDashboard.tsx`, `PROJECT_LOG.md`
+  - MODIFIED (`friendly-learning-srmap`): `public/downloads/install.ps1`, `public/downloads/Oberleaf-Setup.zip`
+- **Status at end**: Complete, verified, and pushed to both repositories.
+
+
 
 
