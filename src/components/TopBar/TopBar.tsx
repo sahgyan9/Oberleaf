@@ -108,6 +108,32 @@ export const TopBar: React.FC<TopBarProps> = ({
   const toolsRef = useRef<HTMLDivElement>(null);
   const [isAddingShortcut, setIsAddingShortcut] = useState(false);
   const [shortcutAdded, setShortcutAdded] = useState(false);
+  const [hasShortcut, setHasShortcut] = useState<boolean | null>(() => {
+    const cached = localStorage.getItem('oberleaf_has_shortcut');
+    return cached !== null ? cached === 'true' : null;
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkShortcut = async () => {
+      try {
+        const res = await fetch('/api/system/shortcut-status');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success) {
+            setHasShortcut(!!data.exists);
+            localStorage.setItem('oberleaf_has_shortcut', data.exists ? 'true' : 'false');
+          }
+        }
+      } catch {
+        // Silently preserve cached status
+      }
+    };
+    checkShortcut();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleAddShortcut = async () => {
     setIsAddingShortcut(true);
@@ -117,6 +143,8 @@ export const TopBar: React.FC<TopBarProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         setShortcutAdded(true);
+        setHasShortcut(true);
+        localStorage.setItem('oberleaf_has_shortcut', 'true');
         onShowToast?.('Desktop & Start Menu shortcut added.', 'success');
         setTimeout(() => setShortcutAdded(false), 3500);
       } else {
@@ -535,7 +563,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   ) : (
                     <MonitorUp className="w-4 h-4 text-stone-700 dark:text-stone-300" />
                   )}
-                  <span>{shortcutAdded ? 'Shortcut Added!' : 'Add Desktop Shortcut'}</span>
+                  <span>{shortcutAdded ? 'Shortcut Added!' : (hasShortcut ? 'Recreate Desktop Shortcut' : 'Add Desktop Shortcut')}</span>
                 </button>
                 {onCheckForUpdates && (
                   <button

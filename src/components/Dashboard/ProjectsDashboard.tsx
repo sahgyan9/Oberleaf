@@ -356,26 +356,28 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
             <span className="hidden sm:inline">Engine</span>
           </button>
 
-          {/* Add Desktop Shortcut Button */}
-          <button
-            onClick={handleAddShortcut}
-            disabled={isAddingShortcut}
-            title="Add Oberleaf shortcut to Desktop & Start Menu"
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition btn-tactile ${
-              shortcutMessage
-                ? 'bg-scholarly-green/15 text-scholarly-green dark:text-scholarly-greenDark border-scholarly-green/30'
-                : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-800'
-            }`}
-          >
-            {isAddingShortcut ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly-green dark:text-scholarly-greenDark" />
-            ) : shortcutMessage ? (
-              <Check className="w-3.5 h-3.5 text-scholarly-green dark:text-scholarly-greenDark" />
-            ) : (
-              <MonitorUp className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
-            )}
-            <span className="hidden sm:inline">{shortcutMessage || 'Add Shortcut'}</span>
-          </button>
+          {/* Add Desktop Shortcut Button - only visible if shortcut hasn't been added yet */}
+          {(!hasShortcut || isAddingShortcut || shortcutMessage) && (
+            <button
+              onClick={handleAddShortcut}
+              disabled={isAddingShortcut}
+              title="Add Oberleaf shortcut to Desktop & Start Menu"
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition btn-tactile ${
+                shortcutMessage
+                  ? 'bg-scholarly-green/15 text-scholarly-green dark:text-scholarly-greenDark border-scholarly-green/30'
+                  : 'bg-surface-lightSubtle dark:bg-surface-darkSubtle border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-800'
+              }`}
+            >
+              {isAddingShortcut ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-scholarly-green dark:text-scholarly-greenDark" />
+              ) : shortcutMessage ? (
+                <Check className="w-3.5 h-3.5 text-scholarly-green dark:text-scholarly-greenDark" />
+              ) : (
+                <MonitorUp className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+              )}
+              <span className="hidden sm:inline">{shortcutMessage || 'Add Shortcut'}</span>
+            </button>
+          )}
 
           {/* Update Available Badge */}
           {hasUpdate && onOpenUpdateModal && (
@@ -427,7 +429,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     }}
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition flex items-center justify-between"
                   >
-                    <span>Add Desktop Shortcut</span>
+                    <span>{hasShortcut ? 'Recreate Desktop Shortcut' : 'Add Desktop Shortcut'}</span>
                     <MonitorUp className="w-3.5 h-3.5 text-stone-400" />
                   </button>
                   {onCheckForUpdates && (
