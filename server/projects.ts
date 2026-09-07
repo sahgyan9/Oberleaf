@@ -222,22 +222,47 @@ export function getProjectsRoot(): string {
     return custom;
   }
 
-  // 2. If running inside a checkout or directory that has a local `projects` folder with content
-  const localProjects = path.join(process.cwd(), 'projects');
-  if (fs.existsSync(localProjects)) {
-    return localProjects;
+  // 2. Default to user's active Windows Documents folder
+  // (Prefers OneDrive Documents if active on Windows 10/11, which matches File Explorer's default library and provides automatic cloud backup)
+  const userHome = process.env.USERPROFILE || process.env.HOME || process.cwd();
+
+  let documentsDir: string;
+  const oneDriveDocs = process.env.OneDrive
+    ? path.join(process.env.OneDrive, 'Documents')
+    : path.join(userHome, 'OneDrive', 'Documents');
+
+  if (fs.existsSync(oneDriveDocs)) {
+    documentsDir = oneDriveDocs;
+  } else {
+    documentsDir = path.join(userHome, 'Documents');
   }
 
-  // 3. For installed desktop application, default to user's visible Documents folder
-  const userHome = process.env.USERPROFILE || process.env.HOME || process.cwd();
-  const docsProjects = path.join(userHome, 'Documents', 'Oberleaf Projects');
+  const docsProjects = path.join(documentsDir, 'Oberleaf Projects');
   try {
     if (!fs.existsSync(docsProjects)) {
       fs.mkdirSync(docsProjects, { recursive: true });
     }
+
+    // Seamless migration: If user previously had projects in local un-synced userHome\Documents\Oberleaf Projects,
+    // copy them to the primary OneDrive\Documents\Oberleaf Projects folder
+    const legacyDocsProjects = path.join(userHome, 'Documents', 'Oberleaf Projects');
+    if (legacyDocsProjects !== docsProjects && fs.existsSync(legacyDocsProjects)) {
+      try {
+        const legacyEntries = fs.readdirSync(legacyDocsProjects);
+        for (const entry of legacyEntries) {
+          const srcPath = path.join(legacyDocsProjects, entry);
+          const destPath = path.join(docsProjects, entry);
+          if (!fs.existsSync(destPath)) {
+            fs.cpSync(srcPath, destPath, { recursive: true });
+          }
+        }
+      } catch {}
+    }
+
     return docsProjects;
   } catch {
     // Fallback to local directory if Documents is inaccessible
+    const localProjects = path.join(process.cwd(), 'projects');
     if (!fs.existsSync(localProjects)) {
       fs.mkdirSync(localProjects, { recursive: true });
     }

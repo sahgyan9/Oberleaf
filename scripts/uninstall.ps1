@@ -141,10 +141,11 @@ if ($isInstalledDir -and (Test-Path $appDir)) {
         # If user has projects inside the app dir, move them safely to Documents
         $localProjects = Join-Path $appDir "projects"
         if (Test-Path $localProjects) {
-            $docsBackup = [System.IO.Path]::Combine($env:USERPROFILE, "Documents", "Oberleaf Projects")
-            if (-not (Test-Path [System.IO.Path]::GetDirectoryName($docsBackup))) {
-                $docsBackup = Join-Path ([System.Environment]::GetFolderPath('MyDocuments')) "Oberleaf Projects"
+            $primaryDocs = [System.Environment]::GetFolderPath('MyDocuments')
+            if (-not (Test-Path $primaryDocs)) {
+                $primaryDocs = [System.IO.Path]::Combine($env:USERPROFILE, "Documents")
             }
+            $docsBackup = Join-Path $primaryDocs "Oberleaf Projects"
             try {
                 if (-not (Test-Path $docsBackup)) {
                     New-Item -ItemType Directory -Path $docsBackup -Force | Out-Null
