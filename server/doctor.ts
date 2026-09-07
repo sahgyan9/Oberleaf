@@ -73,98 +73,104 @@ async function checkMiktexAutoInstall(): Promise<DependencyStatus> {
   }
 }
 
-// Checks that pdfTeX font maps (pdftex.map) have been generated and contain
-// scalable Type1 entries for standard Computer Modern fonts.
+// Detects the "auto expansion is only possible with scalable fonts" crash
+// that microtype triggers when pdfTeX falls back to bitmap PK fonts.
 //
-// Without this, pdfTeX silently falls back to bitmap PK fonts. The
-// microtype package's "font expansion" feature then crashes with:
-//   pdfTeX error (font expansion): auto expansion is only possible with scalable fonts.
-// This is the #1 silent failure mode for new MiKTeX installs.
+// Static file inspection (kpsewhich + reading pdftex.map) is not reliable —
+// the map file can look healthy while pdfTeX's internal map table is stale
+// because initexmf --mkmaps was never run. The only guaranteed detection is
+// a live test compile with microtype enabled.
 async function checkFontMaps(): Promise<DependencyStatus> {
-  const name = 'pdfTeX Font Maps (Type1/Scalable)';
+  const name = 'microtype Font Expansion (pdfTeX)';
   const fixCommand = 'initexmf --mkmaps --force';
 
+  // Minimal document that exercises microtype font expansion on bold CM text —
+  // the exact combination that caused the crash in the quantum-computing project.
+  const testTex = [
+    '\\documentclass{article}',
+    '\\usepackage{microtype}',
+    '\\begin{document}',
+    '\\textbf{Font expansion test.}',
+    '\\end{document}',
+  ].join('\n');
+
+  const os = await import('os');
+  const path = await import('path');
+  const tmpDir = os.tmpdir();
+  const texFile = path.join(tmpDir, '_oberleaf_fontcheck.tex');
+
   try {
-    // Ask kpsewhich where pdftex.map lives
-    const { stdout: mapPath } = await execAsync('kpsewhich pdftex.map');
-    const resolvedPath = mapPath.trim();
+    // Write the test document
+    fs.writeFileSync(texFile, testTex, 'utf8');
 
-    if (!resolvedPath) {
-      return {
-        name,
-        command: 'kpsewhich',
-        installed: false,
-        required: false,
-        guidance:
-          'pdftex.map was not found by kpsewhich. Font maps have not been generated. ' +
-          'This causes a fatal crash when using the microtype package: ' +
-          '"auto expansion is only possible with scalable fonts." ' +
-          'Run the command below to rebuild font maps.',
-        wingetCommand: fixCommand,
-      };
+    // Run pdflatex in nonstopmode so it exits even on errors
+    await execAsync(
+      `pdflatex -interaction=nonstopmode -output-directory="${tmpDir}" "${texFile}"`,
+      { timeout: 20_000 }
+    );
+
+    // Clean up artefacts
+    for (const ext of ['.tex', '.pdf', '.aux', '.log']) {
+      const f = path.join(tmpDir, `_oberleaf_fontcheck${ext}`);
+      if (fs.existsSync(f)) fs.unlinkSync(f);
     }
 
-    // Verify the map file exists on disk and has meaningful content
-    if (!fs.existsSync(resolvedPath)) {
-      return {
-        name,
-        command: 'kpsewhich',
-        installed: false,
-        required: false,
-        guidance:
-          `kpsewhich reported "${resolvedPath}" but the file does not exist on disk. ` +
-          'Font maps are missing or corrupt. Run the command below to rebuild them.',
-        wingetCommand: fixCommand,
-      };
-    }
-
-    const content = fs.readFileSync(resolvedPath, 'utf8');
-
-    // A healthy map file contains entries for Computer Modern (cmr, cmbx, cmti …)
-    // mapped to scalable .pfb Type1 files. An empty or near-empty file means
-    // font maps were never fully built.
-    const hasCMEntries = /\bcm[a-z]+\d+\s+/.test(content);
-
-    if (!hasCMEntries || content.trim().length < 500) {
-      return {
-        name,
-        command: 'kpsewhich',
-        installed: false,
-        required: false,
-        guidance:
-          'pdftex.map exists but appears incomplete — it is missing Computer Modern ' +
-          'Type1 font entries. pdfTeX will fall back to bitmap PK fonts, causing ' +
-          'microtype to crash with: ' +
-          '"auto expansion is only possible with scalable fonts." ' +
-          'Run the command below to regenerate font maps.',
-        wingetCommand: fixCommand,
-      };
-    }
-
+    // If pdflatex exited with code 0 the document compiled cleanly
     return {
       name,
-      command: 'kpsewhich',
+      command: 'pdflatex',
       installed: true,
-      version: `OK — ${resolvedPath.split(/[\\/]/).pop()}`,
+      version: 'OK — expansion works',
       required: false,
       guidance:
-        'Font maps are present and contain scalable Type1 entries. ' +
-        'microtype font expansion will work correctly.',
+        'microtype font expansion compiled successfully. ' +
+        'Bold and serif fonts are mapped to scalable Type1 files.',
     };
-  } catch {
-    // kpsewhich not on PATH — almost certainly TeX Live / MiKTeX is absent,
-    // which the pdflatex check already covers.
+  } catch (err: unknown) {
+    // pdflatex exits with code 1 when it hits a fatal error.
+    // Inspect the log to distinguish the font-expansion error from anything else.
+    const logFile = path.join(tmpDir, '_oberleaf_fontcheck.log');
+    let logContent = '';
+    try {
+      if (fs.existsSync(logFile)) logContent = fs.readFileSync(logFile, 'utf8');
+    } catch { /* ignore */ }
+
+    // Clean up artefacts even on failure
+    for (const ext of ['.tex', '.pdf', '.aux', '.log']) {
+      const f = path.join(tmpDir, `_oberleaf_fontcheck${ext}`);
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch { /* ignore */ }
+    }
+
+    const isFontExpansionError =
+      logContent.includes('auto expansion is only possible with scalable fonts') ||
+      (err instanceof Error && err.message.includes('auto expansion'));
+
+    if (isFontExpansionError) {
+      return {
+        name,
+        command: 'pdflatex',
+        installed: false,
+        required: false,
+        guidance:
+          'pdfTeX font maps are stale or missing. pdfTeX falls back to bitmap PK fonts, ' +
+          'which causes microtype to crash with: ' +
+          '"auto expansion is only possible with scalable fonts." ' +
+          'Run the command below to rebuild font maps, then restart Oberleaf.',
+        wingetCommand: fixCommand,
+      };
+    }
+
+    // pdflatex not on PATH — already reported by the main pdflatex check
     return {
       name,
-      command: 'kpsewhich',
+      command: 'pdflatex',
       installed: true,
       version: 'Not applicable',
       required: false,
-      guidance: 'kpsewhich is not available; font map check skipped (no TeX installation detected).',
+      guidance: 'pdflatex is not available; font expansion check skipped.',
     };
   }
 }
-
 
 
 export async function runDependencyCheck(): Promise<DoctorReport> {
