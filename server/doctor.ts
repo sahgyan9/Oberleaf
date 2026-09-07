@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -72,6 +73,100 @@ async function checkMiktexAutoInstall(): Promise<DependencyStatus> {
   }
 }
 
+// Checks that pdfTeX font maps (pdftex.map) have been generated and contain
+// scalable Type1 entries for standard Computer Modern fonts.
+//
+// Without this, pdfTeX silently falls back to bitmap PK fonts. The
+// microtype package's "font expansion" feature then crashes with:
+//   pdfTeX error (font expansion): auto expansion is only possible with scalable fonts.
+// This is the #1 silent failure mode for new MiKTeX installs.
+async function checkFontMaps(): Promise<DependencyStatus> {
+  const name = 'pdfTeX Font Maps (Type1/Scalable)';
+  const fixCommand = 'initexmf --mkmaps --force';
+
+  try {
+    // Ask kpsewhich where pdftex.map lives
+    const { stdout: mapPath } = await execAsync('kpsewhich pdftex.map');
+    const resolvedPath = mapPath.trim();
+
+    if (!resolvedPath) {
+      return {
+        name,
+        command: 'kpsewhich',
+        installed: false,
+        required: false,
+        guidance:
+          'pdftex.map was not found by kpsewhich. Font maps have not been generated. ' +
+          'This causes a fatal crash when using the microtype package: ' +
+          '"auto expansion is only possible with scalable fonts." ' +
+          'Run the command below to rebuild font maps.',
+        wingetCommand: fixCommand,
+      };
+    }
+
+    // Verify the map file exists on disk and has meaningful content
+    if (!fs.existsSync(resolvedPath)) {
+      return {
+        name,
+        command: 'kpsewhich',
+        installed: false,
+        required: false,
+        guidance:
+          `kpsewhich reported "${resolvedPath}" but the file does not exist on disk. ` +
+          'Font maps are missing or corrupt. Run the command below to rebuild them.',
+        wingetCommand: fixCommand,
+      };
+    }
+
+    const content = fs.readFileSync(resolvedPath, 'utf8');
+
+    // A healthy map file contains entries for Computer Modern (cmr, cmbx, cmti …)
+    // mapped to scalable .pfb Type1 files. An empty or near-empty file means
+    // font maps were never fully built.
+    const hasCMEntries = /\bcm[a-z]+\d+\s+/.test(content);
+
+    if (!hasCMEntries || content.trim().length < 500) {
+      return {
+        name,
+        command: 'kpsewhich',
+        installed: false,
+        required: false,
+        guidance:
+          'pdftex.map exists but appears incomplete — it is missing Computer Modern ' +
+          'Type1 font entries. pdfTeX will fall back to bitmap PK fonts, causing ' +
+          'microtype to crash with: ' +
+          '"auto expansion is only possible with scalable fonts." ' +
+          'Run the command below to regenerate font maps.',
+        wingetCommand: fixCommand,
+      };
+    }
+
+    return {
+      name,
+      command: 'kpsewhich',
+      installed: true,
+      version: `OK — ${resolvedPath.split(/[\\/]/).pop()}`,
+      required: false,
+      guidance:
+        'Font maps are present and contain scalable Type1 entries. ' +
+        'microtype font expansion will work correctly.',
+    };
+  } catch {
+    // kpsewhich not on PATH — almost certainly TeX Live / MiKTeX is absent,
+    // which the pdflatex check already covers.
+    return {
+      name,
+      command: 'kpsewhich',
+      installed: true,
+      version: 'Not applicable',
+      required: false,
+      guidance: 'kpsewhich is not available; font map check skipped (no TeX installation detected).',
+    };
+  }
+}
+
+
+
 export async function runDependencyCheck(): Promise<DoctorReport> {
   const check = async (
     name: string,
@@ -137,6 +232,7 @@ export async function runDependencyCheck(): Promise<DoctorReport> {
       'Optional engine for advanced Unicode fonts and modern typographies.'
     ),
     checkMiktexAutoInstall(),
+    checkFontMaps(),
   ]);
 
   const allHealthy = dependencies.filter((d) => d.required).every((d) => d.installed);
