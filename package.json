@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "server": "tsx watch server/index.ts",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
-    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"@(3001, 5173) | ForEach-Object { Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue | ForEach-Object { Start-Process taskkill.exe -ArgumentList @('/F', '/T', '/PID', $_.OwningProcess) -NoNewWindow -Wait -ErrorAction SilentlyContinue } }\"",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"@(3001, 5173) | ForEach-Object { Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | ForEach-Object { Start-Process taskkill.exe -ArgumentList @('/F', '/T', '/PID', $_.OwningProcess) -NoNewWindow -Wait -ErrorAction SilentlyContinue } }\"",
     "logs": "powershell -NoProfile -Command \"if (Test-Path logs/project.log) { Get-Content -Path logs/project.log -Wait -Tail 50 } else { Write-Host 'No logs found yet. Start the app first.' }\"",
     "setup:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-windows.ps1"
   },
