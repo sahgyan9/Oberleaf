@@ -34,6 +34,10 @@ export interface ProjectInfo {
   name: string;
   template: string;
   updatedAt: string;
+  lastModifiedRelative?: string;
+  owner?: string;
+  isArchived?: boolean;
+  hasPdf?: boolean;
 }
 
 interface TopBarProps {

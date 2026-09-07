@@ -1102,7 +1102,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
             so double-click text selection and click coordinates are both
             accurate (unlike the native browser plugin previously used via
             an <iframe>, which is fully opaque to the host page). */}
-        {activePdf ? (
+        {numPages > 0 ? (
           <div className="flex flex-col items-center gap-4 select-text mx-auto">
             {Array.from({ length: numPages }, (_, idx) => {
               const pageNumber = idx + 1;
@@ -1115,13 +1115,13 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                   }}
                   data-page-number={pageNumber}
                   onDoubleClick={handlePageDoubleClick(pageNumber)}
+                  className="relative shadow-md dark:shadow-2xl bg-white select-text cursor-text"
                   style={{
+                    width: dims ? `${dims.width * scale}px` : undefined,
+                    height: dims ? `${dims.height * scale}px` : undefined,
                     filter: invertColors ? 'invert(0.9) hue-rotate(180deg)' : 'none',
-                    width: dims ? dims.width * scale : undefined,
-                    height: dims ? dims.height * scale : undefined,
                   }}
-                  className="relative paper-sheet rounded-xs bg-white border border-stone-200/60 dark:border-stone-700/60 cursor-pointer flex-shrink-0"
-                  title="Double click on text to jump to LaTeX source code"
+                  title="Double-click any word to jump back to source code (SyncTeX)"
                 >
                   <canvas
                     ref={(el) => {
@@ -1138,6 +1138,11 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                 </div>
               );
             })}
+          </div>
+        ) : activePdf && compileStatus !== 'failed' ? (
+          <div className="flex flex-col items-center justify-center text-stone-400 text-center p-8 space-y-3 font-sans w-full py-24 animate-in fade-in duration-200">
+            <Loader2 className="w-7 h-7 text-scholarly dark:text-scholarly-dark animate-spin" />
+            <span className="text-xs text-stone-500 dark:text-stone-400 font-mono">Loading PDF preview...</span>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-stone-400 text-center p-8 space-y-3 font-sans w-full py-16">

@@ -17,6 +17,7 @@ import {
   listProjectFiles,
   getProjectsRoot,
   getUniqueFilename,
+  touchProject,
 } from './projects.js';
 import {
   createProjectCommit,
@@ -246,6 +247,47 @@ app.get('/api/projects/:id/download-pdf', (req, res) => {
   }
 });
 
+// Inline streaming PDF preview endpoint (for in-browser thumbnail & viewer)
+app.get('/api/projects/:id/pdf', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const pdfCandidates = [
+      path.join(projectDir, 'main.pdf'),
+      path.join(projectDir, 'output.pdf'),
+      path.join(projectDir, '.build', 'output.pdf'),
+      path.join(projectDir, `${req.params.id}.pdf`),
+    ];
+    const foundPdf = pdfCandidates.find((p) => fs.existsSync(p));
+    if (!foundPdf) {
+      return res.status(404).send('PDF not found');
+    }
+    const downloadRequested = req.query.download === '1' || req.query.download === 'true';
+    const customFilename = req.query.filename as string;
+    if (downloadRequested || customFilename) {
+      const baseFallback = path.basename(foundPdf);
+      const resolvedName = customFilename
+        ? customFilename.replace(/\.pdf$/i, '') + '.pdf'
+        : baseFallback;
+      res.setHeader('Content-Disposition', `attachment; filename="${resolvedName}"`);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    fs.createReadStream(foundPdf).pipe(res);
+  } catch (error: any) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Explicit project touch endpoint (called on open or editor focus)
+app.post('/api/projects/:id/touch', (req, res) => {
+  try {
+    touchProject(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/projects/:id/files', (req, res) => {
   try {
     const projectDir = getProjectDir(req.params.id);
@@ -312,6 +354,7 @@ app.post('/api/projects/:id/file', (req, res) => {
     }
 
     fs.writeFileSync(filePath, content, 'utf-8');
+    touchProject(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -587,6 +630,7 @@ app.post('/api/projects/:id/compile', async (req, res) => {
     const result = await compileDocument(projectDir, mainFile, engine, {
       shellEscape: !!req.body.shellEscape,
     });
+    touchProject(req.params.id);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

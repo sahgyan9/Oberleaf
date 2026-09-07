@@ -289,6 +289,26 @@ function formatRelativeTime(date: Date): string {
   return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago by You`;
 }
 
+export function touchProject(projectId: string): void {
+  const root = getProjectsRoot();
+  const targetDir = path.resolve(root, projectId);
+  if (!fs.existsSync(targetDir)) return;
+  const metaPath = path.join(targetDir, '.meta.json');
+  let meta: any = {};
+  if (fs.existsSync(metaPath)) {
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    } catch {}
+  }
+  const now = new Date();
+  meta.updatedAt = now.toISOString();
+  meta.lastOpenedAt = now.toISOString();
+  meta.relativeTime = 'Just now by You';
+  try {
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+  } catch {}
+}
+
 export function listProjects(): ProjectSummary[] {
   const root = getProjectsRoot();
   const entries = fs.readdirSync(root, { withFileTypes: true });
@@ -313,9 +333,38 @@ export function listProjects(): ProjectSummary[] {
         fs.existsSync(path.join(pPath, '.build', 'output.pdf')) ||
         fs.existsSync(path.join(pPath, `${dir.name}.pdf`));
 
+      // Scan files in project to find true latest modification time on disk
+      let latestMtime = stat.mtime;
+      try {
+        const subFiles = fs.readdirSync(pPath);
+        for (const f of subFiles) {
+          if (f.startsWith('.git')) continue;
+          try {
+            const subStat = fs.statSync(path.join(pPath, f));
+            if (subStat.mtime.getTime() > latestMtime.getTime()) {
+              latestMtime = subStat.mtime;
+            }
+          } catch {}
+        }
+      } catch {}
+
+      // Consider explicit updatedAt or lastOpenedAt from .meta.json if newer
+      let effectiveDate = latestMtime;
+      if (meta.updatedAt) {
+        const metaDate = new Date(meta.updatedAt);
+        if (!isNaN(metaDate.getTime()) && metaDate.getTime() > effectiveDate.getTime()) {
+          effectiveDate = metaDate;
+        }
+      }
+      if (meta.lastOpenedAt) {
+        const openedDate = new Date(meta.lastOpenedAt);
+        if (!isNaN(openedDate.getTime()) && openedDate.getTime() > effectiveDate.getTime()) {
+          effectiveDate = openedDate;
+        }
+      }
+
       const effectiveName = meta.name || dir.name;
-      const effectiveDate = meta.updatedAt ? new Date(meta.updatedAt) : stat.mtime;
-      const relativeTime = meta.relativeTime || formatRelativeTime(effectiveDate);
+      const relativeTime = formatRelativeTime(effectiveDate);
 
       return {
         id: dir.name,

@@ -325,9 +325,37 @@ export const App: React.FC = () => {
 
   // Open project from dashboard into editor
   const handleOpenProject = useCallback((id: string) => {
-    setProjectId(id);
+    // Touch on backend to record access time
+    fetch(`/api/projects/${id}/touch`, { method: 'POST' }).catch(() => {});
+
+    // Optimistically update timestamp in local state so Recents updates immediately
+    const nowIso = new Date().toISOString();
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, updatedAt: nowIso, lastModifiedRelative: 'Just now by You' }
+          : p
+      )
+    );
+
     const match = projects.find((p) => p.id === id);
-    if (match) setProjectName(match.name);
+    if (match) {
+      setProjectName(match.name);
+      if (match.hasPdf) {
+        const initialPdf = `/api/projects/${id}/pdf?t=${Date.now()}`;
+        setPdfUrl(initialPdf);
+        setLastValidPdfUrl(initialPdf);
+        setCompileStatus('idle');
+      } else {
+        setPdfUrl(null);
+        setLastValidPdfUrl(null);
+      }
+    } else {
+      setPdfUrl(null);
+      setLastValidPdfUrl(null);
+    }
+
+    setProjectId(id);
     localStorage.setItem('overleaf-copy:active-project-id', id);
     window.location.hash = `#/project/${id}`;
     setCurrentView('editor');
@@ -335,9 +363,10 @@ export const App: React.FC = () => {
 
   // Return from editor back to projects dashboard
   const handleBackToProjects = useCallback(() => {
+    loadProjects();
     setCurrentView('dashboard');
     window.location.hash = '#/projects';
-  }, []);
+  }, [loadProjects]);
 
   // Sync view state with browser URL hash
   useEffect(() => {
@@ -346,18 +375,28 @@ export const App: React.FC = () => {
       if (hash.startsWith('#/project/')) {
         const id = hash.replace('#/project/', '').trim();
         if (id) {
+          fetch(`/api/projects/${id}/touch`, { method: 'POST' }).catch(() => {});
           setProjectId(id);
           const match = projects.find((p) => p.id === id);
-          if (match) setProjectName(match.name);
+          if (match) {
+            setProjectName(match.name);
+            if (match.hasPdf) {
+              const initialPdf = `/api/projects/${id}/pdf?t=${Date.now()}`;
+              setPdfUrl(initialPdf);
+              setLastValidPdfUrl(initialPdf);
+              setCompileStatus('idle');
+            }
+          }
           setCurrentView('editor');
         }
       } else {
+        loadProjects();
         setCurrentView('dashboard');
       }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [projects]);
+  }, [projects, loadProjects]);
 
   // Load Project Files
   const loadProjectFiles = useCallback(async (pId: string) => {
@@ -456,7 +495,7 @@ export const App: React.FC = () => {
     }
   }, [projectId, addToast]);
 
-  // When active project changes, reload files, citations, git status, comments, and main.tex
+  // When active project changes, reload files, citations, git status, comments, main.tex, and existing PDF preview
   useEffect(() => {
     if (!projectId) return;
     localStorage.setItem('overleaf-copy:active-project-id', projectId);
@@ -466,6 +505,32 @@ export const App: React.FC = () => {
     fetchComments(projectId);
     setActiveFilePath('main.tex');
     loadFileContent(projectId, 'main.tex');
+
+    // Auto-detect existing compiled PDF so the user doesn't have to recompile
+    let isMounted = true;
+    fetch(`/api/projects/${projectId}/pdf`, { method: 'HEAD' })
+      .then((res) => {
+        if (!isMounted) return;
+        if (res.ok) {
+          const freshPdf = `/api/projects/${projectId}/pdf?t=${Date.now()}`;
+          setPdfUrl(freshPdf);
+          setLastValidPdfUrl(freshPdf);
+          setCompileStatus('idle');
+        } else {
+          setPdfUrl(null);
+          setLastValidPdfUrl(null);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPdfUrl(null);
+          setLastValidPdfUrl(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [projectId, loadProjectFiles, loadCitations, loadFileContent, fetchGitSyncStatus, fetchComments]);
 
   // Check for ?room= URL parameter for instant peer joining
