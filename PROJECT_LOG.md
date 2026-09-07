@@ -836,3 +836,42 @@ overleaf-copy/
 - **Files changed**:
   - MODIFIED: `server/index.ts`, `src/components/Dashboard/ProjectsDashboard.tsx`, `src/components/TopBar/TopBar.tsx`, `PROJECT_LOG.md`
 - **Status at end**: Complete and verified.
+
+---
+
+### Session 020 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "I restarted my computer, searched for oberleaf on windows and got this error. Note it was working fine before i restarted. Find RCA and make sure it doesn't repeat again" [accompanied by screenshot of 'Oberleaf - Startup Failed' dialog displaying Vite proxy ECONNREFUSED 127.0.0.1:3001]
+- **Root Cause Analysis (RCA)**:
+  1. **Stale Log Bleed Across Reboots**: `project.log` was appended to indefinitely. In `scripts/launch.ps1`, an "early crash detection" block checked `Get-Content -Path $LogFile -Tail 20` at iteration 40 ($i = 40, ~2.4 seconds after launch). Because a fresh cold start after a Windows reboot had only written ~17 lines so far, `-Tail 20` reached back across the session delimiter and read the last lines of the *previous session from before the reboot*.
+  2. **False Positive Trigger on Transient Proxy Error**: During Session 019 at 8:27 AM, while `server/index.ts` was briefly reloading via `tsx watch`, the frontend requested `/api/system/shortcut-status` and Vite printed `[1] http proxy error: /api/system/shortcut-status Error: connect ECONNREFUSED 127.0.0.1:3001`. That transient 33-minute-old warning contained `Error:`, which matched the launcher's generic `$_ -match "Error:"` regex.
+  3. **No Process Liveness Check**: `launch.ps1` called `Start-Process` without `-PassThru` and never verified if the spawned server process was actually dead (`HasExited`). It concluded the app crashed and showed the error modal while the server was actively and normally booting up in the background.
+  4. **Orphaned Background Processes on Exit**: Premature `exit 1` in `launch.ps1` did not terminate the spawned `npm start` background tree, leaving orphan node processes running.
+- **What Was Done**:
+  - **Session Log Rotation (`scripts/launch.ps1`)**:
+    - On every launch, any existing `project.log` is automatically moved to `project.prev.log`.
+    - A clean `project.log` is initialized for the new session, making stale log bleed across reboots or previous runs completely impossible.
+  - **Process Liveness Verification (`scripts/launch.ps1`)**:
+    - Launched `npm start` with `-PassThru` to track the actual root `cmd.exe` process (`$serverProc`).
+    - Removed the arbitrary premature `$i -eq 40` failure check.
+    - Premature exit is now only evaluated if `$serverProc.HasExited -and -not ($viteReady -and $serverReady)`. As long as the process is alive, the polling loop gives the application full time to warm up.
+  - **Refined Fatal Crash Filter (`scripts/launch.ps1`)**:
+    - Replaced the overly broad `Error:` regex with precise fatal signatures: `EADDRINUSE`, `Cannot find module`, `SyntaxError:`, `ReferenceError:`, `npm ERR!`, `ERR_MODULE_NOT_FOUND`, `Failed to resolve import`.
+    - Explicitly filtered out transient proxy notices (`http proxy error`, `ECONNREFUSED`).
+  - **Full Process Tree Cleanup (`scripts/launch.ps1`)**:
+    - Enhanced `Stop-PortProcesses` to identify and terminate any residual `node.exe` and `cmd.exe` processes associated with `$ProjectRoot` (using `/F /T`), ensuring file handles on `project.log` are released and ports are clean.
+    - If startup genuinely fails, all child processes are killed before showing the error dialog.
+  - **Vite Proxy Graceful Error Handling (`vite.config.ts`)**:
+    - Added a `configure(proxy)` event listener on `/api` in `vite.config.ts` to intercept `ECONNREFUSED` during server startup/restarts and respond with HTTP 503 rather than dumping an unhandled proxy error to stdout.
+  - **Installed Directory Synchronization**:
+    - Propagated all changes from `overleaf-copy` to `C:\Users\sahgy\AppData\Local\Programs\Oberleaf`.
+    - Ensured UTF-8 BOM encoding on `launch.ps1` across all checkouts for Windows PowerShell 5.1 compatibility.
+- **Verification**:
+  - `PowerShell AST check`: 0 syntax errors or parser warnings on `launch.ps1`.
+  - `TypeScript check`: `npm run typecheck` passed with 0 errors.
+  - `Cold-Start Test`: Simulated a full system reboot by terminating existing processes; launched Oberleaf via `launch.ps1 -NoSplash`. Confirmed log rotation to `project.prev.log`, verified fresh `project.log`, and confirmed both port 5173 and port 3001 became ready with 0 error popups.
+  - `Warm Launch Test`: Verified instant (<1s) browser launch when ports are already active.
+  - `VBS Shortcut Launch Test`: Verified `launch.vbs` seamlessly initializes both frontend and backend endpoints returning HTTP 200.
+- **Files changed**:
+  - MODIFIED: `scripts/launch.ps1`, `vite.config.ts`, `PROJECT_LOG.md`
+- **Status at end**: Complete, fully verified, and synchronized with installed application.
+

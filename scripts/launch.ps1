@@ -68,6 +68,19 @@ function Show-ErrorDialog {
 
 function Stop-PortProcesses {
     param([int[]]$Ports)
+    # 1. Terminate any previous Oberleaf node/cmd processes associated with this workspace to free files & ports
+    try {
+        $escapedRoot = [regex]::Escape($ProjectRoot)
+        $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            ($_.Name -eq "node.exe" -or $_.Name -eq "cmd.exe") -and
+            $_.CommandLine -and $_.CommandLine -match $escapedRoot
+        }
+        foreach ($proc in $procs) {
+            Start-Process -FilePath "taskkill.exe" -ArgumentList @("/F", "/T", "/PID", [string]$proc.ProcessId) -NoNewWindow -Wait -ErrorAction SilentlyContinue
+        }
+    } catch {}
+
+    # 2. Terminate any processes holding target ports
     foreach ($port in $Ports) {
         try {
             $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 }
@@ -263,11 +276,20 @@ if (-not (Test-Path $nodeModulesPath)) {
 Update-Splash "Checking local ports (:3001, :5173)..."
 Stop-PortProcesses @(3001, 5173)
 
+# Rotate previous session log to avoid stale error bleed across reboots/launches
+if (Test-Path $LogFile) {
+    $prevLogFile = [System.IO.Path]::Combine($LogDir, "project.prev.log")
+    try {
+        Move-Item -Path $LogFile -Destination $prevLogFile -Force -ErrorAction SilentlyContinue
+    } catch {}
+}
+
 Update-Splash "Starting local TeX daemon & workspace..."
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-"`n========================================`n[Oberleaf] Session started at $timestamp`n========================================" | Out-File -FilePath $LogFile -Encoding utf8 -Append
+"========================================`r`n[Oberleaf] Session started at $timestamp`r`n========================================" |
+    Out-File -FilePath $LogFile -Encoding utf8
 
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm start >> `"$LogFile`" 2>&1" -WorkingDirectory $ProjectRoot -WindowStyle Hidden
+$serverProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm start >> `"$LogFile`" 2>&1" -WorkingDirectory $ProjectRoot -WindowStyle Hidden -PassThru
 
 # ------------------------------------------------------------------
 # STEP 5: High-Speed Socket Polling Loop
@@ -291,26 +313,13 @@ for ($i = 0; $i -lt 300; $i++) {
 
     if ($i -eq 15) {
         Update-Splash "Starting TeX daemon (:3001)..."
-    } elseif ($i -eq 35) {
+    } elseif ($i -eq 40) {
         Update-Splash "Starting workspace editor (:5173)..."
     }
 
-    # Early crash detection
-    if ($i -eq 40 -and (Test-Path $LogFile)) {
-        $recentLog = Get-Content -Path $LogFile -Tail 20 -ErrorAction SilentlyContinue
-        $crashSignals = $recentLog | Where-Object {
-            $_ -match "Error:|EADDRINUSE|Cannot find module|SyntaxError|npm ERR!"
-        }
-        if ($crashSignals) {
-            if ($splash) { $splash.Close() }
-            $crashText = ($crashSignals | Select-Object -First 5) -join "`n"
-            Show-ErrorDialog "Oberleaf - Startup Failed" (
-                "Oberleaf crashed shortly after starting.`n`n" +
-                "Error details:`n$crashText`n`n" +
-                "Full log: $LogFile"
-            )
-            exit 1
-        }
+    # Premature exit detection: only trigger if the process actually exited before ports became ready
+    if ($serverProc.HasExited -and -not ($viteReady -and $serverReady)) {
+        break
     }
 
     Start-Sleep -Milliseconds 60
@@ -335,14 +344,40 @@ if ($viteReady -and $serverReady) {
     exit 0
 } else {
     if ($splash) { $splash.Close() }
+
+    # Clean up any partial or zombie processes on startup failure
+    Stop-PortProcesses @(3001, 5173)
+    if ($serverProc -and -not $serverProc.HasExited) {
+        try { Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue } catch {}
+    }
+
+    # Extract genuine fatal errors from the current session log (ignoring transient proxy notices)
+    $crashText = ""
+    if (Test-Path $LogFile) {
+        $recentLog = Get-Content -Path $LogFile -Tail 40 -ErrorAction SilentlyContinue
+        $fatalLines = $recentLog | Where-Object {
+            $_ -match "EADDRINUSE|Cannot find module|SyntaxError:|ReferenceError:|npm ERR!|ERR_MODULE_NOT_FOUND|Failed to resolve import" -and
+            $_ -notmatch "http proxy error|ECONNREFUSED"
+        }
+        if ($fatalLines) {
+            $crashText = ($fatalLines | Select-Object -First 5) -join "`n"
+        }
+    }
+
     $missingParts = @()
     if (-not $viteReady)   { $missingParts += "Frontend (port 5173)" }
     if (-not $serverReady) { $missingParts += "Backend (port 3001)" }
     $missingText = $missingParts -join " and "
 
-    Show-ErrorDialog "Oberleaf - Could Not Start" (
+    $dialogMessage = if ($crashText) {
+        "Oberleaf encountered a startup error.`n`n" +
+        "Error details:`n$crashText`n`n" +
+        "Full log: $LogFile"
+    } else {
         "$missingText did not start within expected time.`n`n" +
         "Check log file for details: $LogFile"
-    )
+    }
+
+    Show-ErrorDialog "Oberleaf - Startup Failed" $dialogMessage
     exit 1
 }
