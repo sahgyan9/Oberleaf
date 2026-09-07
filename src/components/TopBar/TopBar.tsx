@@ -23,7 +23,7 @@ import {
   Eraser,
   MonitorUp,
   MoreHorizontal,
-  Sparkles,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -253,7 +253,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-600 dark:text-stone-300 font-medium transition text-left text-xs"
                   >
                     <div className="flex items-center space-x-2">
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>Check for Updates</span>
                     </div>
                     {hasUpdate && (
@@ -413,7 +413,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             title="A new Oberleaf update is available! Click to view details and install."
             className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer mr-0.5"
           >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">Update Available</span>
           </button>
         )}
@@ -546,7 +546,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
                   >
                     <div className="flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <ArrowDownToLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       <span>Check for Updates</span>
                     </div>
                     {hasUpdate && (

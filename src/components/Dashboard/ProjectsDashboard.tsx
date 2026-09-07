@@ -21,7 +21,7 @@ import {
   MonitorUp,
   Check,
   Loader2,
-  Sparkles,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { ProjectInfo } from '../TopBar/TopBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -352,7 +352,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
               title="A new Oberleaf update is available! Click to view details and install."
               className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden sm:inline">Update Available</span>
             </button>
           )}
@@ -410,7 +410,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                       {hasUpdate ? (
                         <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-white text-[10px] font-bold">New</span>
                       ) : (
-                        <Sparkles className="w-3.5 h-3.5 text-stone-400" />
+                        <RefreshCw className="w-3.5 h-3.5 text-stone-400" />
                       )}
                     </button>
                   )}
