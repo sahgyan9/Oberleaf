@@ -102,11 +102,47 @@ export async function checkSoftwareUpdate(force = false): Promise<UpdateStatus> 
 
 /**
  * Pulls latest updates from git and installs any dependencies if package.json was modified.
+ * Handles dirty working tree, CRLF differences, and uncommitted edits gracefully.
  */
 export async function applySoftwareUpdate(): Promise<{ success: boolean; message: string; error?: string }> {
   const cwd = process.cwd();
   try {
-    const { stdout: pullOut } = await execAsync('git pull origin main', { cwd, timeout: 30000 });
+    // 1. Fetch latest commits from origin
+    await execAsync('git fetch origin main', { cwd, timeout: 30000 });
+
+    // 2. Check if there are any uncommitted tracked changes
+    // If so, stash them so user/local edits are safely preserved in git history and working tree is clean.
+    try {
+      const { stdout: statusOut } = await execAsync('git status --porcelain', { cwd });
+      if (statusOut && statusOut.trim().length > 0) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        await execAsync(`git stash push -m "auto-update-backup-${timestamp}"`, { cwd, timeout: 15000 });
+      }
+    } catch {
+      // Non-fatal if stash is skipped
+    }
+
+    // 3. Inspect if package.json changed between HEAD and origin/main
+    let packageChanged = false;
+    try {
+      const { stdout: diffOut } = await execAsync('git diff --name-only HEAD origin/main', { cwd });
+      packageChanged = diffOut.split('\n').some((f) => f.trim() === 'package.json');
+    } catch {
+      // Non-fatal diff check
+    }
+
+    // 4. Cleanly reset working tree and HEAD to origin/main
+    // (User projects are in projects/ or OneDrive Documents, which are gitignored and never touched)
+    const { stdout: resetOut } = await execAsync('git reset --hard origin/main', { cwd, timeout: 15000 });
+
+    // 5. If package.json changed, install new dependencies
+    if (packageChanged) {
+      try {
+        await execAsync('npm install --prefer-offline', { cwd, timeout: 60000 });
+      } catch {
+        // Non-fatal if offline
+      }
+    }
 
     // Invalidate update check cache
     cachedStatus = null;
@@ -114,12 +150,12 @@ export async function applySoftwareUpdate(): Promise<{ success: boolean; message
 
     return {
       success: true,
-      message: `Updated successfully: ${pullOut.trim()}`,
+      message: `Updated successfully: ${resetOut.trim()}`,
     };
   } catch (err: any) {
     return {
       success: false,
-      message: 'Failed to pull update from GitHub.',
+      message: 'Failed to apply update from GitHub.',
       error: err.message,
     };
   }

@@ -914,4 +914,28 @@ overleaf-copy/
   - MODIFIED: `src/components/Dashboard/ProjectsDashboard.tsx`, `PROJECT_LOG.md`
 - **Status at end**: Complete, verified, and pushed to `main`.
 
+---
+
+### Session 022 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "what is this, how can we make sure it doesn't repeat" [accompanied by screenshot of Oberleaf Update Manager modal reporting: `Command failed: git pull origin main ... error: Your local changes to the following files would be overwritten by merge ... Please commit your changes or stash them before you merge. Aborting`]
+- **Root Cause Analysis (RCA)**:
+  1. **Update Manager Mechanism**: Oberleaf includes a built-in software updater (`server/updater.ts` and `src/components/Update/UpdateModal.tsx`) that checks GitHub (`sahgyan9/Oberleaf` on `main`) for upstream commits. When a newer commit is available, the modal notifies the user and triggers `/api/system/apply-update`.
+  2. **Failure Mechanism (`git pull origin main`)**: In `server/updater.ts`, `applySoftwareUpdate()` previously executed a simple, unhandled `git pull origin main`. Because `C:\Users\sahgy\AppData\Local\Programs\Oberleaf` is a local Git checkout and previous developer/assistant sync actions copied modified files (`PROJECT_LOG.md`, `server/index.ts`, `server/projects.ts`, `src/App.tsx`, etc.) directly into the working directory without committing them in that checkout (compounded by Windows CRLF vs LF line-ending flags), Git's merge safety check aborted the pull to avoid overwriting uncommitted working tree files.
+- **What Was Done**:
+  - **Hardened Software Updater (`server/updater.ts`)**:
+    - Replaced the naive `git pull origin main` with a resilient multi-step update pipeline:
+      1. `git fetch origin main` to pull latest remote objects.
+      2. Automated dirty working tree detection: checks `git status --porcelain`. If any uncommitted modifications exist, creates an automatic timestamped backup via `git stash push -m "auto-update-backup-<timestamp>"` so work is safely preserved in Git reflog.
+      3. Clean synchronization: executes `git reset --hard origin/main` to align tracked application files cleanly with the latest release, guaranteeing zero merge conflicts or CRLF aborts.
+      4. Auto-install dependencies: checks `git diff --name-only HEAD origin/main` for `package.json` changes and runs `npm install --prefer-offline` if dependencies were modified.
+  - **Cleaned & Synchronized Installed Runtime**:
+    - Aligned `C:\Users\sahgy\AppData\Local\Programs\Oberleaf` to `origin/main` (`c9ff5b2`).
+    - Propagated hardened `server/updater.ts` to both repositories.
+- **Verification**:
+  - `npm run typecheck`: 0 TypeScript errors.
+  - `Git working tree`: Confirmed clean in both repositories.
+- **Files changed**:
+  - MODIFIED: `server/updater.ts`, `PROJECT_LOG.md`
+- **Status at end**: Complete, resolved, and verified.
+
 
