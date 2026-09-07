@@ -809,6 +809,30 @@ overleaf-copy/
   - MODIFIED (`friendly-learning-srmap`): `public/downloads/install.ps1`, `public/downloads/Oberleaf-Setup.zip`
 - **Status at end**: Complete, verified, and pushed to both repositories.
 
+---
 
-
-
+### Session 019 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "Add Shortcut is always active even I have added shortcut. Is there way to make it smart so that its not visible if i haven't added shortcut"
+- **Root Cause Analysis (RCA)**:
+  - The "Add Shortcut" button in `ProjectsDashboard.tsx` was unconditionally rendered on every page load and reset back to visible 3.5s after clicking, with no detection of whether the Windows shortcuts (`Oberleaf.lnk`) were already created on the user's Desktop or Start Menu.
+  - System inspection confirmed `Oberleaf.lnk` was already present at `C:\Users\<user>\OneDrive\Desktop\Oberleaf.lnk` and `C:\Users\<user>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Oberleaf.lnk`, making the prominent top navbar button redundant.
+- **What Was Done**:
+  - **Backend Shortcut Status Detection (`server/index.ts`)**:
+    - Added `checkShortcutExists()` inspecting standard Windows desktop paths (`%USERPROFILE%\Desktop`, `%USERPROFILE%\OneDrive\Desktop`, `%OneDrive%\Desktop`, `%PUBLIC%\Desktop`) and start menu paths (`%APPDATA%\Microsoft\Windows\Start Menu\Programs`, `%ProgramData%\Microsoft\Windows\Start Menu\Programs`).
+    - Exposed `GET /api/system/shortcut-status` returning `{ success: true, exists: boolean, details: { desktop, startMenu, projectRoot } }`.
+  - **Frontend Smart Visibility (`src/components/Dashboard/ProjectsDashboard.tsx`)**:
+    - Added `hasShortcut` state initialized with `localStorage` cache to eliminate any layout flash.
+    - Added `useEffect` querying `/api/system/shortcut-status` on mount and updating cache.
+    - Updated `handleAddShortcut()` to display "Shortcut Added!" with green checkmark on success, update `localStorage`, and cleanly transition `hasShortcut = true` to hide the top navbar button.
+    - Top bar button now only renders when `!hasShortcut || isAddingShortcut || shortcutMessage`, keeping the header clean once added.
+    - Updated the User Profile menu (`Local Workspace` dropdown) to display **"Recreate Desktop Shortcut"** when shortcuts already exist, ensuring users can still repair or re-create shortcuts without cluttering the primary header.
+  - **Editor TopBar Dropdown Alignment (`src/components/TopBar/TopBar.tsx`)**:
+    - Synchronized `hasShortcut` status and updated Tools dropdown item label to **"Recreate Desktop Shortcut"** when shortcuts are present.
+- **Verification**:
+  - `npm run typecheck`: 0 TypeScript errors.
+  - `GET /api/system/shortcut-status` directly tested against running server: successfully returned `{ success: true, exists: true, details: { desktop: true, startMenu: true, projectRoot: true } }`.
+  - Tested through Vite proxy (`http://127.0.0.1:5173/api/system/shortcut-status`): 200 OK with correct status.
+  - Hot module replacement (HMR) verified live in running Oberleaf instance.
+- **Files changed**:
+  - MODIFIED: `server/index.ts`, `src/components/Dashboard/ProjectsDashboard.tsx`, `src/components/TopBar/TopBar.tsx`, `PROJECT_LOG.md`
+- **Status at end**: Complete and verified.
