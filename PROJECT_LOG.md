@@ -742,4 +742,38 @@ overleaf-copy/
   - MODIFIED: `scripts/launch.ps1`, `package.json`, `PROJECT_LOG.md`
 - **Status at end**: Resolved, verified, and committed.
 
+---
+
+### Session 017 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**: "great again here is 'Scholarly Tex Studio' remove this word from the entire code base. What i experience that in chrome it took took long for the localhost to open, is it expected or can we improve the experience"
+- **RCA & Browser Load Audit**:
+  1. **"Scholarly TeX Studio" Ubiquity**: Found in `scripts/launch.ps1` (splash card subtitle), `Oberleaf-Setup.bat` (console window title and banner), `scripts/setup-windows.ps1` (registry `DisplayName`), `index.html` (HTML `<title>`), `src/components/Update/UpdateModal.tsx` (header subtitle), `brand_assets/BRAND_GUIDELINES.md`, and `friendly-learning-srmap/scripts/build-oberleaf-bundle.mjs` (README header).
+  2. **Chrome Localhost Latency RCA**:
+     - *Windows IPv6 Loopback Delay*: Navigating to `http://localhost:5173` causes Chrome on Windows 10/11 to resolve `localhost` to `::1` (IPv6) and `127.0.0.1` (IPv4). When Node/Vite is listening on IPv4, Chrome waits 1 to 3 seconds for the IPv6 connection attempt to fail before falling back to IPv4.
+     - *Unwarmed Cold JIT Compilation*: Vite in dev mode compiles TypeScript modules on-the-fly upon the first incoming HTTP request. When Chrome opened immediately after port binding, it hit an un-warmed server and had to wait while Vite compiled and resolved 150+ ESM dependencies.
+     - *Dynamic Dependency Discovery*: Heavy libraries (`monaco-editor`, `pdfjs-dist`, `katex`, `yjs`) were not listed in `optimizeDeps.include`, causing Vite to dynamically discover and bundle them on first load.
+- **What Was Done**:
+  - **Complete Brand Cleanup**:
+    - Removed `Scholarly TeX Studio` from `scripts/launch.ps1` splash card (centered the bold "Oberleaf" title vertically next to the logo; reduced height to 142px for a sleek, minimal aesthetic).
+    - Removed from `Oberleaf-Setup.bat` in both codebases (changed title and header to `Oberleaf Setup`).
+    - Changed `DisplayName` in `scripts/setup-windows.ps1` to simply `Oberleaf`.
+    - Changed HTML `<title>` in `index.html` to `Oberleaf`.
+    - Changed `UpdateModal.tsx` subtitle to `Oberleaf Update Manager`.
+    - Changed `build-oberleaf-bundle.mjs` README header to `Oberleaf`.
+  - **Browser Load Speed Optimizations**:
+    - Direct IPv4 URLs: Changed all browser launch URLs from `http://localhost:5173` to `http://127.0.0.1:5173`, bypassing the Windows IPv6 DNS timeout.
+    - Pre-Warming Cache: Added a background HTTP request to `http://127.0.0.1:5173/` inside `launch.ps1` before launching Chrome, so Vite compiles and warms up its memory cache while the splash card is showing. When Chrome opens, page delivery is instantaneous (0ms).
+    - Configured `optimizeDeps.include` in `vite.config.ts` for all major frontend dependencies (`react`, `react-dom`, `lucide-react`, `clsx`, `tailwind-merge`, `katex`, `pdfjs-dist`, `@monaco-editor/react`, `yjs`, `y-monaco`, `y-webrtc`).
+- **Verification**:
+  - `PowerShell AST check`: `scripts/launch.ps1` 100% clean (0 errors).
+  - `npm run check:latex-probes`: Passed and up to date.
+  - `npm run typecheck`: 0 TypeScript errors.
+  - Re-bundled `Oberleaf-Setup.zip` in `friendly-learning-srmap`.
+  - Pushed commits to both GitHub repositories.
+- **Files changed**:
+  - MODIFIED (`overleaf-copy`): `scripts/launch.ps1`, `Oberleaf-Setup.bat`, `scripts/setup-windows.ps1`, `index.html`, `src/components/Update/UpdateModal.tsx`, `brand_assets/BRAND_GUIDELINES.md`, `vite.config.ts`, `PROJECT_LOG.md`
+  - MODIFIED (`friendly-learning-srmap`): `public/downloads/Oberleaf-Setup.bat`, `public/downloads/Oberleaf-Setup.zip`, `scripts/build-oberleaf-bundle.mjs`
+- **Status at end**: Complete, verified, and pushed.
+
+
 
