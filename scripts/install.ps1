@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Oberleaf",
     [switch]$NoDesktop,
@@ -296,7 +296,8 @@ function Start-InstallationPipeline {
 
     if (Test-Path (Join-Path $InstallDir ".git")) {
         Set-Location $InstallDir
-        & git pull origin main 2>&1 | ForEach-Object { Write-Log $_ "Gray" }
+        & git fetch origin main 2>&1 | Out-Null
+        & git reset --hard origin/main 2>&1 | ForEach-Object { Write-Log $_ "Gray" }
         $repoReady = $true
     } elseif (Test-Path (Join-Path $InstallDir "package.json")) {
         Set-Location $InstallDir
