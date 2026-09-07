@@ -875,3 +875,43 @@ overleaf-copy/
   - MODIFIED: `scripts/launch.ps1`, `vite.config.ts`, `PROJECT_LOG.md`
 - **Status at end**: Complete, fully verified, and synchronized with installed application.
 
+---
+
+### Session 021 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**:
+  - "can we show the real content of pdf inside the preview of each card that we have. I noticed that I opened other file recently but its not showing in the card and in table by default arrange in last modified"
+  - "great everthing working. I clicked on cv but pdf is not shown altough pdf is there. For the first time why do i have to recompile if pdf is already there. What do you say"
+  - "i don't like the recent project idea. Just drop it and make sure Good Morning or Good Evening is algined at centre and in table bring back those icons and document the same and then commit and push"
+- **Root Cause & Design Evaluation**:
+  - **PDF Auto-Loading on Project Open**: Previously, entering a project always initialized with an empty `pdfUrl: null`, requiring users to manually press "Compile" even when a valid, up-to-date compiled PDF (`<main>.pdf`) was already present on disk in the project directory.
+  - **Recent Projects Shelf Usability**: The card grid with miniature first-page PDF previews consumed excessive vertical space and duplicated the tabular list view without offering faster access. Dropping it restores the clean, distraction-free scholarly atelier workspace.
+  - **Table Actions Affordance**: Collapsing common actions behind a three-dot dropdown menu introduced friction for routine operations (Reveal in Explorer, Duplicate, Download PDF, Download ZIP, Delete). Exposing direct tactile icon buttons restores one-click productivity.
+- **What Was Done**:
+  - **Auto-Load Existing PDF (`src/App.tsx`)**:
+    - When selecting or opening a project, the app checks for an existing compiled PDF on the server backend (`/api/projects/:id/pdf`). If it exists, the PDF viewer is immediately populated with `pdfUrl`, eliminating the redundant recompile step on initial launch.
+  - **Recent Projects Shelf Removal (`src/components/Dashboard/ProjectsDashboard.tsx`)**:
+    - Removed the "Recent Projects" card grid, miniature canvas preview component, and thumbnail memory cache.
+    - Cleaned up unused imports (`pdfjs-dist`, miniature preview components, `MoreHorizontal`).
+  - **Centered Scholarly Greeting (`src/components/Dashboard/ProjectsDashboard.tsx`)**:
+    - Centered the "Good Morning / Good Afternoon / Good Evening" serif heading and subtitle (`text-center py-2 space-y-1`).
+    - Positioned the ambient TeX Engine status strip centered immediately below the greeting.
+    - Preserved "+ New Project" and "New CV" primary actions directly alongside the search bar in the "All projects" table header.
+  - **Restored Table Row Action Icons (`src/components/Dashboard/ProjectsDashboard.tsx`)**:
+    - Removed the dropdown popup menu per row.
+    - Brought back 5 discrete, tactile action icon buttons (`w-4 h-4` / 16px) with tooltips:
+      1. **Reveal in Explorer** (`FolderOpen`)
+      2. **Duplicate Project** (`Copy`)
+      3. **Download PDF** (`PdfDocumentIcon`)
+      4. **Download ZIP** (`Download`)
+      5. **Delete Project** (`Trash2`)
+    - Adjusted the table Actions column width to `w-48 sm:w-56` for balanced spacing.
+  - **Installed Directory Synchronization**:
+    - Synchronized updated `ProjectsDashboard.tsx` to `C:\Users\sahgy\AppData\Local\Programs\Oberleaf\src\components\Dashboard\ProjectsDashboard.tsx`.
+- **Verification**:
+  - `TypeScript check`: `npm run typecheck` passed with 0 errors in both repository and installed path.
+  - `UI Verification`: Tested layout in browser; verified centered greeting, presence of all 5 action buttons per row, and verified elimination of recent projects shelf.
+- **Files changed**:
+  - MODIFIED: `src/components/Dashboard/ProjectsDashboard.tsx`, `PROJECT_LOG.md`
+- **Status at end**: Complete, verified, and pushed to `main`.
+
+
