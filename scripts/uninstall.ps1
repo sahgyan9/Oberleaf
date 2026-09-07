@@ -80,6 +80,13 @@ Write-Host "Starting Oberleaf uninstallation..." -ForegroundColor Cyan
 
 # 2. Stop any running Oberleaf processes (ports 3001 and 5173)
 Write-Host "Stopping running Oberleaf instances..." -ForegroundColor DarkGray
+try {
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -like "*Oberleaf*" -or $_.CommandLine -like "*project.log*"
+    } | ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+} catch {}
 foreach ($port in @(3001, 5173)) {
     try {
         $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
@@ -134,7 +141,10 @@ if ($isInstalledDir -and (Test-Path $appDir)) {
         # If user has projects inside the app dir, move them safely to Documents
         $localProjects = Join-Path $appDir "projects"
         if (Test-Path $localProjects) {
-            $docsBackup = Join-Path ([System.Environment]::GetFolderPath('MyDocuments')) "Oberleaf Projects"
+            $docsBackup = [System.IO.Path]::Combine($env:USERPROFILE, "Documents", "Oberleaf Projects")
+            if (-not (Test-Path [System.IO.Path]::GetDirectoryName($docsBackup))) {
+                $docsBackup = Join-Path ([System.Environment]::GetFolderPath('MyDocuments')) "Oberleaf Projects"
+            }
             try {
                 if (-not (Test-Path $docsBackup)) {
                     New-Item -ItemType Directory -Path $docsBackup -Force | Out-Null
@@ -151,7 +161,7 @@ if ($isInstalledDir -and (Test-Path $appDir)) {
     }
 
     # Use detached background process to delete directory after this script exits
-    $delCmd = "Start-Sleep -Seconds 1; Remove-Item -LiteralPath '$appDir' -Recurse -Force -ErrorAction SilentlyContinue"
+    $delCmd = "Start-Sleep -Seconds 2; Remove-Item -LiteralPath '$appDir' -Recurse -Force -ErrorAction SilentlyContinue"
     Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$delCmd`"" -WindowStyle Hidden
 }
 
