@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ProjectInfo } from '../TopBar/TopBar';
 import { useTheme } from '../../context/ThemeContext';
+import { PdfDocumentIcon } from '../Icons/PdfDocumentIcon';
 
 interface ExtendedProjectInfo extends ProjectInfo {
   lastModifiedRelative?: string;
@@ -101,6 +102,33 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   const [isCloning, setIsCloning] = useState<string | null>(null);
   const [isAddingShortcut, setIsAddingShortcut] = useState(false);
   const [shortcutMessage, setShortcutMessage] = useState<string | null>(null);
+  const [hasShortcut, setHasShortcut] = useState<boolean | null>(() => {
+    const cached = localStorage.getItem('oberleaf_has_shortcut');
+    return cached !== null ? cached === 'true' : null;
+  });
+
+  // Query shortcut status on system to conditionally hide the navbar button
+  useEffect(() => {
+    let isMounted = true;
+    const checkShortcut = async () => {
+      try {
+        const res = await fetch('/api/system/shortcut-status');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success) {
+            setHasShortcut(!!data.exists);
+            localStorage.setItem('oberleaf_has_shortcut', data.exists ? 'true' : 'false');
+          }
+        }
+      } catch {
+        // Silently preserve cached state if offline or during reload
+      }
+    };
+    checkShortcut();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleAddShortcut = async () => {
     setIsAddingShortcut(true);
@@ -111,7 +139,11 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       if (res.ok && data.success) {
         setShortcutMessage('Shortcut Added!');
         notify('Shortcut added to Desktop and Start Menu.', 'success');
-        setTimeout(() => setShortcutMessage(null), 3500);
+        localStorage.setItem('oberleaf_has_shortcut', 'true');
+        setTimeout(() => {
+          setHasShortcut(true);
+          setShortcutMessage(null);
+        }, 2500);
       } else {
         notify(data.error || 'Failed to create shortcut.', 'error');
       }
@@ -720,7 +752,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                             title="Download compiled PDF"
                             className="p-1.5 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <PdfDocumentIcon className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Delete */}

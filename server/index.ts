@@ -1065,7 +1065,57 @@ app.get('/api/pdf', (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
-// 12. System Shortcut Registration Endpoint
+// 12. System Shortcut Registration & Status Endpoints
+function checkShortcutExists(): {
+  exists: boolean;
+  details: { desktop: boolean; startMenu: boolean; projectRoot: boolean };
+} {
+  if (process.platform !== 'win32') {
+    return { exists: false, details: { desktop: false, startMenu: false, projectRoot: false } };
+  }
+
+  const userProfile = process.env.USERPROFILE || '';
+  const appData = process.env.APPDATA || '';
+  const oneDrive = process.env.OneDrive || '';
+  const publicDir = process.env.PUBLIC || 'C:\\Users\\Public';
+
+  const desktopPaths = [
+    path.join(userProfile, 'Desktop', 'Oberleaf.lnk'),
+    path.join(userProfile, 'OneDrive', 'Desktop', 'Oberleaf.lnk'),
+    oneDrive ? path.join(oneDrive, 'Desktop', 'Oberleaf.lnk') : '',
+    path.join(publicDir, 'Desktop', 'Oberleaf.lnk'),
+  ].filter(Boolean);
+
+  const startMenuPaths = [
+    path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Oberleaf.lnk'),
+    path.join(process.env.ALLUSERSPROFILE || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Oberleaf.lnk'),
+  ].filter(Boolean);
+
+  const projectRootPath = path.join(process.cwd(), 'Oberleaf.lnk');
+
+  const desktopExists = desktopPaths.some((p) => fs.existsSync(p));
+  const startMenuExists = startMenuPaths.some((p) => fs.existsSync(p));
+  const projectRootExists = fs.existsSync(projectRootPath);
+
+  return {
+    exists: desktopExists || startMenuExists,
+    details: {
+      desktop: desktopExists,
+      startMenu: startMenuExists,
+      projectRoot: projectRootExists,
+    },
+  };
+}
+
+app.get('/api/system/shortcut-status', (_req, res) => {
+  try {
+    const status = checkShortcutExists();
+    return res.json({ success: true, ...status });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/system/create-shortcut', async (_req, res) => {
   try {
     const projectRoot = process.cwd();
