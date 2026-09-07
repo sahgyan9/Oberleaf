@@ -72,7 +72,7 @@ function Stop-PortProcesses {
         try {
             $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 }
             foreach ($conn in $conns) {
-                Start-Process -FilePath "taskkill.exe" -ArgumentList "/F /T /PID $($conn.OwningProcess)" -NoNewWindow -Wait -ErrorAction SilentlyContinue
+                Start-Process -FilePath "taskkill.exe" -ArgumentList @("/F", "/T", "/PID", [string]$conn.OwningProcess) -NoNewWindow -Wait -ErrorAction SilentlyContinue
             }
         } catch {}
     }
@@ -114,12 +114,12 @@ function Open-InChrome {
 }
 
 # ------------------------------------------------------------------
-# STEP 1: Warm Check (If already running, open in <50ms!)
+# STEP 1: Warm Check (If already running, open in <30ms!)
 # ------------------------------------------------------------------
-$isWarmVite = Test-PortOpen "127.0.0.1" 5173 100
-$isWarmServer = Test-PortOpen "127.0.0.1" 3001 100
+$isWarmVite = Test-PortOpen "127.0.0.1" 5173 80
+$isWarmServer = Test-PortOpen "127.0.0.1" 3001 80
 if ($isWarmVite -and $isWarmServer) {
-    Open-InChrome "http://localhost:5173"
+    Open-InChrome "http://127.0.0.1:5173"
     exit 0
 }
 
@@ -138,7 +138,7 @@ if (-not $NoSplash) {
         $splash = New-Object System.Windows.Forms.Form
         $splash.FormBorderStyle = "None"
         $splash.StartPosition = "CenterScreen"
-        $splash.Size = New-Object System.Drawing.Size(390, 160)
+        $splash.Size = New-Object System.Drawing.Size(380, 142)
         $splash.BackColor = [System.Drawing.Color]::FromArgb(28, 25, 23) # Dark Archival Charcoal
         $splash.TopMost = $true
         $splash.ShowInTaskbar = $false
@@ -158,7 +158,7 @@ if (-not $NoSplash) {
 
             $picLogo = New-Object System.Windows.Forms.PictureBox
             $picLogo.Size = New-Object System.Drawing.Size(42, 42)
-            $picLogo.Location = New-Object System.Drawing.Point(24, 22)
+            $picLogo.Location = New-Object System.Drawing.Point(24, 20)
             $picLogo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
             $picLogo.Image = $img
             $borderPanel.Controls.Add($picLogo)
@@ -167,39 +167,30 @@ if (-not $NoSplash) {
             $splash.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
         } catch {}
 
-        # Title
+        # Title: Clean "Oberleaf" (no subtitle)
         $lblTitle = New-Object System.Windows.Forms.Label
         $lblTitle.Text = "Oberleaf"
-        $lblTitle.Font = New-Object System.Drawing.Font("Georgia", 18, [System.Drawing.FontStyle]::Bold)
+        $lblTitle.Font = New-Object System.Drawing.Font("Georgia", 20, [System.Drawing.FontStyle]::Bold)
         $lblTitle.ForeColor = [System.Drawing.Color]::FromArgb(245, 245, 244)
-        $lblTitle.Location = New-Object System.Drawing.Point(76, 20)
+        $lblTitle.Location = New-Object System.Drawing.Point(76, 24)
         $lblTitle.AutoSize = $true
         $borderPanel.Controls.Add($lblTitle)
-
-        # Subtitle
-        $lblSub = New-Object System.Windows.Forms.Label
-        $lblSub.Text = "Scholarly TeX Studio"
-        $lblSub.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-        $lblSub.ForeColor = [System.Drawing.Color]::FromArgb(168, 162, 158)
-        $lblSub.Location = New-Object System.Drawing.Point(78, 48)
-        $lblSub.AutoSize = $true
-        $borderPanel.Controls.Add($lblSub)
 
         # Status
         $lblStatus = New-Object System.Windows.Forms.Label
         $lblStatus.Text = "Initializing workspace..."
         $lblStatus.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
         $lblStatus.ForeColor = [System.Drawing.Color]::FromArgb(52, 211, 153) # Emerald
-        $lblStatus.Location = New-Object System.Drawing.Point(24, 88)
-        $lblStatus.Size = New-Object System.Drawing.Size(340, 18)
+        $lblStatus.Location = New-Object System.Drawing.Point(24, 76)
+        $lblStatus.Size = New-Object System.Drawing.Size(330, 18)
         $borderPanel.Controls.Add($lblStatus)
 
         # Progress bar
         $pb = New-Object System.Windows.Forms.ProgressBar
         $pb.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
         $pb.MarqueeAnimationSpeed = 25
-        $pb.Location = New-Object System.Drawing.Point(24, 112)
-        $pb.Size = New-Object System.Drawing.Size(340, 8)
+        $pb.Location = New-Object System.Drawing.Point(24, 100)
+        $pb.Size = New-Object System.Drawing.Size(330, 8)
         $borderPanel.Controls.Add($pb)
 
         $splash.Show()
@@ -298,12 +289,10 @@ for ($i = 0; $i -lt 300; $i++) {
         break
     }
 
-    if ($i -eq 25) {
-        Update-Splash "Spinning up compiler engine..."
-    } elseif ($i -eq 50) {
-        Update-Splash "Starting local LaTeX daemon (:3001)..."
-    } elseif ($i -eq 80) {
-        Update-Splash "Launching workspace editor (:5173)..."
+    if ($i -eq 15) {
+        Update-Splash "Starting TeX daemon (:3001)..."
+    } elseif ($i -eq 35) {
+        Update-Splash "Starting workspace editor (:5173)..."
     }
 
     # Early crash detection
@@ -324,17 +313,24 @@ for ($i = 0; $i -lt 300; $i++) {
         }
     }
 
-    Start-Sleep -Milliseconds 80
+    Start-Sleep -Milliseconds 60
 }
 
 # ------------------------------------------------------------------
-# STEP 6: Readiness & Smooth Handoff
+# STEP 6: Readiness, Cache Pre-Warming & Instant Browser Launch
 # ------------------------------------------------------------------
 if ($viteReady -and $serverReady) {
     Update-Splash "Workspace ready! Opening browser..."
-    Start-Sleep -Milliseconds 250
-    Open-InChrome "http://localhost:5173"
-    Start-Sleep -Milliseconds 500
+    
+    # Pre-warm Vite in memory before opening Chrome for instant 0ms page render
+    try {
+        $wc = New-Object System.Net.WebClient
+        $null = $wc.DownloadString("http://127.0.0.1:5173/")
+        $wc.Dispose()
+    } catch {}
+
+    Open-InChrome "http://127.0.0.1:5173"
+    Start-Sleep -Milliseconds 300
     if ($splash) { $splash.Close() }
     exit 0
 } else {

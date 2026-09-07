@@ -1,6 +1,6 @@
 # Master Brand Guidelines: The Scholarly Atelier
 
-> **Product**: Oberleaf / Scholarly TeX Studio  
+> **Product**: Oberleaf  
 > **Audience**: Academic researchers, university students, thesis writers, scientific authors  
 > **Core Purpose**: Fast, local-first LaTeX environment freeing authors from cloud timeout quotas and subscription limits, paired with calm concentration and frictionless math authoring.
 

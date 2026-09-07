@@ -82,7 +82,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               {hasUpdate ? 'Update Available' : 'Oberleaf is Up to Date'}
             </h3>
             <p className="text-xs text-stone-500 dark:text-stone-400">
-              Scholarly TeX Studio Update Manager
+              Oberleaf Update Manager
             </p>
           </div>
         </div>

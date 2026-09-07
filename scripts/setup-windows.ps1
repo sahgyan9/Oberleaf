@@ -1,4 +1,4 @@
-﻿# Oberleaf - Windows Integration Script
+# Oberleaf - Windows Integration Script
 # Creates Start Menu, Desktop shortcuts, File Explorer context menu, and Uninstaller registration
 param(
     [switch]$NoDesktop = $false,
@@ -108,7 +108,7 @@ try {
     $uninstallBat = Join-Path $ProjectRoot "Uninstall-Oberleaf.bat"
     $uninstallPs1 = Join-Path $ProjectRoot "scripts\uninstall.ps1"
 
-    Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Oberleaf - Scholarly TeX Studio"
+    Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Oberleaf"
     Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.0.0"
     Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "Oberleaf"
     Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $ProjectRoot

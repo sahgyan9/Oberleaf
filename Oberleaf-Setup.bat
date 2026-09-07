@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Oberleaf - Scholarly TeX Studio Setup
+title Oberleaf Setup
 
 set "LOG=%TEMP%\oberleaf-setup.log"
 set "PS1=%TEMP%\oberleaf_install_%RANDOM%%RANDOM%.ps1"
@@ -9,7 +9,7 @@ set "URL1=https://friendly-learning-srmap.vercel.app/downloads/install.ps1"
 set "URL2=https://raw.githubusercontent.com/sahgyan9/Oberleaf/main/scripts/install.ps1"
 
 echo ==========================================================
-echo         Oberleaf - Scholarly TeX Studio Setup
+echo                     Oberleaf Setup
 echo     Fast, Local-First LaTeX Without Cloud Timeouts
 echo ==========================================================
 echo.

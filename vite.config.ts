@@ -10,6 +10,21 @@ export default defineConfig({
       'monaco-editor/esm/vs/editor/editor.api.js': path.resolve(__dirname, './node_modules/monaco-editor/esm/vs/editor/editor.api.js'),
     },
   },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'lucide-react',
+      'clsx',
+      'tailwind-merge',
+      'katex',
+      'pdfjs-dist',
+      '@monaco-editor/react',
+      'yjs',
+      'y-monaco',
+      'y-webrtc',
+    ],
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',
