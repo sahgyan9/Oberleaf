@@ -5,7 +5,13 @@ import fs from 'fs';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { runDependencyCheck } from './doctor.js';
-import { compileDocument, isLatexmkAvailable, cleanBuildCache } from './compiler.js';
+import {
+  compileDocument,
+  isLatexmkAvailable,
+  cleanBuildCache,
+  SUPPORTED_ENGINES,
+  type SupportedEngine,
+} from './compiler.js';
 import {
   listProjects,
   createProject,
@@ -18,6 +24,8 @@ import {
   getProjectsRoot,
   getUniqueFilename,
   touchProject,
+  isInside,
+  sanitizeProjectId,
 } from './projects.js';
 import {
   createProjectCommit,
@@ -49,9 +57,12 @@ import {
   startCloudflareTunnel,
   stopCloudflareTunnel,
 } from './tunnel.js';
+import { getSessionToken, isLocalRequest, hasValidToken } from './auth.js';
 
 const app = express();
-const PORT = 3001;
+// Overridable so a second instance can be run alongside a live one (tests,
+// debugging) instead of hard-exiting on EADDRINUSE.
+const PORT = Number(process.env.OBERLEAF_PORT) || 3001;
 
 // Allowed origins for local dev, LAN sharing, and secure Cloudflare tunnels
 const ALLOWED_ORIGINS = [
@@ -78,11 +89,11 @@ function isAllowedOrigin(origin?: string): boolean {
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || isAllowedOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Cross-origin requests are not permitted'));
-      }
+      // Deny by withholding the CORS headers rather than throwing. Throwing
+      // here reached Express's default error handler, which answered with a
+      // 500 HTML page containing a full stack trace and absolute paths; the
+      // explicit middleware below produces the clean 403 instead.
+      callback(null, !origin || isAllowedOrigin(origin));
     },
     credentials: true,
   })
@@ -96,29 +107,64 @@ app.use((req, res, next) => {
   next();
 });
 
+// Routes that must never be reachable from off this machine, session token or
+// not: they shell out, rewrite the install, or control the public tunnel.
+const LOCAL_ONLY_PREFIXES = ['/api/system/', '/api/collab/'];
+
+// Authentication. Requests originating on this machine pass straight through,
+// so the owner's own workflow is unchanged; anyone arriving over the LAN or
+// through a Cloudflare tunnel has to present the session token.
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+
+  const local = isLocalRequest(req);
+
+  if (LOCAL_ONLY_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
+    if (!local) {
+      return res.status(403).json({
+        error: 'This action is only available on the machine running Oberleaf.',
+        code: 'LOCAL_ONLY',
+      });
+    }
+    return next();
+  }
+
+  if (local || hasValidToken(req)) return next();
+
+  return res.status(401).json({
+    error: 'This Oberleaf workspace requires an invite link.',
+    code: 'AUTH_REQUIRED',
+  });
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Helper: Contain a resolved path inside a root directory.
-// `startsWith(root)` alone is not enough: "<root>/proj" also prefixes
-// "<root>/proj-evil", so the separator has to be part of the comparison.
-function isInside(root: string, candidate: string): boolean {
-  const normalizedRoot = path.resolve(root);
-  const normalized = path.resolve(candidate);
-  return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
+// `isInside` and `sanitizeProjectId` are defined once in projects.js and
+// imported here: they used to be duplicated, and the copy in projects.js
+// drifted into a bare `startsWith` check that let "../Oberleaf Projects Backup"
+// through.
+
+// Helper: Map a thrown error to a status code. A rejected project id or a
+// path that escapes the workspace is the caller's mistake, not a server fault,
+// and reporting it as 500 hid real failures in the logs.
+function sendApiError(res: express.Response, error: any): void {
+  const message = error?.message || 'Unexpected error';
+  const isClientError =
+    message === 'Invalid project id' ||
+    message === 'Access outside project boundary is forbidden';
+  res.status(isClientError ? 400 : 500).json({ error: message });
 }
 
-// Helper: A project id is a single directory name, never a path.
-// Express decodes route params, so "..%2F..%2Ffoo" arrives here as "../../foo".
-function sanitizeProjectId(rawId: string): string {
-  const id = (rawId || '').trim();
-  if (!id || id === '.' || id === '..') {
-    throw new Error('Invalid project id');
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) {
-    throw new Error('Invalid project id');
-  }
-  return id;
+// Helper: Build a Content-Disposition value that cannot inject headers.
+// The filename arrives from the query string, so CR/LF, quotes and non-ASCII
+// bytes all have to be neutralised before they reach the response.
+function buildContentDisposition(filename: string): string {
+  const asciiName = filename
+    .replace(/[\r\n]/g, '')
+    .replace(/[^\x20-\x7E]/g, '_')
+    .replace(/"/g, "'");
+  return `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 // Helper: Resolve a project directory from an untrusted id.
@@ -160,7 +206,7 @@ app.get('/api/doctor', async (_req, res) => {
     const report = await runDependencyCheck();
     res.json(report);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -170,7 +216,7 @@ app.get('/api/projects', (_req, res) => {
     const projects = listProjects();
     res.json(projects);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -181,41 +227,42 @@ app.post('/api/projects', (req, res) => {
     const project = createProject(name, template || 'cv');
     res.json(project);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
 app.delete('/api/projects/:id', (req, res) => {
   try {
-    deleteProject(req.params.id);
+    deleteProject(sanitizeProjectId(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
 app.post('/api/projects/:id/clone', (req, res) => {
   try {
-    const cloned = duplicateProject(req.params.id);
+    const cloned = duplicateProject(sanitizeProjectId(req.params.id));
     res.json(cloned);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
 app.patch('/api/projects/:id/archive', (req, res) => {
   try {
-    const isArchived = toggleArchiveProject(req.params.id);
+    const isArchived = toggleArchiveProject(sanitizeProjectId(req.params.id));
     res.json({ success: true, isArchived });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
 app.get('/api/projects/:id/zip', (req, res) => {
   try {
-    const zipPath = createProjectZip(req.params.id);
-    res.download(zipPath, `${req.params.id}.zip`, (err) => {
+    const projectId = sanitizeProjectId(req.params.id);
+    const zipPath = createProjectZip(projectId);
+    res.download(zipPath, `${projectId}.zip`, (err) => {
       if (!err && fs.existsSync(zipPath)) {
         try {
           fs.unlinkSync(zipPath);
@@ -223,7 +270,7 @@ app.get('/api/projects/:id/zip', (req, res) => {
       }
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -243,7 +290,7 @@ app.get('/api/projects/:id/download-pdf', (req, res) => {
     const pdfFilename = getProjectPdfFilename(projectDir, req.params.id);
     res.download(foundPdf, pdfFilename);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -266,9 +313,9 @@ app.get('/api/projects/:id/pdf', (req, res) => {
     if (downloadRequested || customFilename) {
       const baseFallback = path.basename(foundPdf);
       const resolvedName = customFilename
-        ? customFilename.replace(/\.pdf$/i, '') + '.pdf'
+        ? sanitizeFilename(customFilename.replace(/\.pdf$/i, '')) + '.pdf'
         : baseFallback;
-      res.setHeader('Content-Disposition', `attachment; filename="${resolvedName}"`);
+      res.setHeader('Content-Disposition', buildContentDisposition(resolvedName));
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -281,10 +328,10 @@ app.get('/api/projects/:id/pdf', (req, res) => {
 // Explicit project touch endpoint (called on open or editor focus)
 app.post('/api/projects/:id/touch', (req, res) => {
   try {
-    touchProject(req.params.id);
+    touchProject(sanitizeProjectId(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -297,7 +344,7 @@ app.get('/api/projects/:id/files', (req, res) => {
     const files = listProjectFiles(projectDir);
     res.json(files);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -326,7 +373,7 @@ app.get('/api/projects/:id/file', (req, res) => {
     const content = fs.readFileSync(filePath, 'utf-8');
     res.send(content);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -357,7 +404,7 @@ app.post('/api/projects/:id/file', (req, res) => {
     touchProject(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -396,7 +443,7 @@ app.post('/api/projects/:id/upload', (req, res) => {
     const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
     res.json({ success: true, fileName: targetFileName, relativePath: relPath });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -456,7 +503,7 @@ app.post('/api/projects/:id/upload-batch', (req, res) => {
 
     res.json({ results });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -482,8 +529,13 @@ app.get('/api/projects/:id/preview-image', (req, res) => {
       '.gif': 'image/gif',
     };
 
-    const contentType = mimeMap[ext] || 'application/octet-stream';
+    // An .svg served inline as image/svg+xml executes its own <script> with
+    // this origin's privileges, and uploads accept .svg. Hand it back as an
+    // opaque octet-stream so it can never become a same-origin document.
+    const contentType = ext === '.svg' ? 'application/octet-stream' : mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     fs.createReadStream(filePath).pipe(res);
   } catch (error: any) {
@@ -523,7 +575,7 @@ app.post('/api/projects/:id/rename', (req, res) => {
       newRelativePath: path.relative(projectDir, destPath).replace(/\\/g, '/'),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -551,7 +603,7 @@ app.delete('/api/projects/:id/file', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -578,7 +630,7 @@ app.post('/api/projects/:id/duplicate', (req, res) => {
       newRelativePath: path.relative(projectDir, destPath).replace(/\\/g, '/'),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -605,16 +657,50 @@ app.post('/api/projects/:id/create-file', (req, res) => {
       relativePath: path.relative(projectDir, resolved).replace(/\\/g, '/'),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
 // 7. Compilation Endpoint
+// One compile at a time per project directory. latexmk writes .aux/.fls state
+// into a shared .build folder, so two concurrent runs corrupt each other.
+const compilesInFlight = new Map<string, Promise<unknown>>();
+
 app.post('/api/projects/:id/compile', async (req, res) => {
   try {
     const projectDir = getProjectDir(req.params.id);
-    const mainFile = req.body.mainFile || 'main.tex';
-    const engine = req.body.engine || 'pdflatex';
+
+    const pending = compilesInFlight.get(projectDir);
+    if (pending) {
+      return res.status(409).json({
+        error: 'A compile is already running for this project.',
+        code: 'COMPILE_IN_PROGRESS',
+      });
+    }
+    // `engine` is interpolated into latexmk's `-pdflatex=<cmd>` option, and
+    // latexmk runs that value through a shell. An unvalidated body field there
+    // is arbitrary command execution on the host, so only the three engines the
+    // app actually offers are accepted.
+    const requestedEngine = String(req.body.engine || 'pdflatex');
+    if (!SUPPORTED_ENGINES.includes(requestedEngine as SupportedEngine)) {
+      return res.status(400).json({ error: `Unsupported engine: ${requestedEngine}` });
+    }
+    const engine = requestedEngine as SupportedEngine;
+
+    // `mainFile` is joined onto the project directory inside compileDocument
+    // with no containment of its own, so "../../elsewhere.tex" would compile a
+    // file outside the workspace -- and with shellEscape on, run whatever that
+    // file contains. Resolve it the same way every other file route does and
+    // hand the compiler a path that is known to sit inside the project.
+    const mainFileRequest = String(req.body.mainFile || 'main.tex');
+    const mainFilePath = resolveProjectPath(req.params.id, mainFileRequest);
+    if (path.extname(mainFilePath).toLowerCase() !== '.tex') {
+      return res.status(400).json({ error: 'Only .tex files can be compiled' });
+    }
+    if (!fs.existsSync(mainFilePath)) {
+      return res.status(404).json({ error: `Main file not found: ${mainFileRequest}` });
+    }
+    const mainFile = path.relative(projectDir, mainFilePath).replace(/\\/g, '/');
 
     // Auto-create snapshot commit only if explicitly enabled in project settings (default: false)
     const gitSettings = getGitSettings(projectDir);
@@ -627,13 +713,22 @@ app.post('/api/projects/:id/compile', async (req, res) => {
       });
     }
 
-    const result = await compileDocument(projectDir, mainFile, engine, {
+    const run = compileDocument(projectDir, mainFile, engine, {
       shellEscape: !!req.body.shellEscape,
     });
+    compilesInFlight.set(projectDir, run);
+
+    let result;
+    try {
+      result = await run;
+    } finally {
+      compilesInFlight.delete(projectDir);
+    }
+
     touchProject(req.params.id);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -644,7 +739,7 @@ app.post('/api/projects/:id/clean', async (req, res) => {
     const result = cleanBuildCache(projectDir);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -713,7 +808,7 @@ app.post('/api/projects/:id/packages/install', async (req, res) => {
       error: `Could not install package '${cleanPkg}'. Please verify your TeX package manager or install it manually.`,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -725,7 +820,7 @@ app.get('/api/projects/:id/history', async (req, res) => {
     const history = await getProjectHistory(projectDir, limit);
     res.json(history);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -736,7 +831,7 @@ app.post('/api/projects/:id/history/checkpoint', async (req, res) => {
     const result = await createProjectCommit(projectDir, message);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -747,7 +842,7 @@ app.get('/api/projects/:id/history/:hash/diff', async (req, res) => {
     const diff = await getCommitDiff(projectDir, req.params.hash, filePath);
     res.json(diff);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -759,7 +854,7 @@ app.post('/api/projects/:id/history/revert', async (req, res) => {
     const result = await revertToCommit(projectDir, hash);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -774,7 +869,7 @@ app.post('/api/projects/:id/git/commit', async (req, res) => {
     const result = await createExplicitCommit(projectDir, message, description);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -785,7 +880,7 @@ app.get('/api/projects/:id/git/settings', async (req, res) => {
     const settings = getGitSettings(projectDir);
     res.json(settings);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -796,7 +891,7 @@ app.post('/api/projects/:id/git/settings', async (req, res) => {
     saveGitSettings(projectDir, { autoCommitOnCompile: !!autoCommitOnCompile });
     res.json({ success: true, settings: getGitSettings(projectDir) });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -807,7 +902,7 @@ app.get('/api/projects/:id/git/status', async (req, res) => {
     const status = await getGitSyncStatus(projectDir);
     res.json(status);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -817,7 +912,7 @@ app.get('/api/projects/:id/git/remote', async (req, res) => {
     const remoteUrl = await getRemoteUrl(projectDir);
     res.json({ remoteUrl });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -831,7 +926,7 @@ app.post('/api/projects/:id/git/remote', async (req, res) => {
     const cleanUrl = await setRemoteUrl(projectDir, remoteUrl, token);
     res.json({ success: true, remoteUrl: cleanUrl });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -842,7 +937,7 @@ app.post('/api/projects/:id/git/push', async (req, res) => {
     const result = await pushToRemote(projectDir, branch, token);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -853,7 +948,7 @@ app.post('/api/projects/:id/git/pull', async (req, res) => {
     const result = await pullFromRemote(projectDir, branch, token);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -864,7 +959,7 @@ app.get('/api/projects/:id/comments', (req, res) => {
     const comments = loadComments(projectDir);
     res.json(comments);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -878,7 +973,7 @@ app.post('/api/projects/:id/comments', (req, res) => {
     const thread = addCommentThread(projectDir, { file, line, selectedText, author, text });
     res.json(thread);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -895,7 +990,7 @@ app.post('/api/projects/:id/comments/:commentId/replies', (req, res) => {
     }
     res.json(updated);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -912,7 +1007,7 @@ app.put('/api/projects/:id/comments/:commentId/status', (req, res) => {
     }
     res.json(updated);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -925,7 +1020,7 @@ app.delete('/api/projects/:id/comments/:commentId', (req, res) => {
     }
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -947,7 +1042,7 @@ app.get('/api/projects/:id/synctex/forward', (req, res) => {
     }
     res.json(forward);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -1036,7 +1131,7 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
     }
     res.json(backward);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -1047,7 +1142,7 @@ app.get('/api/projects/:id/citations', (req, res) => {
     const citations = getProjectCitations(projectDir);
     res.json(citations);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -1067,7 +1162,7 @@ app.post('/api/projects/:id/citations', (req, res) => {
     const result = addProjectCitation(projectDir, rawBibtex, safeBib);
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    sendApiError(res, error);
   }
 });
 
@@ -1098,11 +1193,7 @@ app.get('/api/pdf', (req, res) => {
     const resolvedName = customFilename
       ? sanitizeFilename(customFilename.replace(/\.pdf$/i, '')) + '.pdf'
       : baseFallback;
-    const asciiName = resolvedName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(resolvedName)}`
-    );
+    res.setHeader('Content-Disposition', buildContentDisposition(resolvedName));
   }
 
   res.setHeader('Content-Type', 'application/pdf');
@@ -1231,7 +1322,9 @@ app.post('/api/system/apply-update', async (_req, res) => {
 app.get('/api/collab/network', (_req, res) => {
   try {
     const status = getCollabNetworkStatus(5173);
-    res.json(status);
+    // Local-only route (see LOCAL_ONLY_PREFIXES), so the token is only ever
+    // handed to the owner's own browser, which embeds it in the invite link.
+    res.json({ ...status, shareToken: getSessionToken() });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1278,7 +1371,13 @@ app.post('/api/system/reveal-in-explorer', (req, res) => {
         targetPath = projectDir;
       }
     } else if (folderPath) {
-      targetPath = path.resolve(folderPath);
+      // Only ever reveal something inside the workspace: this used to resolve
+      // any path on the machine.
+      const candidate = path.resolve(String(folderPath));
+      if (!isInside(getProjectsRoot(), candidate)) {
+        return res.status(403).json({ error: 'Access outside project boundary is forbidden' });
+      }
+      targetPath = candidate;
     } else {
       targetPath = getProjectsRoot();
     }
@@ -1318,6 +1417,23 @@ app.get('/api/system/workspace-info', (_req, res) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// Catch-all error handler. Without this, anything thrown outside a route's own
+// try/catch is rendered by Express's default handler as an HTML page carrying a
+// stack trace and absolute filesystem paths.
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[Oberleaf] Unhandled request error:', err);
+  if (res.headersSent) return;
+
+  // Errors raised by middleware carry their own status -- body-parser reports a
+  // malformed JSON body as 400, and reporting that as 500 sends the client
+  // hunting for a server fault that is not there. Only the message of an
+  // explicitly client-facing error is passed through; everything else stays
+  // opaque so internals are not disclosed.
+  const status = Number(err?.status || err?.statusCode) || 500;
+  const message = status < 500 && err?.expose ? err.message : 'Internal server error';
+  res.status(status).json({ error: message });
 });
 
 // Ensure clean starter CV template if workspace has 0 projects

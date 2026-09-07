@@ -1,6 +1,44 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
+
+// ----------------------------------------------------
+// Path containment helpers (canonical definitions)
+// ----------------------------------------------------
+
+// Contain a resolved path inside a root directory.
+// `startsWith(root)` alone is not enough: "<root>/proj" also prefixes
+// "<root>/proj-evil", so the separator has to be part of the comparison.
+export function isInside(root: string, candidate: string): boolean {
+  const normalizedRoot = path.resolve(root);
+  const normalized = path.resolve(candidate);
+  return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
+}
+
+// A project id is a single directory name, never a path.
+// Express decodes route params, so "..%2F..%2Ffoo" arrives here as "../../foo".
+export function sanitizeProjectId(rawId: string): string {
+  const id = (rawId || '').trim();
+  if (!id || id === '.' || id === '..') {
+    throw new Error('Invalid project id');
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) {
+    throw new Error('Invalid project id');
+  }
+  return id;
+}
+
+// Resolve a project directory from an untrusted id. Every function in this
+// module that takes a projectId must go through here -- callers reach these
+// straight from route params.
+export function resolveProjectDir(rawId: string): string {
+  const root = getProjectsRoot();
+  const targetDir = path.resolve(root, sanitizeProjectId(rawId));
+  if (!isInside(root, targetDir)) {
+    throw new Error('Access outside project boundary is forbidden');
+  }
+  return targetDir;
+}
 
 export interface ProjectSummary {
   id: string;
@@ -290,8 +328,12 @@ function formatRelativeTime(date: Date): string {
 }
 
 export function touchProject(projectId: string): void {
-  const root = getProjectsRoot();
-  const targetDir = path.resolve(root, projectId);
+  let targetDir: string;
+  try {
+    targetDir = resolveProjectDir(projectId);
+  } catch {
+    return;
+  }
   if (!fs.existsSync(targetDir)) return;
   const metaPath = path.join(targetDir, '.meta.json');
   let meta: any = {};
@@ -384,11 +426,7 @@ export function listProjects(): ProjectSummary[] {
 }
 
 export function deleteProject(projectId: string): boolean {
-  const root = getProjectsRoot();
-  const targetDir = path.resolve(root, projectId);
-  if (!targetDir.startsWith(path.resolve(root))) {
-    throw new Error('Access outside project boundary is forbidden');
-  }
+  const targetDir = resolveProjectDir(projectId);
   if (!fs.existsSync(targetDir)) {
     throw new Error('Project not found');
   }
@@ -396,9 +434,10 @@ export function deleteProject(projectId: string): boolean {
   return true;
 }
 
-export function duplicateProject(projectId: string): ProjectSummary {
+export function duplicateProject(rawProjectId: string): ProjectSummary {
   const root = getProjectsRoot();
-  const sourceDir = path.resolve(root, projectId);
+  const projectId = sanitizeProjectId(rawProjectId);
+  const sourceDir = resolveProjectDir(projectId);
   if (!fs.existsSync(sourceDir)) {
     throw new Error('Source project not found');
   }
@@ -440,8 +479,7 @@ export function duplicateProject(projectId: string): ProjectSummary {
 }
 
 export function toggleArchiveProject(projectId: string): boolean {
-  const root = getProjectsRoot();
-  const targetDir = path.resolve(root, projectId);
+  const targetDir = resolveProjectDir(projectId);
   if (!fs.existsSync(targetDir)) {
     throw new Error('Project not found');
   }
@@ -457,9 +495,15 @@ export function toggleArchiveProject(projectId: string): boolean {
   return meta.isArchived;
 }
 
-export function createProjectZip(projectId: string): string {
-  const root = getProjectsRoot();
-  const targetDir = path.resolve(root, projectId);
+// Never bundled into an export. .build is regenerable compiler scratch, and
+// .git is repository internals -- repositories configured by older versions
+// still carry an access token in .git/config until git.ts migrates them out,
+// and an export should not be the thing that leaks it.
+const ZIP_EXCLUDED_ENTRIES = ['.git', '.build'];
+
+export function createProjectZip(rawProjectId: string): string {
+  const projectId = sanitizeProjectId(rawProjectId);
+  const targetDir = resolveProjectDir(projectId);
   if (!fs.existsSync(targetDir)) {
     throw new Error('Project not found');
   }
@@ -475,13 +519,44 @@ export function createProjectZip(projectId: string): string {
     fs.unlinkSync(zipPath);
   }
 
+  // Both branches pass paths as argv entries or environment variables rather
+  // than interpolating them into a shell string: a directory name may legally
+  // contain quotes, apostrophes or '&' on Windows.
   try {
     // bsdtar creates standard zip archives on Windows 10/11
-    execSync(`tar.exe -a -c -f "${zipPath}" -C "${targetDir}" .`);
+    execFileSync('tar.exe', [
+      '-a',
+      '-c',
+      '-f',
+      zipPath,
+      '-C',
+      targetDir,
+      ...ZIP_EXCLUDED_ENTRIES.map((e) => `--exclude=./${e}`),
+      '.',
+    ]);
   } catch (err) {
     // Fallback using powershell Compress-Archive
-    execSync(
-      `powershell.exe -NoProfile -Command "Compress-Archive -Path '${targetDir}\\*' -DestinationPath '${zipPath}' -Force"`
+    execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        "$excluded = $env:OBERLEAF_ZIP_EXCLUDE -split ';'; " +
+          '$items = Get-ChildItem -LiteralPath $env:OBERLEAF_ZIP_SRC -Force | ' +
+          'Where-Object { $excluded -notcontains $_.Name }; ' +
+          'if ($items) { Compress-Archive -LiteralPath $items.FullName ' +
+          '-DestinationPath $env:OBERLEAF_ZIP_DEST -Force }',
+      ],
+      {
+        env: {
+          ...process.env,
+          OBERLEAF_ZIP_SRC: targetDir,
+          OBERLEAF_ZIP_DEST: zipPath,
+          OBERLEAF_ZIP_EXCLUDE: ZIP_EXCLUDED_ENTRIES.join(';'),
+        },
+      }
     );
   }
 

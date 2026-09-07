@@ -948,6 +948,16 @@ function executeCommand(
     let stderr = '';
     let resolved = false;
 
+    // A document that loops -- \loop without an exit, a runaway \def -- makes
+    // pdfTeX print without bound. The compile timeout is configurable up to
+    // "no limit", so nothing else stops these buffers from growing until the
+    // server runs out of memory. The tail is what the log parser needs anyway.
+    const MAX_CAPTURE_BYTES = 8 * 1024 * 1024;
+    const appendCapped = (buffer: string, chunk: string): string => {
+      const next = buffer + chunk;
+      return next.length > MAX_CAPTURE_BYTES ? next.slice(next.length - MAX_CAPTURE_BYTES) : next;
+    };
+
     const child = spawn(cmd, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -977,8 +987,8 @@ function executeCommand(
           }, timeoutMs)
         : null;
 
-    child.stdout.on('data', (d) => (stdout += d.toString()));
-    child.stderr.on('data', (d) => (stderr += d.toString()));
+    child.stdout.on('data', (d) => (stdout = appendCapped(stdout, d.toString())));
+    child.stderr.on('data', (d) => (stderr = appendCapped(stderr, d.toString())));
 
     child.on('close', (code) => {
       if (!resolved) {
@@ -1014,12 +1024,36 @@ export function cleanBuildCache(projectDir: string): { cleaned: boolean; message
   return { cleaned: true, message: 'Build cache already clean.' };
 }
 
+/**
+ * The engines the app offers. This doubles as the allow-list the compile route
+ * validates against: the value ends up inside latexmk's `-pdflatex=<cmd>`
+ * option, which latexmk hands to a shell, so anything unvetted reaching it is
+ * command execution on the host.
+ */
+export const SUPPORTED_ENGINES = ['pdflatex', 'xelatex', 'lualatex'] as const;
+export type SupportedEngine = (typeof SUPPORTED_ENGINES)[number];
+
 export async function compileDocument(
   projectDir: string,
   mainFile: string = 'main.tex',
-  engine: 'pdflatex' | 'xelatex' | 'lualatex' = 'pdflatex',
+  engine: SupportedEngine = 'pdflatex',
   options: { shellEscape?: boolean } = {}
 ): Promise<CompileResult> {
+  // Defence in depth. The route validates both of these, but this function is
+  // also reachable from scripts and tests, and getting either one wrong is a
+  // host compromise rather than a bad compile.
+  if (!SUPPORTED_ENGINES.includes(engine)) {
+    throw new Error(`Unsupported engine: ${engine}`);
+  }
+  const normalizedRoot = path.resolve(projectDir);
+  const resolvedMain = path.resolve(projectDir, mainFile);
+  if (
+    resolvedMain !== normalizedRoot &&
+    !resolvedMain.startsWith(normalizedRoot + path.sep)
+  ) {
+    throw new Error('Access outside project boundary is forbidden');
+  }
+
   const startTime = Date.now();
   const buildDir = path.join(projectDir, '.build');
 

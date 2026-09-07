@@ -33,6 +33,10 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true,
+        // Stamp X-Forwarded-For. Without it every proxied request reaches the
+        // API as loopback and a LAN visitor would be treated as the local
+        // owner, bypassing the session token (see server/auth.ts).
+        xfwd: true,
         configure: (proxy) => {
           proxy.on('error', (err, _req, res) => {
             // Gracefully handle transient ECONNREFUSED during server boot or restart

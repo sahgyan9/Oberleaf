@@ -1,6 +1,12 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import path from 'path';
 import fs from 'fs';
+import {
+  saveGitToken,
+  getGitToken,
+  extractCredentials,
+  buildAuthConfig,
+} from './credentials.js';
 
 export interface CommitItem {
   hash: string;
@@ -256,7 +262,22 @@ export async function getRemoteUrl(projectDir: string): Promise<string | null> {
   try {
     const remotes = await git.getRemotes(true);
     const origin = remotes.find((r) => r.name === 'origin');
-    return origin?.refs?.fetch || origin?.refs?.push || null;
+    const stored = origin?.refs?.fetch || origin?.refs?.push || null;
+    if (!stored) return null;
+
+    // Migration: repositories configured by earlier versions have the token
+    // baked into the URL. Move it into the credential store and rewrite the
+    // remote so the secret leaves .git/config for good.
+    const { url, token } = extractCredentials(stored);
+    if (token) {
+      saveGitToken(projectDir, token);
+      try {
+        await git.remote(['set-url', 'origin', url]);
+      } catch {
+        // Reporting the clean URL still beats handing the token back.
+      }
+    }
+    return url;
   } catch {
     return null;
   }
@@ -268,30 +289,39 @@ export async function setRemoteUrl(
   token?: string
 ): Promise<string> {
   const git = await ensureProjectGit(projectDir);
-  let targetUrl = remoteUrl.trim();
 
-  // If token is provided and it's an HTTPS github.com / gitlab.com URL, inject token
-  if (token && token.trim() && targetUrl.startsWith('https://')) {
-    const cleanToken = token.trim();
-    targetUrl = targetUrl.replace(/^https:\/\//, `https://${cleanToken}@`);
+  // The URL written to .git/config never carries credentials. If the caller
+  // pasted a URL that already embeds one, it is peeled off here and stored
+  // alongside any explicitly supplied token.
+  const { url: cleanUrl, token: embeddedToken } = extractCredentials(remoteUrl);
+  const effectiveToken = (token && token.trim()) || embeddedToken || '';
+  if (effectiveToken) {
+    saveGitToken(projectDir, effectiveToken);
   }
 
   try {
     const remotes = await git.getRemotes(true);
     const hasOrigin = remotes.some((r) => r.name === 'origin');
     if (hasOrigin) {
-      await git.remote(['set-url', 'origin', targetUrl]);
+      await git.remote(['set-url', 'origin', cleanUrl]);
     } else {
-      await git.addRemote('origin', targetUrl);
+      await git.addRemote('origin', cleanUrl);
     }
-    return sanitizeRemoteUrl(targetUrl);
+    return cleanUrl;
   } catch (err: any) {
     throw new Error(`Failed to set remote URL: ${err.message}`);
   }
 }
 
-function sanitizeRemoteUrl(url: string): string {
-  return url.replace(/https:\/\/[^@]+@/, 'https://');
+/**
+ * An authenticated git handle for one command. The token travels as an
+ * `http.extraHeader` config override rather than being written anywhere on
+ * disk.
+ */
+function authenticatedGit(projectDir: string, token?: string): SimpleGit {
+  const effectiveToken = (token && token.trim()) || getGitToken(projectDir) || '';
+  const config = buildAuthConfig(effectiveToken);
+  return simpleGit({ baseDir: projectDir, config });
 }
 
 export async function getGitSyncStatus(projectDir: string): Promise<GitSyncStatus> {
@@ -302,7 +332,8 @@ export async function getGitSyncStatus(projectDir: string): Promise<GitSyncStatu
 
     return {
       currentBranch: status.current || 'main',
-      remoteUrl: remoteUrl ? sanitizeRemoteUrl(remoteUrl) : null,
+      // getRemoteUrl already strips (and migrates) any embedded credential.
+      remoteUrl,
       ahead: status.ahead || 0,
       behind: status.behind || 0,
       isClean: status.isClean(),
@@ -325,16 +356,14 @@ export async function pushToRemote(
   branch?: string,
   token?: string
 ): Promise<{ success: boolean; message: string }> {
-  const git = await ensureProjectGit(projectDir);
-  const status = await git.status();
+  await ensureProjectGit(projectDir);
+  const status = await simpleGit({ baseDir: projectDir }).status();
   const currentBranch = branch || status.current || 'main';
 
   if (token && token.trim()) {
-    const remoteUrl = await getRemoteUrl(projectDir);
-    if (remoteUrl) {
-      await setRemoteUrl(projectDir, remoteUrl, token);
-    }
+    saveGitToken(projectDir, token);
   }
+  const git = authenticatedGit(projectDir, token);
 
   try {
     await git.push('origin', currentBranch, ['--set-upstream']);
@@ -360,16 +389,14 @@ export async function pullFromRemote(
   branch?: string,
   token?: string
 ): Promise<{ success: boolean; message: string; summary?: any }> {
-  const git = await ensureProjectGit(projectDir);
-  const status = await git.status();
+  await ensureProjectGit(projectDir);
+  const status = await simpleGit({ baseDir: projectDir }).status();
   const currentBranch = branch || status.current || 'main';
 
   if (token && token.trim()) {
-    const remoteUrl = await getRemoteUrl(projectDir);
-    if (remoteUrl) {
-      await setRemoteUrl(projectDir, remoteUrl, token);
-    }
+    saveGitToken(projectDir, token);
   }
+  const git = authenticatedGit(projectDir, token);
 
   try {
     const pullResult = await git.pull('origin', currentBranch);
