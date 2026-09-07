@@ -938,4 +938,35 @@ overleaf-copy/
   - MODIFIED: `server/updater.ts`, `PROJECT_LOG.md`
 - **Status at end**: Complete, resolved, and verified.
 
+---
+
+### Session 023 — 2026-09-07 · Agent: Antigravity (Gemini 3.8 Flash)
+- **Prompt**:
+  - "see the recent changes to see what we were trying to do. I am still getting the erro in line 14, but line 14 is blank. similary for line 43 and other. has this been fixed but I am still facing the same error. why????"
+  - "the goal is not to fix the main.tex, rather to fix user experience from UI itself so user knows at what line there is mistake and what exactly to do and if we can incorporate autofix it would be great and go ahead to fix these all"
+- **Root Cause Analysis (RCA)**:
+  1. **Deployment Disconnect**: The user was running Oberleaf from `C:\Users\sahgy\AppData\Local\Programs\Oberleaf`, but recent draft improvements were sitting uncommitted only in `Downloads\overleaf-copy`.
+  2. **TeX Error Offset & Math Collision**:
+     - **Line 14**: Caused by `\author{... \And ...}` on Line 11. Because `\usepackage{amsmath}` was imported, `amsmath` defines `\And` as an internal math-mode symbol (`\DOTSB \;\mathchar "3026 \;`). When `\maketitle` rendered the author tabular in text mode, TeX hit the math symbol and threw `Missing $ inserted` / `Extra }` only when finishing `\maketitle` on Line 14 (a blank line). The draft code only searched for `Undefined control sequence`, completely missing this crash.
+     - **Line 43, 99, 124**: Caused by illegal `\\` forced line breaks after `\end{itemize}` (Line 42), standalone `\\` after `\subsection` (Line 98), and standalone `\\` after `\end{enumerate}` (Line 123). TeX throws `LaTeX Error: There's no line here to end.` on the following line. The draft code only matched `Missing $ inserted` and completely omitted `There's no line here to end`.
+- **What Was Done**:
+  - **Enhanced Source-Aware Error Enrichment (`server/compiler.ts`)**:
+    - **`\author` with `\And` Detection**: Checks if `\author` has `\And` when `\maketitle` errors with `Missing $ inserted` or `Extra }`. Remaps error from the blank line to the actual `\author` line (Line 11), provides clear plain-English explanation, and attaches a 1-click `replace_line` suggested fix (`Replace \And with \and (Line 11)`). Subsequent errors on Line 14 are marked cascading with `Cascades from Line 11`.
+    - **Illegal `\\` / `There's no line here to end` Detection**: Scans backwards from the reported line for trailing `\\` after `\end{...}`, section headers, standalone `\\`, and double linebreaks `\\\\`. Remaps error to the true offending line (e.g. Line 42, 98, 123), explains why `\\` is illegal in that context, and provides 1-click `replace_line` fix (strips `\\` or deletes standalone line).
+    - **Missing Graphics in Subfolders**: When TeX warns `File '<name>' not found`, scans common subdirectories (`figures/`, `images/`, etc.). If found, points to the `\includegraphics` line and attaches a 1-click fix to update the path.
+    - Integrated enrichment pass directly into `parseLatexLog` so deduplication and cascade marking accurately reflect the true enriched lines.
+  - **Resilient 1-Click Auto-Fix Handler (`src/App.tsx`)**:
+    - Enhanced `replace_line` in `handleApplyFix` with CRLF (`\r`) normalization and whitespace-tolerant matching so line endings on Windows never cause search misses.
+    - Added indentation preservation when replacing lines.
+    - Automatically centers and positions the Monaco editor cursor on the repaired line after applying the fix.
+  - **Installed Directory Synchronization**:
+    - Synchronized `server/compiler.ts`, `src/App.tsx`, `src/components/DependencyDoctor/DependencyDoctor.tsx`, and `src/components/PDFViewer/PDFViewer.tsx` to `C:\Users\sahgy\AppData\Local\Programs\Oberleaf`.
+- **Verification**:
+  - `npm run typecheck`: Passed with 0 errors in both repositories.
+  - `Live API Compilation Test`: Hit `POST /api/projects/automatic-temperature-controller-fan/compile` on running daemon. Verified all errors are mapped to their true lines: Line 11 (`\And` in `\author`), Line 42 (`Illegal \\ after \end{itemize}`), Line 98 (`Delete \\ on line 98`), Line 123 (`Delete \\ on line 123`), and Line 14 errors correctly flagged as secondary cascades.
+- **Files changed**:
+  - MODIFIED: `server/compiler.ts`, `src/App.tsx`, `src/components/DependencyDoctor/DependencyDoctor.tsx`, `src/components/PDFViewer/PDFViewer.tsx`, `PROJECT_LOG.md`
+- **Status at end**: Complete, fully verified, and active in the live daemon.
+
+
 

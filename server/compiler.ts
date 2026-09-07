@@ -4,13 +4,17 @@ import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 
 export interface SuggestedFix {
-  type: 'add_preamble' | 'install_package' | 'wrap_math_mode';
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line';
   packageName?: string;
   codeSnippet: string;
   label: string;
   description: string;
   line?: number;
   targetEnvironment?: string;
+  /** For replace_line: the exact source line to find */
+  find?: string;
+  /** For replace_line: the replacement text (empty string = delete the line) */
+  replace?: string;
 }
 
 export interface DetectedMissingPackage {
@@ -480,7 +484,11 @@ function extractFullErrorMessage(initialMsg: string, subsequentLines: string[], 
   return msg.trim();
 }
 
-export function parseLatexLog(logContent: string): { errors: CompileError[]; warnings: string[] } {
+export function parseLatexLog(
+  logContent: string,
+  sourceLines?: string[],
+  projectDir?: string
+): { errors: CompileError[]; warnings: string[] } {
   const errors: CompileError[] = [];
   const warnings: string[] = [];
   const lines = logContent.split('\n');
@@ -562,7 +570,12 @@ export function parseLatexLog(logContent: string): { errors: CompileError[]; war
     }
   }
 
-  return { errors: markCascadingErrors(dedupeErrors(errors)), warnings: [...new Set(warnings)] };
+  const uniqueErrors = dedupeErrors(errors);
+  const enrichedErrors = sourceLines
+    ? enrichErrorsWithSourceContext(uniqueErrors, sourceLines, projectDir)
+    : uniqueErrors;
+
+  return { errors: markCascadingErrors(enrichedErrors), warnings: [...new Set(warnings)] };
 }
 
 // TeX repeats itself: the same fault appears in the on-disk log and again in
@@ -608,7 +621,7 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
 
     // Detect if this subsequent error is a classic TeX cascade caused by the unresolved root error
     const isCascadePattern =
-      /Misplaced alignment|Missing \$ inserted|ended by \\end|Undefined control sequence|Runaway argument|Extra \}|Emergency stop/i.test(
+      /Misplaced alignment|Missing \$ inserted|ended by \\end|Undefined control sequence|Runaway argument|Extra \}|Missing \} inserted|Emergency stop/i.test(
         err.message
       );
 
@@ -619,6 +632,221 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
         cascadingFromLine: rootError.line,
         friendlyExplanation: `Secondary error cascading from Line ${rootError.line}. Resolving the root issue on Line ${rootError.line} will fix this.`,
       };
+    }
+
+    return err;
+  });
+}
+
+/**
+ * Source-aware enrichment pass — runs AFTER log parsing and deduplication.
+ * Inspects source code to remap misleading errors to their true source line,
+ * provides clear plain-English explanations, and attaches 1-click Quick Fixes.
+ */
+function enrichErrorsWithSourceContext(
+  errors: CompileError[],
+  sourceLines: string[],
+  projectDir?: string
+): CompileError[] {
+  // Pre-find author line with \And (if any)
+  let authorLineIdx = -1;
+  for (let i = 0; i < sourceLines.length; i++) {
+    if (/\\author\b/.test(sourceLines[i])) {
+      for (let j = i; j < Math.min(i + 15, sourceLines.length); j++) {
+        if (/\\And\b/.test(sourceLines[j])) {
+          authorLineIdx = j;
+          break;
+        }
+        if (sourceLines[j].includes('}') && !sourceLines[j].includes('\\author')) break;
+      }
+    }
+    if (authorLineIdx >= 0) break;
+  }
+
+  // Pre-find \maketitle line (if any)
+  const maketitleLineIdx = sourceLines.findIndex((l) => /\\maketitle\b/.test(l));
+  let authorFixAssigned = false;
+
+  return errors.map((err) => {
+    const lineIdx = (err.line ?? 0) - 1; // convert to 0-based
+
+    // ── Pattern 1: \And used instead of \and in \author{} ─────────────────
+    // Symptoms:
+    // Case A: "Undefined control sequence" with \And nearby.
+    // Case B: With amsmath loaded, \And is a math-symbol macro (\mathchar "3026).
+    // When \maketitle renders the author block inside a tabular, TeX hits math mode
+    // inside text mode and crashes with "Missing $ inserted" or "Extra }, or forgotten $"
+    // on or right after \maketitle (often reported on a blank line!).
+    if (authorLineIdx >= 0) {
+      const isNearMaketitle =
+        maketitleLineIdx >= 0 &&
+        (Math.abs(lineIdx - maketitleLineIdx) <= 4 ||
+          (lineIdx >= maketitleLineIdx && lineIdx <= maketitleLineIdx + 5));
+
+      const isAndError =
+        (/Undefined control sequence/i.test(err.message) &&
+          /\\And\b/.test(sourceLines[lineIdx] || '')) ||
+        ((/Missing \$ inserted|Extra \}|forgotten \$|Misplaced alignment tab/i.test(err.message)) &&
+          isNearMaketitle);
+
+      if (isAndError) {
+        if (!authorFixAssigned) {
+          authorFixAssigned = true;
+          const actualLine = authorLineIdx + 1;
+          const srcLine = sourceLines[authorLineIdx];
+          const fixedLine = srcLine.replace(/\\And\b/g, '\\and');
+          return {
+            ...err,
+            line: actualLine,
+            message: `\\And used in \\author instead of \\and`,
+            friendlyExplanation:
+              `Line ${actualLine} uses \\And (capitalized) instead of \\and inside \\author{...}. ` +
+              `In standard LaTeX document classes, multiple authors must be separated with lowercase \\and. ` +
+              `Because amsmath is loaded, \\And is defined as a mathematical symbol, which caused \\maketitle to fail ` +
+              `with "${err.message}" on line ${err.line}.`,
+            suggestedFix: {
+              type: 'replace_line' as const,
+              codeSnippet: fixedLine,
+              label: `Replace \\And with \\and (Line ${actualLine})`,
+              description: `In \\author{...}, replace \\And with \\and to properly separate multiple authors.`,
+              line: actualLine,
+              find: srcLine,
+              replace: fixedLine,
+            },
+          };
+        } else {
+          return {
+            ...err,
+            isCascading: true,
+            cascadingFromLine: authorLineIdx + 1,
+            friendlyExplanation: `Secondary error cascading from Line ${authorLineIdx + 1}. Resolving the root issue on Line ${authorLineIdx + 1} will fix this.`,
+          };
+        }
+      }
+    }
+
+    // ── Pattern 2: \\ used outside a valid context / There's no line here to end ──
+    // Symptoms: "There's no line here to end", "Missing $ inserted", or "Extra }, or forgotten $"
+    // Real cause: \\ on the reported line, or on preceding lines (e.g. after \end{itemize},
+    // after section titles, or standalone \\). TeX often reports this on the blank line following it.
+    if (
+      /There's no line here to end|Missing \$ inserted|Extra \}|forgotten \$/i.test(err.message)
+    ) {
+      const candidateIndices = [lineIdx, lineIdx - 1, lineIdx - 2].filter(
+        (i) => i >= 0 && i < sourceLines.length
+      );
+
+      for (const idx of candidateIndices) {
+        const srcLine = sourceLines[idx];
+        const isIllegalNewline =
+          /\\end\{[^}]+\}\s*\\\\+/.test(srcLine) || // \end{itemize}\\
+          /^\s*\\\\+\s*$/.test(srcLine) || // standalone \\ or \\\\
+          /\\(?:sub)*section\{[^}]+\}\s*\\\\+/.test(srcLine) || // \section{...}\\ or \subsection{...}\\
+          /\S+.*\\\\{2,}\s*$/.test(srcLine); // text\\\\ (double backslash)
+
+        if (isIllegalNewline) {
+          const actualLine = idx + 1;
+          const envMatch = srcLine.match(/\\end\{([^}]+)\}/);
+          const isStandalone = /^\s*\\\\+\s*$/.test(srcLine);
+          const isDoubleNewline = /\S+.*\\\\{2,}\s*$/.test(srcLine);
+          const isHeading = /\\(?:sub)*section/.test(srcLine);
+
+          const context = envMatch
+            ? `after \\end{${envMatch[1]}}`
+            : isStandalone
+            ? 'as a standalone line break'
+            : isHeading
+            ? 'after a section heading'
+            : isDoubleNewline
+            ? 'as a double line break (\\\\\\\\)'
+            : 'at the end of the line';
+
+          const fixedLine = isStandalone
+            ? ''
+            : isDoubleNewline
+            ? srcLine.replace(/\\\\{2,}\s*$/, '').trimEnd()
+            : srcLine.replace(/\s*\\\\+\s*$/, '').trimEnd();
+
+          return {
+            ...err,
+            line: actualLine,
+            message: `Illegal \\\\ ${context}`,
+            friendlyExplanation:
+              `The \\\\ on line ${actualLine} is used ${context}, which is illegal in LaTeX. ` +
+              `Line breaks (\\\\) can only be used inside running paragraph text or table cells — ` +
+              `never after list environments (\\end{...}), section headings, or on blank lines. ` +
+              `Remove \\\\ to fix this error.`,
+            suggestedFix: {
+              type: 'replace_line' as const,
+              codeSnippet: fixedLine || '(delete line)',
+              label: isStandalone
+                ? `Delete \\\\ on line ${actualLine}`
+                : `Remove \\\\ on line ${actualLine}`,
+              description: `Remove the illegal \\\\ ${context} on line ${actualLine}.`,
+              line: actualLine,
+              find: srcLine,
+              replace: fixedLine,
+            },
+          };
+        }
+      }
+    }
+
+    // ── Pattern 3: Missing image/graphic located in a subfolder ───────────────
+    // Symptoms: "File '<name>' not found" or "Package pdftex.def Error: File '<name>' not found"
+    // If the file actually exists inside figures/, images/, img/, assets/, etc.,
+    // suggest updating the path in \includegraphics.
+    const fileNotFoundMatch = err.message.match(
+      /File [`']?([^`'\s:]+\.(?:png|jpe?g|pdf|eps))[`']?\s+not found/i
+    );
+    if (fileNotFoundMatch && projectDir) {
+      const missingFile = fileNotFoundMatch[1].trim();
+      const candidateDirs = ['figures', 'images', 'img', 'assets', 'graphics', 'photos'];
+      let foundSubdir: string | null = null;
+
+      for (const dir of candidateDirs) {
+        const candidatePath = path.join(projectDir, dir, missingFile);
+        if (fs.existsSync(candidatePath)) {
+          foundSubdir = dir;
+          break;
+        }
+      }
+
+      if (foundSubdir) {
+        const relativePath = `${foundSubdir}/${missingFile}`;
+        let imgLineIdx = lineIdx;
+        if (
+          imgLineIdx < 0 ||
+          imgLineIdx >= sourceLines.length ||
+          !sourceLines[imgLineIdx].includes(missingFile)
+        ) {
+          imgLineIdx = sourceLines.findIndex((l) => l.includes(missingFile));
+        }
+
+        if (imgLineIdx >= 0) {
+          const actualLine = imgLineIdx + 1;
+          const srcLine = sourceLines[imgLineIdx];
+          const fixedLine = srcLine.replace(missingFile, relativePath);
+
+          return {
+            ...err,
+            line: actualLine,
+            message: `Image '${missingFile}' found in '${foundSubdir}/'`,
+            friendlyExplanation:
+              `File '${missingFile}' was not found in the project root directory, but it exists at '${relativePath}'. ` +
+              `Update the path in \\includegraphics to resolve this error.`,
+            suggestedFix: {
+              type: 'replace_line' as const,
+              codeSnippet: fixedLine,
+              label: `Update path to ${relativePath}`,
+              description: `Change '${missingFile}' to '${relativePath}' in \\includegraphics on line ${actualLine}.`,
+              line: actualLine,
+              find: srcLine,
+              replace: fixedLine,
+            },
+          };
+        }
+      }
     }
 
     return err;
@@ -882,7 +1110,14 @@ export async function compileDocument(
   // the engine printed. Only fall back to stdout/stderr when it is missing,
   // otherwise every error gets parsed twice.
   const fullLog = diskLog || `${res.stdout}\n${res.stderr}`;
-  const { errors, warnings } = parseLatexLog(fullLog);
+  const mainSourcePath = path.isAbsolute(mainFile) ? mainFile : path.join(projectDir, mainFile);
+  const mainSource = readSafe(mainSourcePath);
+  const sourceLines = mainSource.split('\n').map((l) => l.replace(/\r$/, ''));
+  const documentTitle = extractLatexTitle(mainSource) || undefined;
+  const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
+  const detectedMissingPackages = scanMissingPackages(mainSource);
+
+  const { errors, warnings } = parseLatexLog(fullLog, sourceLines, projectDir);
   const pdfGenerated = fs.existsSync(generatedPdf);
 
   // A PDF that exists is worth showing even when the log carries errors, which
@@ -896,12 +1131,6 @@ export async function compileDocument(
       // Ignore if the target is locked by a viewer
     }
   }
-
-  const mainSourcePath = path.isAbsolute(mainFile) ? mainFile : path.join(projectDir, mainFile);
-  const mainSource = readSafe(mainSourcePath);
-  const documentTitle = extractLatexTitle(mainSource) || undefined;
-  const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
-  const detectedMissingPackages = scanMissingPackages(mainSource);
 
   return {
     success: pdfGenerated,

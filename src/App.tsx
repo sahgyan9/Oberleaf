@@ -945,6 +945,69 @@ export const App: React.FC = () => {
       } else {
         addToast(`Could not locate \\begin{${envName}} around line ${fix.line || 1} to wrap.`, 'warning');
       }
+    } else if (fix.type === 'replace_line') {
+      // replace_line: find the target line by its text (with whitespace tolerance
+      // and CRLF resilience) then replace or remove it.
+      const currentLiveContent = getLiveContent();
+      lastPreFixContentRef.current = currentLiveContent;
+      setCanUndoFix(true);
+
+      const lines = currentLiveContent.split('\n');
+      const hintIdx = (fix.line ?? 1) - 1; // 0-based hint from server
+
+      // Search within ±4 lines of hint for text match (ignoring \r and outer whitespace)
+      let targetIdx = -1;
+      if (fix.find !== undefined) {
+        const cleanFind = fix.find.replace(/\r$/, '').trim();
+        const searchStart = Math.max(0, hintIdx - 4);
+        const searchEnd = Math.min(lines.length - 1, hintIdx + 4);
+        for (let i = searchStart; i <= searchEnd; i++) {
+          if (lines[i].replace(/\r$/, '').trim() === cleanFind) {
+            targetIdx = i;
+            break;
+          }
+        }
+        // Fallback: search across entire document
+        if (targetIdx < 0) {
+          targetIdx = lines.findIndex((l) => l.replace(/\r$/, '').trim() === cleanFind);
+        }
+        // Fallback: use hinted line directly
+        if (targetIdx < 0 && hintIdx >= 0 && hintIdx < lines.length) {
+          targetIdx = hintIdx;
+        }
+      } else {
+        targetIdx = hintIdx;
+      }
+
+      if (targetIdx >= 0 && targetIdx < lines.length) {
+        const replacement = fix.replace ?? '';
+        if (replacement === '') {
+          // Delete the line entirely
+          lines.splice(targetIdx, 1);
+        } else {
+          // Preserve original indentation if replacement has no leading indentation
+          const origIndent = lines[targetIdx].match(/^(\s*)/)?.[1] || '';
+          const repIndent = replacement.match(/^(\s*)/)?.[1] || '';
+          const finalRep =
+            repIndent === '' && origIndent !== ''
+              ? origIndent + replacement.trimStart()
+              : replacement;
+          lines[targetIdx] = finalRep;
+        }
+        const updatedContent = lines.join('\n');
+        if (monacoEditorRef.current) {
+          monacoEditorRef.current.setValue(updatedContent);
+          const targetLineNum = Math.min(lines.length, targetIdx + 1);
+          monacoEditorRef.current.revealLineInCenter(targetLineNum);
+          monacoEditorRef.current.setPosition({ lineNumber: targetLineNum, column: 1 });
+        }
+        setEditorContent(updatedContent);
+        await saveActiveFile(updatedContent);
+        addToast(`Applied fix on line ${(fix.line ?? targetIdx + 1)}. Recompiling…`, 'info');
+        setTimeout(() => { handleCompile(); }, 50);
+      } else {
+        addToast('Could not locate the target line to fix. Please fix it manually.', 'warning');
+      }
     }
   };
 

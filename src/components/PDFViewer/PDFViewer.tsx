@@ -35,13 +35,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 const CSS_UNITS = 96 / 72;
 
 export interface SuggestedFix {
-  type: 'add_preamble' | 'install_package' | 'wrap_math_mode';
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line';
   packageName?: string;
   codeSnippet: string;
   label: string;
   description: string;
   line?: number;
   targetEnvironment?: string;
+  /** For replace_line: the exact source line text to find */
+  find?: string;
+  /** For replace_line: what to replace it with (empty = delete the line) */
+  replace?: string;
 }
 
 export interface CompileErrorItem {
