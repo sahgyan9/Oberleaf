@@ -40,6 +40,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       {/* Left formatting buttons */}
       <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
         <button
+          aria-label="Bold (\\textbf) - Ctrl+B"
           onClick={() => onWrapSelection('\\textbf{', '}', 'text')}
           title="Bold (\\textbf) - Ctrl+B"
           className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -48,6 +49,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         <button
+          aria-label="Italic (\\textit) - Ctrl+I"
           onClick={() => onWrapSelection('\\textit{', '}', 'text')}
           title="Italic (\\textit) - Ctrl+I"
           className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -59,6 +61,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         {/* Sections & Math */}
         <button
+          aria-label="Insert Section"
           onClick={() => onInsertSnippet('\\section{Section Title}\n')}
           title="Insert Section"
           className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -67,6 +70,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         <button
+          aria-label="Inline Math ($...$)"
           onClick={() => onWrapSelection('$', '$', 'x')}
           title="Inline Math ($...$)"
           className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition font-mono text-xs font-semibold btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -75,6 +79,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         <button
+          aria-label="Display Equation (\\begin{equation})"
           onClick={() =>
             onInsertSnippet(`\\begin{equation}
   E = mc^2
@@ -90,6 +95,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         {/* Overleaf-Style Modals: Image & Table */}
         <button
+          aria-label="Insert Figure / Image"
           onClick={onOpenImageModal}
           title="Insert Figure / Image"
           className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -99,6 +105,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </button>
 
         <button
+          aria-label="Insert Table (Visual Generator)"
           onClick={onOpenTableModal}
           title="Insert Table (Visual Generator)"
           className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -111,6 +118,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         {/* Lists */}
         <button
+          aria-label="Bullet List"
           onClick={() =>
             onInsertSnippet(`\\begin{itemize}
   \\item Item 1
@@ -125,6 +133,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         {/* Citation Picker */}
         <button
+          aria-label="Browse & Insert Citations (\\cite)"
           onClick={() => (onOpenCitationModal ? onOpenCitationModal() : onInsertSnippet('\\cite{citation_key}'))}
           title="Browse & Insert Citations (\\cite)"
           className="flex items-center space-x-1 px-2 py-1 rounded text-xs hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile flex-shrink-0 whitespace-nowrap"
@@ -138,6 +147,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <div className="flex items-center space-x-1.5 flex-shrink-0 ml-auto pl-1">
         {onJumpToPdf && (
           <button
+            aria-label="Jump to Cursor Location in PDF (SyncTeX: Ctrl+Alt+J)"
             onClick={onJumpToPdf}
             disabled={isJumpingToPdf}
             title="Jump to Cursor Location in PDF (SyncTeX: Ctrl+Alt+J)"
@@ -155,6 +165,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         {/* Live Math Toggle */}
         {onToggleLiveMath && (
           <button
+            aria-label={isLiveMathEnabled ? "Live Math Preview is ON. Click to disable." : "Live Math Preview is OFF. Click to enable."}
             onClick={onToggleLiveMath}
             title={isLiveMathEnabled ? "Live Math Preview is ON. Click to disable." : "Live Math Preview is OFF. Click to enable."}
             className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-mono transition border btn-tactile whitespace-nowrap flex-shrink-0 ${

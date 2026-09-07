@@ -715,6 +715,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
         {/* Left: Zoom controls */}
         <div className="flex items-center space-x-1">
           <button
+            aria-label="Zoom Out"
             onClick={() => {
               updateViewportAnchor();
               setIsFitWidth(false);
@@ -728,6 +729,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
           </button>
           <span className="font-mono w-10 text-center text-[11px] text-stone-700 dark:text-stone-300">{zoom}%</span>
           <button
+            aria-label="Zoom In"
             onClick={() => {
               updateViewportAnchor();
               setIsFitWidth(false);
@@ -740,6 +742,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label={isFitWidth ? 'Fit to Width (Active) (F)' : 'Fit to Width (F)'}
             onClick={handleToggleFitWidth}
             title={isFitWidth ? 'Fit to Width (Active) (F)' : 'Fit to Width (F)'}
             className={`p-1 rounded transition text-[10px] btn-tactile ${
@@ -751,6 +754,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label="Reset Zoom (80%)"
             onClick={() => {
               updateViewportAnchor();
               setIsFitWidth(false);
@@ -816,6 +820,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                     className="w-36 bg-transparent text-[11px] text-stone-800 dark:text-stone-100 outline-none placeholder-stone-400 font-sans"
                   />
                   <button
+                    aria-label="Jump to LaTeX code containing this text"
                     onClick={() => handleBackwardJump(jumpSearchText)}
                     disabled={isSyncingBackward}
                     title="Jump to LaTeX code containing this text"
@@ -837,6 +842,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
               ) : (
                 <div className="flex items-center space-x-0.5">
                   <button
+                    aria-label="Jump to code from selected text or current PDF position (SyncTeX Backward)"
                     onClick={() => handleBackwardJump()}
                     disabled={isSyncingBackward}
                     title="Jump to code from selected text or current PDF position (SyncTeX Backward)"
@@ -850,6 +856,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                     <span className="hidden sm:inline">To Code</span>
                   </button>
                   <button
+                    aria-label="Jump by text search in source code"
                     onClick={() => setShowSearchInput(true)}
                     title="Jump by text search in source code"
                     className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-800 transition btn-tactile"
@@ -862,6 +869,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
           )}
 
           <button
+            aria-label="Toggle Night Reading Mode"
             onClick={() => setInvertColors((v) => !v)}
             title="Toggle Night Reading Mode"
             className={`flex items-center space-x-1 px-1.5 py-0.5 rounded transition text-[11px] btn-tactile ${
@@ -888,6 +896,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
 
           {onToggleCollapse && (
             <button
+              aria-label="Collapse PDF Viewer"
               onClick={onToggleCollapse}
               title="Collapse PDF Viewer"
               className="p-1 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile"
@@ -923,6 +932,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                 <div className="flex items-center space-x-2">
                   {canUndoFix && onUndoFix && (
                     <button
+                      aria-label="Revert previous automatic fix and restore code"
                       onClick={(e) => {
                         e.stopPropagation();
                         onUndoFix();
@@ -953,6 +963,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                     </span>
                   </div>
                   <button
+                    aria-label="Inject all missing packages into preamble in one operation"
                     onClick={(e) => {
                       e.stopPropagation();
                       onApplyBatchFix(detectedMissingPackages);
@@ -1008,6 +1019,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                           {/* 1-Click Quick Fix Button */}
                           {err.suggestedFix && onApplyFix && (
                             <button
+                              aria-label={err.suggestedFix.description}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onApplyFix(err.suggestedFix!);
@@ -1022,6 +1034,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
 
                           {/* 1-Click Copy Prompt Button */}
                           <button
+                            aria-label="Copy error prompt to clipboard"
                             onClick={(e) => handleCopyAIPrompt(err, idx, e)}
                             title="Copy error prompt to clipboard"
                             className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 transition btn-tactile"

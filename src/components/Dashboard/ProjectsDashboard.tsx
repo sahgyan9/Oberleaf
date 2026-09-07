@@ -105,6 +105,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   // Modals & Menu State
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [deleteConfirmProject, setDeleteConfirmProject] = useState<ExtendedProjectInfo | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCloning, setIsCloning] = useState<string | null>(null);
   const [isAddingShortcut, setIsAddingShortcut] = useState(false);
@@ -300,15 +301,42 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedProjectIds.length} selected project(s)?`)) return;
-    for (const id of selectedProjectIds) {
-      try {
-        await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-      } catch {}
+  // Deleting projects is an unrecoverable recursive remove on the server, so it
+  // gets the same deliberate confirmation as a single delete rather than a
+  // native confirm() the browser styles like a bug report.
+  const confirmBulkDelete = async () => {
+    setIsDeleting(true);
+    const failed: string[] = [];
+    try {
+      for (const id of selectedProjectIds) {
+        try {
+          const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+          if (!res.ok) failed.push(id);
+        } catch {
+          failed.push(id);
+        }
+      }
+
+      const deleted = selectedProjectIds.length - failed.length;
+      if (failed.length === 0) {
+        notify(`Deleted ${deleted} ${deleted === 1 ? 'project' : 'projects'}.`, 'info');
+      } else {
+        // Silently swallowing these left the dashboard showing projects the
+        // user believed were gone.
+        notify(`Deleted ${deleted}, but ${failed.length} could not be removed.`, 'error');
+      }
+
+      setSelectedProjectIds(failed);
+      setIsBulkDeleteOpen(false);
+      await onRefreshProjects();
+    } finally {
+      setIsDeleting(false);
     }
-    setSelectedProjectIds([]);
-    await onRefreshProjects();
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedProjectIds.length === 0) return;
+    setIsBulkDeleteOpen(true);
   };
 
   return (
@@ -340,6 +368,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
         <div className="flex items-center space-x-2">
           {/* Ambient Engine Health Status */}
           <button
+            aria-label={isDoctorHealthy ? 'Local TeX Engine Healthy' : 'Check TeX Engine Status'}
             onClick={onOpenDoctor}
             title={isDoctorHealthy ? 'Local TeX Engine Healthy' : 'Check TeX Engine Status'}
             className="hidden md:flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white transition btn-tactile"
@@ -362,6 +391,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
           {/* Quick Reveal in Explorer */}
           <button
+            aria-label="Open Oberleaf projects root directory in Windows File Explorer"
             onClick={() => handleRevealInExplorer()}
             title="Open Oberleaf projects root directory in Windows File Explorer"
             className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white transition btn-tactile cursor-pointer"
@@ -372,6 +402,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
           {/* Refresh Projects Button */}
           <button
+            aria-label="Refresh projects list"
             onClick={handleRefresh}
             title="Refresh projects list"
             className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 hover:bg-stone-200 dark:hover:bg-stone-800 border border-transparent hover:border-surface-lightBorder dark:border-surface-darkBorder transition btn-tactile"
@@ -382,6 +413,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
           {/* Add Desktop Shortcut Button - only visible if shortcut hasn't been added yet */}
           {(!hasShortcut || isAddingShortcut || shortcutMessage) && (
             <button
+              aria-label="Add Oberleaf shortcut to Desktop & Start Menu"
               onClick={handleAddShortcut}
               disabled={isAddingShortcut}
               title="Add Oberleaf shortcut to Desktop & Start Menu"
@@ -405,6 +437,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
           {/* Update Available Badge */}
           {hasUpdate && onOpenUpdateModal && (
             <button
+              aria-label="A new Oberleaf update is available! Click to view details and install."
               onClick={onOpenUpdateModal}
               title="A new Oberleaf update is available! Click to view details and install."
               className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer"
@@ -416,6 +449,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
           {/* Theme Toggle */}
           <button
+            aria-label={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
             className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 hover:bg-stone-200 dark:hover:bg-stone-800 border border-surface-lightBorder dark:border-surface-darkBorder transition btn-tactile"
@@ -426,6 +460,8 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
           {/* User Profile Avatar */}
           <div className="relative">
             <button
+              aria-label="Account menu"
+              aria-expanded={isUserMenuOpen}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsUserMenuOpen((prev) => !prev);
@@ -533,6 +569,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
           <div className="flex items-center space-x-2">
             <button
+              aria-label="Open Oberleaf projects folder in File Explorer"
               onClick={() => handleRevealInExplorer()}
               className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-surface-lightBorder dark:border-surface-darkBorder text-xs font-medium transition cursor-pointer btn-tactile"
               title="Open Oberleaf projects folder in File Explorer"
@@ -579,6 +616,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
               {/* Action Buttons */}
               <button
+                aria-label="Create a new CV from template"
                 onClick={onNewProject}
                 className="px-3 py-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder hover:bg-stone-200/60 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold flex items-center space-x-1.5 transition btn-tactile cursor-pointer"
                 title="Create a new CV from template"
@@ -631,6 +669,10 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
               <tr className="border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightSubtle dark:bg-surface-darkSubtle text-[13px] font-semibold text-stone-600 dark:text-stone-400 select-none">
                 <th className="py-3.5 px-4 w-12 text-center">
                   <button
+                    aria-label="Select all projects"
+                    aria-pressed={
+                      selectedProjectIds.length === filteredProjects.length && filteredProjects.length > 0
+                    }
                     onClick={toggleSelectAll}
                     title="Select All"
                     className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition flex items-center justify-center mx-auto"
@@ -735,7 +777,11 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     >
                       {/* Checkbox */}
                       <td className="py-3.5 px-4 text-center" onClick={(e) => toggleSelectOne(project.id, e)}>
-                        <button className="text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-200 transition flex items-center justify-center mx-auto">
+                        <button
+                          aria-label={`${isSelected ? 'Deselect' : 'Select'} ${project.name}`}
+                          aria-pressed={isSelected}
+                          className="text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-200 transition flex items-center justify-center mx-auto"
+                        >
                           {isSelected ? (
                             <CheckSquare className="w-4.5 h-4.5 text-scholarly-green dark:text-scholarly-greenDark" />
                           ) : (
@@ -764,6 +810,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                         <div className="flex items-center justify-end space-x-1.5 text-stone-500">
                           {/* Reveal in Explorer */}
                           <button
+                            aria-label="Reveal in File Explorer"
                             onClick={(e) => handleRevealInExplorer(project.id, e)}
                             title="Reveal in File Explorer"
                             className="p-1.5 rounded-lg hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile cursor-pointer"
@@ -773,6 +820,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
                           {/* Duplicate Project */}
                           <button
+                            aria-label="Duplicate project"
                             onClick={(e) => handleDuplicate(project.id, e)}
                             disabled={isCloning === project.id}
                             title="Duplicate project"
@@ -783,6 +831,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
                           {/* Download PDF */}
                           <button
+                            aria-label="Download compiled PDF"
                             onClick={(e) => handleDownloadPdf(project, e)}
                             title="Download compiled PDF"
                             className="p-1.5 rounded-lg hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile cursor-pointer"
@@ -792,6 +841,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
                           {/* Download Zip */}
                           <button
+                            aria-label="Download project as .zip"
                             onClick={(e) => handleDownloadZip(project.id, e)}
                             title="Download project as .zip"
                             className="p-1.5 rounded-lg hover:bg-stone-200/80 dark:hover:bg-stone-800 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile cursor-pointer"
@@ -801,6 +851,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
                           {/* Delete Project */}
                           <button
+                            aria-label="Delete project"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeleteConfirmProject(project);
@@ -820,6 +871,51 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
           </table>
         </div>
       </main>
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/30 rounded-xl shadow-2xl max-w-md w-full p-6 text-stone-900 dark:text-stone-100">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif font-semibold text-stone-900 dark:text-stone-100 text-base">
+                  Delete {selectedProjectIds.length} {selectedProjectIds.length === 1 ? 'Project' : 'Projects'}?
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-600 dark:text-stone-300 mb-6 leading-relaxed">
+              This permanently removes every file, figure and version-history checkpoint in{' '}
+              {selectedProjectIds.length === 1 ? 'this project' : 'these projects'}.
+            </p>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteOpen(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-800 text-xs font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmBulkDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-xs btn-tactile"
+              >
+                {isDeleting
+                  ? 'Deleting...'
+                  : `Delete ${selectedProjectIds.length} ${selectedProjectIds.length === 1 ? 'Project' : 'Projects'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmProject && (

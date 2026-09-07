@@ -191,6 +191,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center space-x-2.5 flex-shrink-0">
         {onBackToProjects && (
           <button
+            aria-label="Back to All Projects"
             onClick={onBackToProjects}
             title="Back to All Projects"
             className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 border border-surface-lightBorder dark:border-surface-darkBorder transition text-xs font-semibold btn-tactile flex-shrink-0"
@@ -203,6 +204,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Brand & Project Switcher Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
+            aria-label="Switch or Browse Projects"
             onClick={() => setIsProjectsDropdownOpen((prev) => !prev)}
             title="Switch or Browse Projects"
             className="flex items-center space-x-2 h-8 px-2.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition text-left group border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
@@ -327,6 +329,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Center Actions: Tactile Oxford Green Recompile Button */}
       <div className="flex items-center space-x-2 flex-shrink-0 px-2">
         <button
+          aria-label="Compile LaTeX (Ctrl+Enter)"
           onClick={onCompile}
           disabled={isCompiling}
           title="Compile LaTeX (Ctrl+Enter)"
@@ -355,6 +358,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Layout Switchers */}
         <div className="flex items-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder h-8">
           <button
+            aria-label="Full Code Mode (Ctrl+7)"
             onClick={() => onViewModeChange('code')}
             title="Full Code Mode (Ctrl+7)"
             className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
@@ -366,6 +370,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Code2 className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label="Split Mode (Ctrl+8)"
             onClick={() => onViewModeChange('split')}
             title="Split Mode (Ctrl+8)"
             className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
@@ -377,6 +382,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Columns className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label="Full PDF Mode (Ctrl+9)"
             onClick={() => onViewModeChange('pdf')}
             title="Full PDF Mode (Ctrl+9)"
             className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
@@ -394,6 +400,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Comments Button */}
         {onOpenComments && (
           <button
+            aria-label="Review Comments (Alt+M)"
             onClick={onOpenComments}
             title="Review Comments (Alt+M)"
             className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
@@ -411,6 +418,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Live Collab Button */}
         {onOpenCollab && (
           <button
+            aria-label="Live Peer-to-Peer Collaboration"
             onClick={onOpenCollab}
             title="Live Peer-to-Peer Collaboration"
             className={`flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition border btn-tactile whitespace-nowrap ${
@@ -429,6 +437,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* History & Checkpoints Button */}
         {onOpenHistory && (
           <button
+            aria-label="Version History & Git Checkpoints"
             onClick={onOpenHistory}
             title="Version History & Git Checkpoints"
             className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
@@ -441,6 +450,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Update Available Badge */}
         {hasUpdate && onOpenUpdateModal && (
           <button
+            aria-label="A new Oberleaf update is available! Click to view details and install."
             onClick={onOpenUpdateModal}
             title="A new Oberleaf update is available! Click to view details and install."
             className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer mr-0.5"
@@ -455,6 +465,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Workspace Tools Dropdown */}
         <div className="relative" ref={toolsRef}>
           <button
+            aria-label="Workspace Tools & Diagnostics"
             onClick={() => setIsToolsOpen((prev) => !prev)}
             title="Workspace Tools & Diagnostics"
             className="relative flex items-center justify-center w-8 h-8 rounded-lg text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
@@ -595,6 +606,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Dark/Light Toggle */}
         <button
+          aria-label="Toggle Light / Dark Mode"
           onClick={toggleTheme}
           title="Toggle Light / Dark Mode"
           className="flex items-center justify-center w-8 h-8 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
@@ -605,6 +617,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Full Screen Zen Mode Toggle */}
         {onToggleFullscreen && (
           <button
+            aria-label={
+              isFullscreen
+                ? 'Exit Full Screen Zen Mode (F11, Ctrl+Shift+F, or Esc)'
+                : 'Enter Full Screen Zen Mode (F11 or Ctrl+Shift+F)'
+            }
             onClick={onToggleFullscreen}
             title={
               isFullscreen

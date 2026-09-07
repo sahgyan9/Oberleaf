@@ -37,6 +37,8 @@ interface ContextMenuState {
 interface FileTreeProps {
   files: FileEntry[];
   selectedFilePath: string | null;
+  /** True when the open file has edits that are not on disk yet. */
+  hasUnsavedChanges?: boolean;
   onSelectFile: (filePath: string) => void;
   onUploadFiles: (files: File[]) => void;
   onNewFile: (folderPath?: string) => void;
@@ -52,6 +54,7 @@ interface FileTreeProps {
 export const FileTree: React.FC<FileTreeProps> = ({
   files,
   selectedFilePath,
+  hasUnsavedChanges = false,
   onSelectFile,
   onUploadFiles,
   onNewFile,
@@ -207,6 +210,16 @@ export const FileTree: React.FC<FileTreeProps> = ({
           <div className="flex items-center space-x-2 truncate">
             {renderIcon(item.extension)}
             <span className="truncate">{item.name}</span>
+            {/* The save indicator lives in the status bar, which says nothing
+                about *which* file is dirty. Mark it here, where the user is
+                choosing what to open next. */}
+            {isSelected && hasUnsavedChanges && (
+              <span
+                title="Unsaved changes"
+                aria-label="Unsaved changes"
+                className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
+              />
+            )}
           </div>
 
           <button
@@ -246,6 +259,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
         </span>
         <div className="flex items-center space-x-0.5">
           <button
+            aria-label="Import Files (or Drag & Drop multiple)"
             onClick={() => fileInputRef.current?.click()}
             title="Import Files (or Drag & Drop multiple)"
             className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
@@ -253,6 +267,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <Upload className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label="New File"
             onClick={() => onNewFile()}
             title="New File"
             className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
@@ -260,6 +275,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button
+            aria-label="New Folder"
             onClick={() => onNewFolder()}
             title="New Folder"
             className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
@@ -268,6 +284,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
           </button>
           {onRevealInExplorer && (
             <button
+              aria-label="Reveal Project in Windows File Explorer"
               onClick={() => onRevealInExplorer()}
               title="Reveal Project in Windows File Explorer"
               className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
@@ -277,6 +294,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
           )}
           {onToggleCollapse && (
             <button
+              aria-label="Collapse Sidebar (Ctrl+B)"
               onClick={onToggleCollapse}
               title="Collapse Sidebar (Ctrl+B)"
               className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition ml-0.5 btn-tactile"

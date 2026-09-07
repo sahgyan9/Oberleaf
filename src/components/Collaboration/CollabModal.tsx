@@ -10,6 +10,7 @@ import {
   Loader2,
   Terminal,
 } from 'lucide-react';
+import { withSessionToken } from '../../session';
 
 export interface CollabModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export const CollabModal: React.FC<CollabModalProps> = ({
     localUrl: string;
     isCloudflaredAvailable: boolean;
     tunnel: { isActive: boolean; url: string | null };
+    shareToken?: string;
   } | null>(null);
   const [isStartingTunnel, setIsStartingTunnel] = useState<boolean>(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
@@ -127,12 +129,21 @@ export const CollabModal: React.FC<CollabModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Compute invitation URLs
+  // Compute invitation URLs. The session token rides along in the link: the
+  // API rejects anything arriving from another machine without it, so the link
+  // is the credential and should be shared the way a password would be.
+  const shareToken = networkInfo?.shareToken;
   const lanBaseUrl = networkInfo?.localUrl || window.location.origin;
-  const lanInviteUrl = `${lanBaseUrl}/?project=${encodeURIComponent(projectId)}&room=${encodeURIComponent(room)}`;
+  const lanInviteUrl = withSessionToken(
+    `${lanBaseUrl}/?project=${encodeURIComponent(projectId)}&room=${encodeURIComponent(room)}`,
+    shareToken
+  );
   const tunnelBaseUrl = networkInfo?.tunnel?.url;
   const tunnelInviteUrl = tunnelBaseUrl
-    ? `${tunnelBaseUrl}/?project=${encodeURIComponent(projectId)}&room=${encodeURIComponent(room)}`
+    ? withSessionToken(
+        `${tunnelBaseUrl}/?project=${encodeURIComponent(projectId)}&room=${encodeURIComponent(room)}`,
+        shareToken
+      )
     : null;
 
   return (

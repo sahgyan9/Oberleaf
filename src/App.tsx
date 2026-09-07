@@ -38,6 +38,13 @@ import {
   BOLD_FORMAT,
   ITALIC_FORMAT,
 } from './utils/editorFormatting';
+import {
+  readSetting,
+  writeSetting,
+  readCachedContent,
+  writeCachedContent,
+  getInitialProjectId,
+} from './utils/storage';
 
 const DEFAULT_STARTER_DOCUMENT = [
   '\\documentclass{article}',
@@ -80,6 +87,10 @@ const DEFAULT_STARTER_DOCUMENT = [
   '',
 ].join('\n');
 
+// Resolved once, before any state initialiser runs, so the seeded editor
+// content and the project actually being opened cannot disagree.
+const initialProjectId = getInitialProjectId();
+
 export const App: React.FC = () => {
   // Toast notification system (replaces window.alert)
   const { toasts, addToast, removeToast } = useToast();
@@ -92,7 +103,7 @@ export const App: React.FC = () => {
   // Projects State
   const [projects, setProjects] = useState<ProjectInfo[]>(() => {
     try {
-      const cached = localStorage.getItem('overleaf-copy:cached-projects');
+      const cached = readSetting('cached-projects');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -101,31 +112,32 @@ export const App: React.FC = () => {
     // Return empty array — server is the source of truth; loadProjects() fills this on mount.
     return [];
   });
-  const [projectId, setProjectId] = useState<string>(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryProj = urlParams.get('project');
-    if (queryProj) return queryProj;
-    return localStorage.getItem('overleaf-copy:active-project-id') || '';
-  });
+  const [projectId, setProjectId] = useState<string>(initialProjectId);
   const [projectName, setProjectName] = useState<string>('');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFilePath, setActiveFilePath] = useState<string>('main.tex');
+  // Seeded from the cache for the project actually being opened. A single
+  // global 'last-content' key used to paint the previous project's document
+  // into the editor, and if the real fetch then failed that stale text was what
+  // got auto-saved.
   const [editorContent, setEditorContent] = useState<string>(() => {
-    return localStorage.getItem('overleaf-copy:last-content') || DEFAULT_STARTER_DOCUMENT;
+    const seeded = readCachedContent(initialProjectId, 'main.tex');
+    return seeded ?? DEFAULT_STARTER_DOCUMENT;
   });
   const [docTitle, setDocTitle] = useState<string | null>(() => {
-    const initial = localStorage.getItem('overleaf-copy:last-content') || DEFAULT_STARTER_DOCUMENT;
-    return extractLatexTitle(initial);
+    const seeded = readCachedContent(initialProjectId, 'main.tex') ?? DEFAULT_STARTER_DOCUMENT;
+    return extractLatexTitle(seeded);
   });
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
 
   // View & UI State
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('overleaf-copy:filetree-collapsed') === 'true';
+    return readSetting('filetree-collapsed') === 'true';
   });
   const [pdfCollapsed, setPdfCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('overleaf-copy:pdf-collapsed') === 'true';
+    return readSetting('pdf-collapsed') === 'true';
   });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => !!document.fullscreenElement);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
@@ -150,7 +162,7 @@ export const App: React.FC = () => {
   const [liveEquationPos, setLiveEquationPos] = useState<{ top: number; left: number } | undefined>(undefined);
   const [liveEquationDisplay, setLiveEquationDisplay] = useState<boolean>(true);
   const [isLiveMathEnabled, setIsLiveMathEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('overleaf-copy:live-math-enabled') !== 'false';
+    return readSetting('live-math-enabled') !== 'false';
   });
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number }>({ line: 1, column: 1 });
 
@@ -270,7 +282,7 @@ export const App: React.FC = () => {
       const data: ProjectInfo[] = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         setProjects(data);
-        localStorage.setItem('overleaf-copy:cached-projects', JSON.stringify(data));
+        writeSetting('cached-projects', JSON.stringify(data));
 
         // Check if URL query parameter or hash specifies an existing project
         const urlParams = new URLSearchParams(window.location.search);
@@ -296,7 +308,7 @@ export const App: React.FC = () => {
         }
 
         // Determine which project to load in background
-        const savedId = localStorage.getItem('overleaf-copy:active-project-id');
+        const savedId = readSetting('active-project-id');
         const match = data.find((p) => p.id === savedId) || data[0];
         if (match) {
           setProjectId(match.id);
@@ -307,7 +319,7 @@ export const App: React.FC = () => {
       console.warn('[Oberleaf] Network error loading /api/projects:', err);
       // Try local storage cache
       try {
-        const cached = localStorage.getItem('overleaf-copy:cached-projects');
+        const cached = readSetting('cached-projects');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -356,7 +368,7 @@ export const App: React.FC = () => {
     }
 
     setProjectId(id);
-    localStorage.setItem('overleaf-copy:active-project-id', id);
+    writeSetting('active-project-id', id);
     window.location.hash = `#/project/${id}`;
     setCurrentView('editor');
   }, [projects]);
@@ -415,28 +427,51 @@ export const App: React.FC = () => {
   }, []);
 
   // Load File Content into Editor
-  const loadFileContent = useCallback(async (pId: string, relPath: string) => {
-    try {
-      const res = await fetch(`/api/projects/${pId}/file?path=${encodeURIComponent(relPath)}`);
-      if (res.ok) {
-        const content = await res.text();
-        const finalContent = content || (relPath === 'main.tex' ? DEFAULT_STARTER_DOCUMENT : '');
-        setEditorContent(finalContent);
-        setSaveStatus('saved');
-        localStorage.setItem('overleaf-copy:last-content', finalContent);
-        if (relPath === 'main.tex') {
-          const parsedTitle = extractLatexTitle(finalContent);
-          setDocTitle(parsedTitle);
+  /**
+   * Loads a file into the editor. Returns false if the content could not be
+   * fetched.
+   *
+   * This used to fail silently for anything but main.tex: the editor kept
+   * showing the previous file while activeFilePath had already moved on, so the
+   * next auto-save wrote the old file's text into the new file. The server
+   * returns 503 during every dev-server restart, so that was easy to hit.
+   */
+  const loadFileContent = useCallback(
+    async (pId: string, relPath: string): Promise<boolean> => {
+      setIsLoadingFile(true);
+      try {
+        const res = await fetch(`/api/projects/${pId}/file?path=${encodeURIComponent(relPath)}`);
+        if (res.ok) {
+          const content = await res.text();
+          const finalContent = content || (relPath === 'main.tex' ? DEFAULT_STARTER_DOCUMENT : '');
+          setEditorContent(finalContent);
+          setSaveStatus('saved');
+          writeCachedContent(pId, relPath, finalContent);
+          if (relPath === 'main.tex') {
+            setDocTitle(extractLatexTitle(finalContent));
+          }
+          return true;
         }
-      } else if (relPath === 'main.tex') {
-        setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
+
+        // main.tex is the one file the app can legitimately conjure from a
+        // template when the project has not been written yet.
+        if (relPath === 'main.tex') {
+          setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
+          return true;
+        }
+        return false;
+      } catch {
+        if (relPath === 'main.tex') {
+          setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
+          return true;
+        }
+        return false;
+      } finally {
+        setIsLoadingFile(false);
       }
-    } catch {
-      if (relPath === 'main.tex') {
-        setEditorContent((prev) => prev || DEFAULT_STARTER_DOCUMENT);
-      }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Load Citations
   const loadCitations = useCallback(async (pId: string) => {
@@ -498,7 +533,7 @@ export const App: React.FC = () => {
   // When active project changes, reload files, citations, git status, comments, main.tex, and existing PDF preview
   useEffect(() => {
     if (!projectId) return;
-    localStorage.setItem('overleaf-copy:active-project-id', projectId);
+    writeSetting('active-project-id', projectId);
     loadProjectFiles(projectId);
     loadCitations(projectId);
     fetchGitSyncStatus(projectId);
@@ -687,7 +722,7 @@ export const App: React.FC = () => {
 
   // Persist sidebar collapsed states
   useEffect(() => {
-    localStorage.setItem('overleaf-copy:filetree-collapsed', fileTreeCollapsed.toString());
+    writeSetting('filetree-collapsed', fileTreeCollapsed.toString());
     if (fileTreePanelRef.current) {
       if (fileTreeCollapsed) {
         fileTreePanelRef.current.collapse();
@@ -698,7 +733,7 @@ export const App: React.FC = () => {
   }, [fileTreeCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('overleaf-copy:pdf-collapsed', pdfCollapsed.toString());
+    writeSetting('pdf-collapsed', pdfCollapsed.toString());
     if (pdfPanelRef.current) {
       if (pdfCollapsed) {
         pdfPanelRef.current.collapse();
@@ -708,29 +743,44 @@ export const App: React.FC = () => {
     }
   }, [pdfCollapsed]);
 
-  // Save File Content to Server
-  const saveActiveFile = useCallback(async (contentToSave: string, filePathToSave = activeFilePath) => {
-    // Only save text files (.tex, .bib, .txt, .sty, .cls)
-    const ext = '.' + filePathToSave.split('.').pop()?.toLowerCase();
-    const binaryExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'];
-    if (binaryExts.includes(ext)) return;
+  // Save File Content to Server.
+  // Resolves true only when the bytes actually reached disk -- callers that
+  // switch files or close the document rely on that answer.
+  const saveActiveFile = useCallback(
+    async (contentToSave: string, filePathToSave = activeFilePath): Promise<boolean> => {
+      // Only save text files (.tex, .bib, .txt, .sty, .cls)
+      const ext = '.' + filePathToSave.split('.').pop()?.toLowerCase();
+      const binaryExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'];
+      if (binaryExts.includes(ext)) return true;
 
-    setSaveStatus('saving');
-    try {
-      const res = await fetch(`/api/projects/${projectId}/file?path=${encodeURIComponent(filePathToSave)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: contentToSave }),
-      });
-      if (res.ok) {
-        setSaveStatus('saved');
-      } else {
+      setSaveStatus('saving');
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/file?path=${encodeURIComponent(filePathToSave)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: contentToSave }),
+          }
+        );
+        if (res.ok) {
+          setSaveStatus('saved');
+          writeCachedContent(projectId, filePathToSave, contentToSave);
+          return true;
+        }
         setSaveStatus('unsaved');
+        // A greyed-out "unsaved" label is not enough signal for "your work is
+        // not on disk".
+        addToast(`Could not save ${filePathToSave}. Your changes are still in the editor.`, 'error');
+        return false;
+      } catch {
+        setSaveStatus('unsaved');
+        addToast(`Could not reach the Oberleaf server to save ${filePathToSave}.`, 'error');
+        return false;
       }
-    } catch {
-      setSaveStatus('unsaved');
-    }
-  }, [projectId, activeFilePath]);
+    },
+    [projectId, activeFilePath, addToast]
+  );
 
   // The Monaco model is the source of truth for what the user actually sees.
   // React state can trail it by a render, so anything that persists to disk
@@ -756,9 +806,25 @@ export const App: React.FC = () => {
       clearTimeout(autoSaveTimerRef.current);
     }
     autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
       saveActiveFile(newVal);
     }, 800);
   }, [activeFilePath, saveActiveFile]);
+
+  // Flush a pending debounced save immediately. Anything that navigates away
+  // from the current buffer -- switching files, closing the window, backgrounding
+  // the tab -- goes through here first.
+  const flushPendingSave = useCallback(async (): Promise<boolean> => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+      return saveActiveFile(getLiveContent());
+    }
+    if (saveStatus === 'unsaved') {
+      return saveActiveFile(getLiveContent());
+    }
+    return true;
+  }, [saveActiveFile, getLiveContent, saveStatus]);
 
   // Compile Handler
   const handleCompile = async () => {
@@ -814,6 +880,12 @@ export const App: React.FC = () => {
           setDocTitle(result.documentTitle);
         }
         setCompileStatus(errors.length > 0 ? 'failed' : 'success');
+      } else if (res.status === 409) {
+        // The server serialises compiles per project. Another tab -- or a
+        // collaborator -- is already building this document; that is a wait,
+        // not a compile error, so don't dress it up as one.
+        setCompileStatus('idle');
+        addToast('A compile is already running for this project. Try again in a moment.', 'warning');
       } else {
         setCompileStatus('failed');
         setCompileErrors([
@@ -1208,21 +1280,85 @@ export const App: React.FC = () => {
     }
   }, [projectId, addToast]);
 
-  const handleSelectFile = useCallback((relPath: string) => {
-    const ext = '.' + relPath.split('.').pop()?.toLowerCase();
-    const textExts = ['.tex', '.bib', '.txt', '.sty', '.cls', '.md'];
+  const handleSelectFile = useCallback(
+    async (relPath: string) => {
+      const ext = '.' + relPath.split('.').pop()?.toLowerCase();
+      const textExts = ['.tex', '.bib', '.txt', '.sty', '.cls', '.md'];
 
-    if (textExts.includes(ext)) {
-      if (saveStatus === 'unsaved') {
-        saveActiveFile(getLiveContent());
+      if (!textExts.includes(ext)) {
+        if (['.png', '.jpg', '.jpeg', '.svg', '.webp'].includes(ext)) {
+          // If user clicked an image, open Insert Image modal
+          setIsImageModalOpen(true);
+        }
+        return;
+      }
+
+      if (relPath === activeFilePath) return;
+
+      // Persist the outgoing buffer before anything else touches the editor.
+      // Losing this save silently is how edits used to disappear on a switch.
+      const flushed = await flushPendingSave();
+      if (!flushed) {
+        addToast('Staying on this file until your changes are saved.', 'error');
+        return;
+      }
+
+      // Only commit the new path once its content is actually in the editor.
+      // Switching first meant a failed read left the previous file's text
+      // sitting under the new file's name, ready to be auto-saved over it.
+      const loaded = await loadFileContent(projectId, relPath);
+      if (!loaded) {
+        addToast(`Could not open ${relPath}.`, 'error');
+        return;
       }
       setActiveFilePath(relPath);
-      loadFileContent(projectId, relPath);
-    } else if (['.png', '.jpg', '.jpeg', '.svg', '.webp'].includes(ext)) {
-      // If user clicked an image, open Insert Image modal
-      setIsImageModalOpen(true);
-    }
-  }, [saveStatus, saveActiveFile, getLiveContent, projectId, loadFileContent]);
+    },
+    [activeFilePath, flushPendingSave, projectId, loadFileContent, addToast]
+  );
+
+  // Last line of defence against losing the debounce window. The editor
+  // auto-saves 800ms after a keystroke; closing the window inside that window
+  // used to throw the edit away with no warning.
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const pending = autoSaveTimerRef.current !== null || saveStatus !== 'saved';
+      if (!pending) return;
+
+      // Best effort: keepalive lets the write outlive the page in browsers that
+      // honour it, and the prompt covers the ones that do not.
+      try {
+        const blob = new Blob([JSON.stringify({ content: getLiveContent() })], {
+          type: 'application/json',
+        });
+        fetch(`/api/projects/${projectId}/file?path=${encodeURIComponent(activeFilePath)}`, {
+          method: 'POST',
+          body: blob,
+          keepalive: true,
+        });
+      } catch {
+        // Fall through to the confirmation prompt.
+      }
+
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+
+    // Backgrounding the tab is the common case on a laptop lid-close, and it
+    // can save quietly without a prompt.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingSave();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [saveStatus, getLiveContent, projectId, activeFilePath, flushPendingSave]);
 
   const handleRenameItem = async (oldPath: string, newName: string) => {
     try {
@@ -1608,6 +1744,7 @@ export const App: React.FC = () => {
                 <FileTree
                   files={files}
                   selectedFilePath={activeFilePath}
+                  hasUnsavedChanges={saveStatus !== 'saved'}
                   onSelectFile={handleSelectFile}
                   onUploadFiles={handleUploadFiles}
                   onNewFile={handleNewFile}
@@ -1653,7 +1790,7 @@ export const App: React.FC = () => {
                 onToggleLiveMath={() => {
                   setIsLiveMathEnabled((prev) => {
                     const next = !prev;
-                    localStorage.setItem('overleaf-copy:live-math-enabled', next.toString());
+                    writeSetting('live-math-enabled', next.toString());
                     if (!next) {
                       setLiveEquation(null);
                     }
@@ -1799,6 +1936,7 @@ export const App: React.FC = () => {
         cursorLine={cursorPosition.line}
         cursorColumn={cursorPosition.column}
         isDoctorHealthy={isDoctorHealthy}
+        isLoadingFile={isLoadingFile}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onShowToast={addToast}
       />

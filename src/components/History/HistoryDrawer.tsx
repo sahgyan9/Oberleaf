@@ -379,6 +379,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             {/* Remote Sync Header Actions */}
             {onOpenSyncModal && (
               <button
+                aria-label="Configure GitHub Remote"
                 onClick={onOpenSyncModal}
                 title="Configure GitHub Remote"
                 className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-700 dark:text-stone-300 text-xs hover:border-scholarly transition"
@@ -393,6 +394,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             {syncStatus?.remoteUrl && (
               <div className="flex items-center space-x-1">
                 <button
+                  aria-label="Pull changes from GitHub"
                   onClick={handleQuickPull}
                   disabled={isLoading}
                   title="Pull changes from GitHub"
@@ -401,6 +403,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   <ArrowDownCircle className="w-3.5 h-3.5" />
                 </button>
                 <button
+                  aria-label={`Push ${syncStatus.ahead} commits to GitHub`}
                   onClick={handleQuickPush}
                   disabled={isPushing}
                   title={`Push ${syncStatus.ahead} commits to GitHub`}
@@ -417,6 +420,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             )}
 
             <button
+              aria-label="Refresh Timeline"
               onClick={() => {
                 fetchHistory();
                 fetchSyncStatus();

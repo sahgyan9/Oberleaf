@@ -342,6 +342,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
                     {formatCommentDate(thread.createdAt)}
                   </span>
                   <button
+                    aria-label={thread.status === 'open' ? 'Mark as Resolved' : 'Re-open comment'}
                     type="button"
                     onClick={() => handleToggleStatus(thread.id, thread.status)}
                     title={thread.status === 'open' ? 'Mark as Resolved' : 'Re-open comment'}
@@ -354,6 +355,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
                     {thread.status === 'open' ? 'Resolve' : 'Resolved'}
                   </button>
                   <button
+                    aria-label="Delete thread"
                     type="button"
                     onClick={() => handleDeleteComment(thread.id)}
                     title="Delete thread"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FolderOpen,
   Activity,
@@ -17,6 +17,7 @@ interface StatusBarProps {
   cursorLine?: number;
   cursorColumn?: number;
   isDoctorHealthy: boolean | null;
+  isLoadingFile?: boolean;
   onOpenDoctor: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
@@ -30,10 +31,32 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   cursorLine,
   cursorColumn,
   isDoctorHealthy,
+  isLoadingFile = false,
   onOpenDoctor,
   onShowToast,
 }) => {
   const [isOpeningExplorer, setIsOpeningExplorer] = useState(false);
+
+  // Compile timeouts are configurable up to "no limit", so a long build used to
+  // sit on a static spinner with no way to tell progress from a hang.
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const compileStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isCompiling) {
+      compileStartRef.current = null;
+      setElapsedMs(0);
+      return;
+    }
+    compileStartRef.current = Date.now();
+    setElapsedMs(0);
+    const id = window.setInterval(() => {
+      if (compileStartRef.current !== null) {
+        setElapsedMs(Date.now() - compileStartRef.current);
+      }
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [isCompiling]);
 
   const handleRevealInExplorer = async () => {
     setIsOpeningExplorer(true);
@@ -77,7 +100,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           {isCompiling ? (
             <div className="flex items-center space-x-1.5 text-scholarly-teal dark:text-scholarly-tealDark animate-pulse">
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Compiling {activeFilePath || 'document'}...</span>
+              <span>
+                Compiling {activeFilePath || 'document'}... {(elapsedMs / 1000).toFixed(1)}s
+              </span>
             </div>
           ) : compileDuration !== null ? (
             <div className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400">
@@ -100,6 +125,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               <FileCode className="w-3 h-3 text-stone-400 flex-shrink-0" />
               <span className="truncate">{projectName}</span>
               {activeFilePath && <span className="text-stone-400">/ {activeFilePath}</span>}
+              {isLoadingFile && (
+                <span className="flex items-center space-x-1 text-stone-400">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Opening...</span>
+                </span>
+              )}
             </div>
           </>
         )}
