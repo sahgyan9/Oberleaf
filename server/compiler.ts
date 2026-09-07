@@ -1057,6 +1057,7 @@ export async function compileDocument(
   // compile so we don't pay the probe overhead on every subsequent keypress.
   const latexmkArgs = [
     '-pdf',
+    '-g',
     `-pdflatex=${engine}`,
     '-interaction=nonstopmode',
     '-synctex=1',
@@ -1065,6 +1066,16 @@ export async function compileDocument(
     ...(options.shellEscape ? ['-shell-escape'] : []),
     path.join(projectDir, mainFile),
   ];
+
+  // Remove stale log file so previous compile errors cannot bleed into this run
+  const buildLogFile = path.join(buildDir, `${baseName}.log`);
+  if (fs.existsSync(buildLogFile)) {
+    try {
+      fs.unlinkSync(buildLogFile);
+    } catch {
+      // Ignore if file is locked
+    }
+  }
 
   // Portable flags only. -c-style-errors, -disable-installer and
   // -include-directory are MiKTeX extensions that make this path fail
@@ -1103,7 +1114,6 @@ export async function compileDocument(
   }
 
   const durationMs = Date.now() - startTime;
-  const buildLogFile = path.join(buildDir, `${baseName}.log`);
   const diskLog = readSafe(buildLogFile);
 
   // The on-disk log is the authoritative record and already contains anything
