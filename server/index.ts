@@ -13,7 +13,7 @@ import {
   duplicateProject,
   toggleArchiveProject,
   createProjectZip,
-  seedScreenshotProjects,
+  ensureStarterCVProject,
   listProjectFiles,
   getProjectsRoot,
   getUniqueFilename,
@@ -177,7 +177,7 @@ app.post('/api/projects', (req, res) => {
   try {
     const { name, template } = req.body;
     if (!name) return res.status(400).json({ error: 'Project name is required' });
-    const project = createProject(name, template || 'blank');
+    const project = createProject(name, template || 'cv');
     res.json(project);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1226,8 +1226,8 @@ app.get('/api/system/workspace-info', (_req, res) => {
   }
 });
 
-// Seed initial projects matching Overleaf landing screenshot
-seedScreenshotProjects();
+// Ensure clean starter CV template if workspace has 0 projects
+ensureStarterCVProject();
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Oberleaf] Server daemon running at http://127.0.0.1:${PORT}`);

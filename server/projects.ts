@@ -25,6 +25,102 @@ export interface FileItem {
 }
 
 const TEMPLATES: Record<string, { mainTex: string; files?: Record<string, string> }> = {
+  cv: {
+    mainTex: `\\documentclass[a4paper, 10pt]{article}
+
+\\usepackage[
+  top=1.5cm, bottom=1.5cm,
+  left=1.5cm, right=1.5cm
+]{geometry}
+\\usepackage[T1]{fontenc}
+\\usepackage{lmodern}
+\\usepackage{microtype}
+\\usepackage{xcolor}
+\\usepackage{titlesec}
+\\usepackage{enumitem}
+\\usepackage{hyperref}
+\\usepackage{parskip}
+
+% Color Palette
+\\definecolor{primary}{HTML}{1E293B}   % Deep slate
+\\definecolor{accent}{HTML}{2563EB}    % Scholarly blue
+\\definecolor{muted}{HTML}{64748B}     % Slate muted
+
+\\hypersetup{
+  colorlinks=true,
+  urlcolor=accent,
+  linkcolor=accent
+}
+
+\\titleformat{\\section}
+  {\\large\\bfseries\\color{primary}}
+  {}
+  {0em}
+  {}
+  [\\vspace{1pt}\\color{accent}\\hrule\\vspace{4pt}]
+\\titlespacing{\\section}{0pt}{10pt}{4pt}
+
+\\setlist[itemize]{
+  leftmargin=1.2em,
+  itemsep=1.5pt,
+  topsep=1.5pt,
+  parsep=0pt
+}
+\\pagestyle{empty}
+
+\\begin{document}
+
+\\begin{center}
+  {\\Huge \\textbf{Your Name}} \\\\ \\vspace{4pt}
+  \\small \\color{muted}
+  Email: \\href{mailto:you@example.com}{you@example.com} \\quad | \\quad
+  Phone: +1 (555) 019-2834 \\quad | \\quad
+  LinkedIn: \\href{https://linkedin.com}{linkedin.com/in/yourprofile} \\quad | \\quad
+  GitHub: \\href{https://github.com}{github.com/yourhandle}
+\\end{center}
+
+\\vspace{6pt}
+
+\\section{Education}
+\\textbf{Master of Science in Computer Science} \\hfill 2022 -- 2024 \\\\
+\\textit{University Name} \\hfill City, State \\\\
+Relevant Coursework: Distributed Systems, Machine Learning, Advanced Algorithms.
+
+\\vspace{3pt}
+\\textbf{Bachelor of Science in Physics} \\hfill 2018 -- 2022 \\\\
+\\textit{University Name} \\hfill City, State
+
+\\section{Experience}
+\\textbf{Software Engineer} \\hfill Jan 2024 -- Present \\\\
+\\textit{Company Name} \\hfill City, State
+\\begin{itemize}
+  \\item Designed and deployed scalable REST and WebSocket APIs serving 50k+ daily active users.
+  \\item Optimized core compilation pipeline latency by 35\\% using caching and connection pooling.
+  \\item Collaborated with cross-functional engineering teams in an agile, CI/CD-driven workflow.
+\\end{itemize}
+
+\\vspace{3pt}
+\\textbf{Research Fellow} \\hfill Jun 2022 -- Dec 2023 \\\\
+\\textit{Laboratory / Institute Name} \\hfill City, State
+\\begin{itemize}
+  \\item Developed automated computational scripts for numerical data analysis and visualization.
+  \\item Co-authored research findings published in peer-reviewed scientific proceedings.
+\\end{itemize}
+
+\\section{Technical Projects}
+\\textbf{Oberleaf --- Local TeX Studio} \\hfill \\href{https://github.com}{github.com/project}
+\\begin{itemize}
+  \\item Built a responsive offline LaTeX desktop editor with instant live PDF preview and SyncTeX.
+  \\item Engineered cross-platform background processes, local project discovery, and zero-loss uninstaller.
+\\end{itemize}
+
+\\section{Technical Skills}
+\\textbf{Languages:} Python, TypeScript, C++, LaTeX, SQL, Bash. \\\\
+\\textbf{Frameworks \\& Tools:} React, Node.js, Express, Git, Docker, Linux, Vite.
+
+\\end{document}
+`,
+  },
   blank: {
     mainTex: `\\documentclass{article}
 \\usepackage{amsmath}
@@ -318,9 +414,9 @@ export function createProjectZip(projectId: string): string {
   return zipPath;
 }
 
-export function createProject(name: string, templateKey: string = 'blank'): ProjectSummary {
+export function createProject(name: string, templateKey: string = 'cv'): ProjectSummary {
   const root = getProjectsRoot();
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'new-project';
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'my-cv';
   let finalSlug = slug;
   let counter = 1;
 
@@ -332,7 +428,7 @@ export function createProject(name: string, templateKey: string = 'blank'): Proj
   fs.mkdirSync(projectDir, { recursive: true });
   fs.mkdirSync(path.join(projectDir, 'figures'), { recursive: true });
 
-  const template = TEMPLATES[templateKey] || TEMPLATES.blank;
+  const template = TEMPLATES[templateKey] || TEMPLATES.cv || TEMPLATES.blank;
   fs.writeFileSync(path.join(projectDir, 'main.tex'), template.mainTex, 'utf-8');
 
   const nowIso = new Date().toISOString();
@@ -415,11 +511,19 @@ export function getUniqueFilename(directory: string, filename: string): string {
   return targetName;
 }
 
-export function seedScreenshotProjects(): void {
+export function ensureStarterCVProject(): void {
   const root = getProjectsRoot();
 
-  // Remove the old test placeholders if user wants the clean screenshot replica
-  const legacyDirs = ['sample-project', 'demo-paper'];
+  // Remove legacy dummy demo placeholders
+  const legacyDirs = [
+    'sample-project',
+    'demo-paper',
+    'MoS2_Thin_Film',
+    'CV_Sydney',
+    'Quantum_Computing_For_Everyone',
+    'CdSe_GQD',
+    'CLA2_OE_Data_Analytics',
+  ];
   for (const legacy of legacyDirs) {
     const legacyPath = path.join(root, legacy);
     if (fs.existsSync(legacyPath)) {
@@ -429,233 +533,10 @@ export function seedScreenshotProjects(): void {
     }
   }
 
-  const now = Date.now();
-  const ONE_HOUR = 3600 * 1000;
-  const ONE_DAY = 24 * ONE_HOUR;
-
-  const defaultProjects = [
-    {
-      id: 'MoS2_Thin_Film',
-      name: 'MoS2_Thin_Film',
-      relativeTime: '12 hours ago by You',
-      updatedAt: new Date(now - 12 * ONE_HOUR).toISOString(),
-      mainTex: `\\documentclass{article}
-\\usepackage{amsmath,amssymb}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-
-\\title{Atomically Thin $\\text{MoS}_2$: Electronic Properties and Exciton Dynamics}
-\\author{You}
-\\date{\\today}
-
-\\begin{document}
-\\maketitle
-
-\\begin{abstract}
-Molybdenum disulfide ($\\text{MoS}_2$) transitions from an indirect bandgap semiconductor in bulk form ($E_g \\approx 1.29\\text{ eV}$) to a direct bandgap monolayer ($E_g \\approx 1.80\\text{ eV}$). We present photoluminescence and Raman spectra demonstrating layer-dependent characteristics.
-\\end{abstract}
-
-\\section{Introduction}
-Two-dimensional transition metal dichalcogenides (TMDs) exhibit strong spin-orbit coupling and broken inversion symmetry in monolayer limits.
-
-\\section{Bandgap and Optical Transitions}
-The optical absorbance and direct excitonic transitions are described by:
-\\begin{equation}
-E_{A} = E_g - E_b = 1.88\\text{ eV}
-\\end{equation}
-where $E_b \\approx 0.5\\text{ eV}$ represents the tightly bound exciton binding energy due to reduced dielectric screening.
-
-\\section{Raman Phonon Modes}
-The characteristic in-plane $E^1_{2g}$ and out-of-plane $A_{1g}$ modes obey:
-\\begin{equation}
-\\Delta \\omega = \\omega(A_{1g}) - \\omega(E^1_{2g}) \\approx 19.2\\text{ cm}^{-1}
-\\end{equation}
-
-\\end{document}
-`,
-    },
-    {
-      id: 'CV_Sydney',
-      name: 'CV Sydney',
-      relativeTime: '24 days ago by You',
-      updatedAt: new Date(now - 24 * ONE_DAY).toISOString(),
-      mainTex: `\\documentclass[11pt,a4paper]{article}
-\\usepackage[utf8]{inputenc}
-\\usepackage{geometry}
-\\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
-\\usepackage{hyperref}
-\\usepackage{titlesec}
-
-\\titleformat{\\section}{\\large\\bfseries}{}{0em}{}[\\titlerule]
-
-\\begin{document}
-\\pagestyle{empty}
-
-\\begin{center}
-{\\LARGE\\textbf{Sydney Researcher}} \\\\
-\\vspace{4pt}
-\\small Email: sydney.research@university.edu \\quad | \\quad Web: sydney-research.io \\quad | \\quad GitHub: @sydney-research
-\\end{center}
-
-\\vspace{8pt}
-
-\\section{Education}
-\\textbf{Ph.D. in Condensed Matter Physics} \\hfill 2022 -- Present \\\\
-University of Sydney, Australia \\\\
-\\textit{Dissertation: Quantum Dynamics of 2D Materials and Monolayer Heterostructures}
-
-\\vspace{4pt}
-\\textbf{B.S. in Physics (First Class Honours)} \\hfill 2018 -- 2022 \\\\
-University of Sydney, Australia
-
-\\section{Selected Publications}
-\\begin{itemize}
-  \\item \\textbf{Sydney R.}, et al. \`\`Excitonic Stark Shift in Atomically Thin $\\text{MoS}_2$ Heterostructures.'' \\textit{Physical Review Letters}, 2024.
-  \\item \\textbf{Sydney R.}, et al. \`\`Colloidal Quantum Dots: Photoluminescence Engineering.'' \\textit{Nano Letters}, 2023.
-\\end{itemize}
-
-\\section{Technical Skills}
-\\textbf{Tools \\& Languages:} LaTeX, Python (NumPy, SciPy, PyTorch), MATLAB, Git, Linux.
-
-\\end{document}
-`,
-    },
-    {
-      id: 'Quantum_Computing_For_Everyone',
-      name: 'Quantum Computing For Everyone',
-      relativeTime: '4 months ago by You',
-      updatedAt: new Date(now - 120 * ONE_DAY).toISOString(),
-      mainTex: `\\documentclass[12pt]{article}
-\\usepackage{amsmath,amssymb}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-
-\\title{Quantum Computing For Everyone: Foundational Principles}
-\\author{You}
-\\date{\\today}
-
-\\begin{document}
-\\maketitle
-
-\\section{The Qubit and Superposition}
-Unlike classical bits with values $0$ or $1$, a quantum bit exists in an arbitrary superposition:
-\\begin{equation}
-|\\psi\\rangle = \\alpha |0\\rangle + \\beta |1\\rangle, \\quad \\text{where } |\\alpha|^2 + |\\beta|^2 = 1
-\\end{equation}
-
-\\section{Quantum Logic Gates}
-The single-qubit Hadamard gate creates an equal superposition from computational basis states:
-\\begin{equation}
-H = \\frac{1}{\\sqrt{2}}\\begin{pmatrix} 1 & 1 \\\\ 1 & -1 \\end{pmatrix}, \\quad H|0\\rangle = \\frac{|0\\rangle + |1\\rangle}{\\sqrt{2}} = |+\\rangle
-\\end{equation}
-
-\\section{Entanglement and Bell States}
-Applying a CNOT gate with control qubit in superposition yields maximally entangled Bell pairs:
-\\begin{equation}
-|\\Phi^+\\rangle = \\frac{|00\\rangle + |11\\rangle}{\\sqrt{2}}
-\\end{equation}
-Measurement of one qubit instantaneously determines the state of the other across arbitrary distances.
-
-\\end{document}
-`,
-    },
-    {
-      id: 'CdSe_GQD',
-      name: 'CdSe_GQD',
-      relativeTime: '4 months ago by You',
-      updatedAt: new Date(now - 122 * ONE_DAY).toISOString(),
-      mainTex: `\\documentclass{article}
-\\usepackage{amsmath,amssymb}
-\\usepackage{graphicx}
-
-\\title{Colloidal CdSe and Graphene Quantum Dots: Optical Confinement}
-\\author{You}
-\\date{\\today}
-
-\\begin{document}
-\\maketitle
-
-\\section{Quantum Confinement in Zero Dimensions}
-When the semiconductor nanoparticle radius $r$ becomes comparable to or smaller than the exciton Bohr radius $a_B$, quantum confinement shifts the bandgap:
-\\begin{equation}
-E_{g,QD} = E_{g,bulk} + \\frac{\\hbar^2 \\pi^2}{2 r^2}\\left(\\frac{1}{m_e^*} + \\frac{1}{m_h^*}\\right) - \\frac{1.8 e^2}{4 \\pi \\varepsilon_0 \\varepsilon_r r}
-\\end{equation}
-
-\\section{Photoluminescence Quantum Yield}
-The radiative decay rate $k_r$ and non-radiative trap rate $k_{nr}$ determine the overall quantum efficiency:
-\\begin{equation}
-\\Phi_{PL} = \\frac{k_r}{k_r + k_{nr}}
-\\end{equation}
-Monodisperse CdSe nanocrystals synthesized via hot-injection exhibit narrow full-width at half-maximum (FWHM $< 25\\text{ nm}$).
-
-\\end{document}
-`,
-    },
-    {
-      id: 'CLA2_OE_Data_Analytics',
-      name: 'CLA2_OE_Data_Analytics',
-      relativeTime: '5 months ago by You',
-      updatedAt: new Date(now - 150 * ONE_DAY).toISOString(),
-      mainTex: `\\documentclass[11pt]{article}
-\\usepackage{amsmath,amssymb}
-\\usepackage{booktabs}
-
-\\title{Continuous Learning Assessment 2: Open Economy Macroeconomic Data Analytics}
-\\author{You}
-\\date{\\today}
-
-\\begin{document}
-\\maketitle
-
-\\section{Model Formulation}
-We formulate a simultaneous equations model evaluating interest rate parity and trade balances:
-\\begin{equation}
-Y_t = \\beta_0 + \\beta_1 (r_t - r_t^*) + \\beta_2 \\ln(\\text{REER}_t) + \\epsilon_t
-\\end{equation}
-where $\\text{REER}_t$ denotes the Real Effective Exchange Rate and $r_t - r_t^*$ is the policy rate differential.
-
-\\section{Empirical Estimates}
-\\begin{table}[h]
-\\centering
-\\caption{OLS and IV Estimations with Robust Standard Errors}
-\\begin{tabular}{lccc}
-\\toprule
-Variable & OLS (1) & IV-2SLS (2) & GMM (3) \\\\
-\\midrule
-Interest Differential & -0.428*** (0.082) & -0.512*** (0.104) & -0.495*** (0.091) \\\\
-Real Exchange Rate & 0.315** (0.110) & 0.284** (0.119) & 0.298** (0.105) \\\\
-Constant & 1.042 (0.315) & 1.189 (0.360) & 1.120 (0.320) \\\\
-\\bottomrule
-\\end{tabular}
-\\end{table}
-
-\\end{document}
-`,
-    },
-  ];
-
-  for (const proj of defaultProjects) {
-    const projDir = path.join(root, proj.id);
-    if (!fs.existsSync(projDir)) {
-      fs.mkdirSync(projDir, { recursive: true });
-      fs.mkdirSync(path.join(projDir, 'figures'), { recursive: true });
-      fs.writeFileSync(path.join(projDir, 'main.tex'), proj.mainTex, 'utf-8');
-      fs.writeFileSync(
-        path.join(projDir, '.meta.json'),
-        JSON.stringify(
-          {
-            name: proj.name,
-            owner: 'You',
-            relativeTime: proj.relativeTime,
-            updatedAt: proj.updatedAt,
-            isArchived: false,
-          },
-          null,
-          2
-        ),
-        'utf-8'
-      );
-    }
+  // If user has zero projects, seed a clean starter CV template
+  const existing = listProjects();
+  if (existing.length === 0) {
+    createProject('My_CV', 'cv');
   }
 }
 

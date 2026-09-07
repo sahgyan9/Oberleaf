@@ -13,7 +13,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   onCreate,
 }) => {
   const [name, setName] = useState('');
-  const [template, setTemplate] = useState('blank');
+  const [template, setTemplate] = useState('cv');
 
   if (!isOpen) return null;
 
@@ -26,6 +26,12 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   };
 
   const templates = [
+    {
+      id: 'cv',
+      title: 'Curriculum Vitae / Resume (Default)',
+      desc: 'Clean, modern single-page ATS-friendly CV with education, experience, and skills.',
+      icon: <FileText className="w-5 h-5 text-scholarly-green dark:text-scholarly-greenDark" />,
+    },
     {
       id: 'blank',
       title: 'Blank Document',
@@ -67,7 +73,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Quantum Computing Thesis"
+              placeholder="e.g. My CV or Research Paper"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoCapitalize="words"

@@ -501,8 +501,16 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
             )}
           </div>
 
-          {/* New Project Button */}
+          {/* New Project & Quick CV Buttons */}
           <div className="flex items-center space-x-2">
+            <button
+              onClick={onNewProject}
+              className="px-3.5 py-2 rounded-lg bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder hover:bg-stone-200/60 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 text-xs font-semibold flex items-center space-x-1.5 transition btn-tactile cursor-pointer"
+              title="Create a new CV from the default template"
+            >
+              <FileText className="w-3.5 h-3.5 text-scholarly-green dark:text-scholarly-greenDark" />
+              <span>New CV</span>
+            </button>
             <button
               onClick={onNewProject}
               className="px-4 py-2 rounded-lg bg-scholarly-green hover:bg-scholarly-greenDark active:scale-98 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition btn-tactile cursor-pointer"
@@ -615,16 +623,25 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-stone-400">
                     <FolderOpen className="w-8 h-8 mx-auto text-stone-400 dark:text-stone-600 mb-2" />
-                    <p className="text-sm font-serif font-medium text-stone-700 dark:text-stone-300">No projects found</p>
+                    <p className="text-sm font-serif font-medium text-stone-700 dark:text-stone-300">No projects yet</p>
                     <p className="text-xs text-stone-500 mt-1">
-                      {searchQuery ? 'Try adjusting your search query' : 'Create a new project to get started'}
+                      {searchQuery ? 'Try adjusting your search query' : 'Create your CV from the clean default template or start a new project'}
                     </p>
-                    <button
-                      onClick={onNewProject}
-                      className="mt-3 px-3.5 py-1.5 rounded-lg bg-scholarly-green hover:bg-scholarly-greenDark text-white text-xs font-semibold transition cursor-pointer btn-tactile shadow-xs"
-                    >
-                      + Create Project
-                    </button>
+                    <div className="mt-4 flex items-center justify-center space-x-2">
+                      <button
+                        onClick={onNewProject}
+                        className="px-4 py-2 rounded-lg bg-scholarly-green hover:bg-scholarly-greenDark text-white text-xs font-semibold transition cursor-pointer btn-tactile shadow-xs flex items-center space-x-1.5"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Create New CV</span>
+                      </button>
+                      <button
+                        onClick={onNewProject}
+                        className="px-3.5 py-2 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-300 text-xs font-medium transition cursor-pointer btn-tactile"
+                      >
+                        <span>New Project</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
