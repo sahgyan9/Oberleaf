@@ -4,7 +4,12 @@ import path from 'path';
 import fs from 'fs';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { runDependencyCheck } from './doctor.js';
+import {
+  runDependencyCheck,
+  runDoctorAction,
+  DOCTOR_ACTION_IDS,
+  type DoctorActionId,
+} from './doctor.js';
 import {
   compileDocument,
   isLatexmkAvailable,
@@ -207,6 +212,28 @@ app.get('/api/doctor', async (_req, res) => {
     res.json(report);
   } catch (error: any) {
     sendApiError(res, error);
+  }
+});
+
+// 1.1. Doctor repairs. Lives under /api/system/ so it is local-only: it
+// changes the TeX installation on the host. The body names an action from a
+// fixed list; the commands themselves are defined server-side.
+let doctorActionRunning = false;
+app.post('/api/system/doctor/fix', async (req, res) => {
+  const actionId = String(req.body?.actionId || '') as DoctorActionId;
+  if (!DOCTOR_ACTION_IDS.includes(actionId)) {
+    return res.status(400).json({ error: `Unknown repair: ${actionId}` });
+  }
+  if (doctorActionRunning) {
+    return res.status(409).json({ error: 'Another repair is still running.' });
+  }
+  doctorActionRunning = true;
+  try {
+    res.json(await runDoctorAction(actionId));
+  } catch (error: any) {
+    sendApiError(res, error);
+  } finally {
+    doctorActionRunning = false;
   }
 });
 
@@ -759,30 +786,37 @@ app.post('/api/projects/:id/packages/install', async (req, res) => {
       return res.status(400).json({ error: 'Invalid packageName' });
     }
 
-    // Attempt 1: Try MiKTeX Package Manager (mpm)
-    try {
-      const { stdout } = await execAsync(`mpm --install=${cleanPkg}`);
-      return res.json({
-        success: true,
-        method: 'mpm',
-        message: `Successfully installed '${cleanPkg}' via MiKTeX Package Manager.`,
-        stdout,
-      });
-    } catch {
-      // mpm failed or not installed, continue
-    }
+    // The compile log names the missing .sty file, but package managers index
+    // by distribution package. Most match; these common ones do not.
+    const STY_TO_PACKAGE: Record<string, string> = {
+      tikz: 'pgf',
+      graphicx: 'graphics',
+      amssymb: 'amsfonts',
+      subcaption: 'caption',
+      algorithmic: 'algorithms',
+      algorithm: 'algorithms',
+    };
+    const distPkg = STY_TO_PACKAGE[cleanPkg] ?? cleanPkg;
 
-    // Attempt 2: Try TeX Live Package Manager (tlmgr)
-    try {
-      const { stdout } = await execAsync(`tlmgr install ${cleanPkg}`);
-      return res.json({
-        success: true,
-        method: 'tlmgr',
-        message: `Successfully installed '${cleanPkg}' via TeX Live (tlmgr).`,
-        stdout,
-      });
-    } catch {
-      // tlmgr failed, continue
+    const managers: Array<{ method: string; label: string; cmd: string }> = [
+      // MiKTeX 22+; `mpm` is deprecated upstream and kept only as a fallback.
+      { method: 'miktex', label: 'MiKTeX', cmd: `miktex packages install ${distPkg}` },
+      { method: 'mpm', label: 'MiKTeX Package Manager', cmd: `mpm --install=${distPkg}` },
+      { method: 'tlmgr', label: 'TeX Live (tlmgr)', cmd: `tlmgr install ${distPkg}` },
+    ];
+
+    for (const manager of managers) {
+      try {
+        const { stdout } = await execAsync(manager.cmd, { timeout: 300_000, windowsHide: true });
+        return res.json({
+          success: true,
+          method: manager.method,
+          message: `Installed '${distPkg}' with ${manager.label}.`,
+          stdout,
+        });
+      } catch {
+        // Not installed, or the package is unknown to this manager: try the next
+      }
     }
 
     // Attempt 3: Direct download from CTAN mirror into project root

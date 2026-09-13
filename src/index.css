@@ -64,6 +64,22 @@ body {
   background: rgba(168, 162, 158, 0.35);
 }
 
+/* Image drag over the editor: shows exactly where the figure block will land */
+.figure-drop-at {
+  background: rgba(46, 160, 67, 0.12) !important;
+}
+.figure-drop-before {
+  box-shadow: inset 0 2px 0 #2EA043 !important;
+}
+.figure-drop-after {
+  box-shadow: inset 0 -2px 0 #2EA043 !important;
+}
+.figure-drop-swap {
+  background: rgba(46, 160, 67, 0.25);
+  outline: 1px solid #2EA043;
+  border-radius: 2px;
+}
+
 /* SyncTeX Jump Line Highlight Animation: Calm Oxford green pulse */
 .synctex-highlight-line {
   background: rgba(46, 160, 67, 0.2) !important;

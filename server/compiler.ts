@@ -4,8 +4,10 @@ import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 
 export interface SuggestedFix {
-  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line';
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line' | 'set_engine' | 'open_doctor';
   packageName?: string;
+  /** For set_engine: the engine the magic comment selects */
+  engine?: SupportedEngine;
   codeSnippet: string;
   label: string;
   description: string;
@@ -45,7 +47,13 @@ export interface CompileResult {
   documentTitle?: string;
   pdfDownloadFilename?: string;
   detectedMissingPackages?: DetectedMissingPackage[];
+  /** The engine that actually ran, after any % !TEX program override */
+  engine?: SupportedEngine;
 }
+
+// Package errors continue on lines prefixed with "(fontspec)", so the two
+// halves of the sentence are separated by that prefix, not just whitespace.
+const FONTSPEC_ENGINE_ERROR = /fontspec package requires either XeTeX or[\s\S]{0,80}?LuaTeX/i;
 
 // Don Norman Error Translator: maps cryptic TeX errors to helpful human advice
 function translateTeXError(rawText: string): string {
@@ -102,6 +110,30 @@ function translateTeXError(rawText: string): string {
       return `The \\begin{${mathEnvMatch[1]}} environment must be used inside math mode. Wrap it in display math (\\[ ... \\]) or \\begin{equation}.`;
     }
     return 'Mathematical symbol used outside of a math environment. Wrap the formula in $...$ or \\begin{equation}.';
+  }
+  if (FONTSPEC_ENGINE_ERROR.test(raw)) {
+    return 'fontspec loads system fonts, which pdfLaTeX cannot do. This document has to be compiled with XeLaTeX or LuaLaTeX.';
+  }
+  if (raw.includes('auto expansion is only possible with scalable fonts')) {
+    return 'pdfTeX fell back to a bitmap font, and microtype cannot stretch bitmaps. Either the scalable font package is missing or the font maps are stale.';
+  }
+  if (/Unicode character .* not set up for use with\s*LaTeX/i.test(raw)) {
+    return 'pdfLaTeX has no definition for this character. Replace it with the equivalent LaTeX command, or compile with XeLaTeX.';
+  }
+  if (raw.includes('Missing \\begin{document}')) {
+    return 'Text was found in the preamble. Everything that prints must come after \\begin{document}; check for a stray character above it.';
+  }
+  if (raw.includes('File ended while scanning use of')) {
+    return 'A command argument was never closed. Look for a missing } in or just before the reported line.';
+  }
+  if (raw.includes("Too many }'s")) {
+    return 'There is a } with no matching {. Remove it or add the missing opening brace.';
+  }
+  if (raw.includes('Option clash for package')) {
+    return 'The same package is loaded twice with different options, often once directly and once by the document class or another package. Load it once and merge the options.';
+  }
+  if (raw.includes("I can't write on file")) {
+    return 'The output file is locked, usually because the PDF is open in another viewer such as Acrobat. Close it and compile again.';
   }
   if (raw.includes('Emergency stop')) {
     return 'LaTeX encountered a fatal syntax error and halted. Check your latest typed line.';
@@ -189,8 +221,13 @@ export function scanMissingPackages(source: string): DetectedMissingPackage[] {
 
   const missing: DetectedMissingPackage[] = [];
 
+  // Mirrors isPackageLoaded in src/utils/latexPackages.ts: comma lists such as
+  // \usepackage{amsmath,amssymb} count, and commented-out lines do not.
+  const livePreamble = preamble.replace(/(^|[^\\])%.*$/gm, '$1');
   for (const rule of COMMON_PACKAGE_RULES) {
-    const isDeclared = new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${rule.packageName}\\}`, 'i').test(preamble);
+    const isDeclared = new RegExp(
+      `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${rule.packageName}\\s*(?:,[^}]*)?\\}`
+    ).test(livePreamble);
     if (!isDeclared) {
       if (rule.pattern.test(source)) {
         missing.push({
@@ -229,6 +266,43 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
       codeSnippet: `\\[\n\\begin{${envName}}\n...\n\\end{${envName}}\n\\]`,
       label: `Wrap in \\[ ... \\]`,
       description: `The \\begin{${envName}} environment requires math mode. Wrap it in display math mode (\\[ ... \\]).`,
+    };
+  }
+
+  // 0a. fontspec under pdfLaTeX. The document is right; the engine is wrong.
+  // A magic comment is the fix rather than a hidden setting: it lives in the
+  // source, travels with the project, and is what TeXstudio, TeXShop and
+  // LaTeX Workshop already read.
+  if (FONTSPEC_ENGINE_ERROR.test(combined)) {
+    return {
+      type: 'set_engine',
+      engine: 'xelatex',
+      line: 1,
+      codeSnippet: '% !TEX program = xelatex',
+      label: 'Compile with XeLaTeX',
+      description: 'Adds "% !TEX program = xelatex" as the first line, so this document always compiles with XeLaTeX.',
+    };
+  }
+
+  // 0b. microtype on a bitmap font. The font name in the message separates the
+  // two causes: ec*/tc* are T1/TS1 fonts whose scalable versions come from
+  // cm-super; anything else means the maps do not point at files that exist.
+  if (/auto expansion is only possible with scalable fonts/i.test(combined)) {
+    const font = combined.match(/\(file ([A-Za-z0-9-]+)\)\s*:\s*auto expansion/i)?.[1] ?? '';
+    if (/^(ec|tc)/i.test(font)) {
+      return {
+        type: 'install_package',
+        packageName: 'cm-super',
+        codeSnippet: 'cm-super',
+        label: 'Install cm-super fonts',
+        description: `The T1 font "${font}" has no scalable version installed. cm-super provides it.`,
+      };
+    }
+    return {
+      type: 'open_doctor',
+      codeSnippet: '',
+      label: 'Open TeX Doctor',
+      description: `pdfTeX has no scalable file mapped for ${font ? `"${font}"` : 'this font'}. TeX Doctor can rebuild the font maps.`,
     };
   }
 
@@ -484,6 +558,40 @@ function extractFullErrorMessage(initialMsg: string, subsequentLines: string[], 
   return msg.trim();
 }
 
+const FILE_LINE_ERROR = /^((?:[A-Za-z]:)?[^:]*?\.(?:tex|sty|cls|bib)):(\d+):\s*(.*)$/;
+
+// TeX hard-wraps the log at max_print_line (79 by default in both TeX Live
+// and MiKTeX). An error raised inside an installed package carries its full
+// absolute path, which on Windows is long enough to split the
+// "file:line: message" prefix itself:
+//
+//   C:\Users\me\AppData\Local\Programs\MiKTeX\tex/latex/fontspec\fontspec.sty:10
+//   1: Fatal Package fontspec Error: The fontspec package requires either XeTeX or
+//
+// Neither half matches, so the error vanished and the user got a failed
+// compile with an empty diagnostics panel. Rejoin a full-width line with its
+// successors whenever that is what turns it into a file-line-error.
+function unwrapFileLineErrors(lines: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (line.length >= 79 && !FILE_LINE_ERROR.test(line)) {
+      let joined = line;
+      for (let k = 1; k <= 3 && i + k < lines.length; k++) {
+        joined += lines[i + k];
+        if (FILE_LINE_ERROR.test(joined)) {
+          line = joined;
+          i += k;
+          break;
+        }
+        if (lines[i + k].length < 79) break;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 export function parseLatexLog(
   logContent: string,
   sourceLines?: string[],
@@ -491,7 +599,7 @@ export function parseLatexLog(
 ): { errors: CompileError[]; warnings: string[] } {
   const errors: CompileError[] = [];
   const warnings: string[] = [];
-  const lines = logContent.split('\n');
+  const lines = unwrapFileLineErrors(logContent.split('\n').map((l) => l.replace(/\r$/, '')));
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -500,9 +608,7 @@ export function parseLatexLog(
     // The optional leading drive letter matters on Windows, where the engine
     // reports absolute paths like C:\project\main.tex:24: and a naive
     // [^:]+ pattern stops dead at the drive colon.
-    const fileLineMatch = line.match(
-      /^((?:[A-Za-z]:)?[^:]*?\.(?:tex|sty|cls|bib)):(\d+):\s*(.*)$/
-    );
+    const fileLineMatch = line.match(FILE_LINE_ERROR);
     if (fileLineMatch) {
       const [, file, lineStr, rawMessage] = fileLineMatch;
       const fullMessage = extractFullErrorMessage(rawMessage, lines.slice(i + 1, i + 4), line);
@@ -614,18 +720,27 @@ function dedupeErrors(errors: CompileError[]): CompileError[] {
 function markCascadingErrors(errors: CompileError[]): CompileError[] {
   if (errors.length <= 1) return errors;
 
-  const rootError = errors[0];
+  // A cascade belongs to the most recent root error before it in the log, not
+  // to the first error in the document. With an unrelated error earlier (a
+  // stray Unicode character on line 6, say), blaming errors[0] told the user
+  // that fixing line 6 would clear the fallout of an undefined environment on
+  // line 8.
+  let rootError = errors[0];
 
   return errors.map((err, idx) => {
     if (idx === 0) return err;
 
     // Detect if this subsequent error is a classic TeX cascade caused by the unresolved root error
     const isCascadePattern =
-      /Misplaced alignment|Missing \$ inserted|ended by \\end|Undefined control sequence|Runaway argument|Extra \}|Missing \} inserted|Emergency stop/i.test(
+      /Misplaced alignment|Missing \$ inserted|ended by \\end|Undefined control sequence|Runaway argument|Extra \}|Missing \} inserted|Emergency stop|Fatal error occurred, no output PDF/i.test(
         err.message
       );
 
-    if (isCascadePattern && (rootError.suggestedFix || rootError.line > 0)) {
+    // An error that carries its own targeted fix (an \includegraphics without
+    // graphicx is also "Undefined control sequence") is actionable by itself
+    // and stays a root cause.
+    if (err.isCascading) return err;
+    if (isCascadePattern && !err.suggestedFix && (rootError.suggestedFix || rootError.line > 0)) {
       return {
         ...err,
         isCascading: true,
@@ -634,9 +749,51 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
       };
     }
 
+    rootError = err;
     return err;
   });
 }
+
+// Characters pdfLaTeX's utf8 input does not define, mapped to commands that
+// work in both text and math mode (\ensuremath), so the fix does not need to
+// know which mode the character sits in. Characters the LaTeX kernel already
+// handles (é, ü, °, ±, ×, –, —, curly quotes) never raise the error and are
+// deliberately absent.
+const UNICODE_TO_LATEX: Record<number, string> = (() => {
+  const m = (cmd: string) => `\\ensuremath{${cmd}}`;
+  const table: Record<number, string> = {
+    // Invisible characters that arrive with copy-paste
+    0x00a0: '~', 0x2009: '\\,', 0x200b: '', 0x2060: '', 0xfeff: '', 0x2011: '-',
+    // Lowercase Greek
+    0x03b1: m('\\alpha'), 0x03b2: m('\\beta'), 0x03b3: m('\\gamma'), 0x03b4: m('\\delta'),
+    0x03b5: m('\\varepsilon'), 0x03f5: m('\\epsilon'), 0x03b6: m('\\zeta'), 0x03b7: m('\\eta'),
+    0x03b8: m('\\theta'), 0x03d1: m('\\vartheta'), 0x03b9: m('\\iota'), 0x03ba: m('\\kappa'),
+    0x03bb: m('\\lambda'), 0x03bc: m('\\mu'), 0x03bd: m('\\nu'), 0x03be: m('\\xi'),
+    0x03c0: m('\\pi'), 0x03c1: m('\\rho'), 0x03c2: m('\\varsigma'), 0x03c3: m('\\sigma'),
+    0x03c4: m('\\tau'), 0x03c5: m('\\upsilon'), 0x03c6: m('\\varphi'), 0x03d5: m('\\phi'),
+    0x03c7: m('\\chi'), 0x03c8: m('\\psi'), 0x03c9: m('\\omega'),
+    // Uppercase Greek with distinct glyphs
+    0x0393: m('\\Gamma'), 0x0394: m('\\Delta'), 0x0398: m('\\Theta'), 0x039b: m('\\Lambda'),
+    0x039e: m('\\Xi'), 0x03a0: m('\\Pi'), 0x03a3: m('\\Sigma'), 0x03a5: m('\\Upsilon'),
+    0x03a6: m('\\Phi'), 0x03a8: m('\\Psi'), 0x03a9: m('\\Omega'),
+    // Relations and operators
+    0x2212: m('-'), 0x2264: m('\\leq'), 0x2265: m('\\geq'), 0x2260: m('\\neq'),
+    0x2248: m('\\approx'), 0x2261: m('\\equiv'), 0x221d: m('\\propto'), 0x223c: m('\\sim'),
+    0x22c5: m('\\cdot'), 0x2217: m('\\ast'), 0x2297: m('\\otimes'), 0x2295: m('\\oplus'),
+    0x2208: m('\\in'), 0x2209: m('\\notin'), 0x2282: m('\\subset'), 0x2286: m('\\subseteq'),
+    0x2229: m('\\cap'), 0x222a: m('\\cup'), 0x2227: m('\\wedge'), 0x2228: m('\\vee'),
+    0x2200: m('\\forall'), 0x2203: m('\\exists'), 0x2205: m('\\emptyset'),
+    0x2211: m('\\sum'), 0x220f: m('\\prod'), 0x222b: m('\\int'), 0x221a: m('\\surd'),
+    0x2202: m('\\partial'), 0x2207: m('\\nabla'), 0x221e: m('\\infty'),
+    0x210f: m('\\hbar'), 0x2113: m('\\ell'), 0x2032: m("'"), 0x2033: m("''"),
+    0x27e8: m('\\langle'), 0x27e9: m('\\rangle'), 0x2016: m('\\|'),
+    // Arrows
+    0x2192: m('\\rightarrow'), 0x2190: m('\\leftarrow'), 0x2194: m('\\leftrightarrow'),
+    0x21d2: m('\\Rightarrow'), 0x21d0: m('\\Leftarrow'), 0x21d4: m('\\Leftrightarrow'),
+    0x2191: m('\\uparrow'), 0x2193: m('\\downarrow'), 0x21a6: m('\\mapsto'),
+  };
+  return table;
+})();
 
 /**
  * Source-aware enrichment pass — runs AFTER log parsing and deduplication.
@@ -644,10 +801,28 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
  * provides clear plain-English explanations, and attaches 1-click Quick Fixes.
  */
 function enrichErrorsWithSourceContext(
-  errors: CompileError[],
+  rawErrors: CompileError[],
   sourceLines: string[],
   projectDir?: string
 ): CompileError[] {
+  // An error raised inside an installed package reports the package's own
+  // file and line (fontspec.sty:101), so "Jump" would land on line 101 of the
+  // user's document. Point it at the \usepackage line that loaded the package.
+  const errors = rawErrors.map((err) => {
+    const ext = path.extname(err.file).toLowerCase();
+    if (ext !== '.sty' && ext !== '.cls') return err;
+    // A .sty the user keeps in the project is their own file; its line is right.
+    if (projectDir && path.resolve(projectDir, err.file).startsWith(path.resolve(projectDir) + path.sep)) return err;
+    const name = path.basename(err.file, ext).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const loader = new RegExp(
+      ext === '.cls'
+        ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${name}\\s*\\}`
+        : `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${name}\\s*(?:,[^}]*)?\\}`
+    );
+    const idx = sourceLines.findIndex((l) => loader.test(l));
+    return idx >= 0 ? { ...err, file: 'main.tex', line: idx + 1 } : err;
+  });
+
   // Pre-find author line with \And (if any)
   let authorLineIdx = -1;
   for (let i = 0; i < sourceLines.length; i++) {
@@ -669,6 +844,54 @@ function enrichErrorsWithSourceContext(
 
   return errors.map((err) => {
     const lineIdx = (err.line ?? 0) - 1; // convert to 0-based
+
+    // ── Pattern 0: Unicode character pdfLaTeX has no definition for ────────
+    // Typical source: Greek letters and math symbols pasted from a PDF, a web
+    // page or Word. The code point in the message is authoritative; the glyph
+    // next to it can be mangled by the log's encoding.
+    const unicodeMatch = `${err.message} ${err.raw}`.match(/Unicode character .*?\(U\+([0-9A-Fa-f]{4,6})\)/);
+    if (unicodeMatch) {
+      const codePoint = parseInt(unicodeMatch[1], 16);
+      const char = String.fromCodePoint(codePoint);
+      const replacement = UNICODE_TO_LATEX[codePoint];
+      const hex = `U+${unicodeMatch[1].toUpperCase()}`;
+
+      const candidates = [lineIdx, lineIdx - 1, lineIdx + 1].filter((i) => i >= 0 && i < sourceLines.length);
+      let targetIdx = candidates.find((i) => sourceLines[i].includes(char)) ?? -1;
+      if (targetIdx < 0) targetIdx = sourceLines.findIndex((l) => l.includes(char));
+
+      if (replacement === undefined || targetIdx < 0) {
+        return {
+          ...err,
+          friendlyExplanation:
+            `pdfLaTeX has no definition for "${char}" (${hex}). ` +
+            'Replace it with a LaTeX command, or compile with XeLaTeX and a font that contains the character.',
+        };
+      }
+
+      const actualLine = targetIdx + 1;
+      const srcLine = sourceLines[targetIdx];
+      // An empty replacement means "delete this line" to the client, and a
+      // blank line is a paragraph break, so never let a fix produce one.
+      const fixedLine = srcLine.split(char).join(replacement) || ' ';
+      const shown = replacement === '' ? 'nothing (it is invisible)' : replacement;
+      return {
+        ...err,
+        line: actualLine,
+        friendlyExplanation:
+          `Line ${actualLine} contains "${char}" (${hex}), which pdfLaTeX cannot typeset directly. ` +
+          `The LaTeX equivalent is ${shown}.`,
+        suggestedFix: {
+          type: 'replace_line' as const,
+          codeSnippet: fixedLine,
+          label: replacement === '' ? `Remove invisible ${hex}` : `Replace "${char}" with ${replacement}`,
+          description: `Replaces every "${char}" on line ${actualLine} with ${shown}.`,
+          line: actualLine,
+          find: srcLine,
+          replace: fixedLine,
+        },
+      };
+    }
 
     // ── Pattern 1: \And used instead of \and in \author{} ─────────────────
     // Symptoms:
@@ -1033,6 +1256,23 @@ export function cleanBuildCache(projectDir: string): { cleaned: boolean; message
 export const SUPPORTED_ENGINES = ['pdflatex', 'xelatex', 'lualatex'] as const;
 export type SupportedEngine = (typeof SUPPORTED_ENGINES)[number];
 
+/**
+ * Reads a "% !TEX program = xelatex" (or "% !TeX TS-program = ...") magic
+ * comment from the top of a document. The value is only returned when it is
+ * one of SUPPORTED_ENGINES, so a document cannot use it to name a command.
+ */
+export function readMagicEngine(source: string): SupportedEngine | undefined {
+  const head = source.split('\n').slice(0, 20);
+  for (const line of head) {
+    const match = line.match(/^\s*%\s*!\s*TEX\s+(?:TS-)?program\s*=\s*([A-Za-z]+)/i);
+    if (match) {
+      const value = match[1].toLowerCase();
+      return (SUPPORTED_ENGINES as readonly string[]).includes(value) ? (value as SupportedEngine) : undefined;
+    }
+  }
+  return undefined;
+}
+
 export async function compileDocument(
   projectDir: string,
   mainFile: string = 'main.tex',
@@ -1056,6 +1296,13 @@ export async function compileDocument(
 
   const startTime = Date.now();
   const buildDir = path.join(projectDir, '.build');
+
+  // The document's own magic comment outranks the request default, because
+  // the client always sends pdflatex and the comment is an explicit choice
+  // written into the source.
+  const mainSourcePath = path.isAbsolute(mainFile) ? mainFile : path.join(projectDir, mainFile);
+  const mainSource = readSafe(mainSourcePath);
+  engine = readMagicEngine(mainSource) ?? engine;
 
   if (!fs.existsSync(buildDir)) {
     fs.mkdirSync(buildDir, { recursive: true });
@@ -1154,8 +1401,6 @@ export async function compileDocument(
   // the engine printed. Only fall back to stdout/stderr when it is missing,
   // otherwise every error gets parsed twice.
   const fullLog = diskLog || `${res.stdout}\n${res.stderr}`;
-  const mainSourcePath = path.isAbsolute(mainFile) ? mainFile : path.join(projectDir, mainFile);
-  const mainSource = readSafe(mainSourcePath);
   const sourceLines = mainSource.split('\n').map((l) => l.replace(/\r$/, ''));
   const documentTitle = extractLatexTitle(mainSource) || undefined;
   const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
@@ -1186,6 +1431,7 @@ export async function compileDocument(
     documentTitle,
     pdfDownloadFilename,
     detectedMissingPackages,
+    engine,
   };
 }
 

@@ -73,6 +73,19 @@ export const COMMON_PACKAGE_RULES: Array<{
   },
 ];
 
+/**
+ * Whether a package is loaded, including inside a comma list such as
+ * \usepackage{amsmath,amssymb} and via \RequirePackage. Matching only the
+ * single-name form made the starter document report amssymb as missing.
+ */
+export function isPackageLoaded(source: string, packageName: string): boolean {
+  const name = packageName.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  return new RegExp(
+    `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${name}\\s*(?:,[^}]*)?\\}`,
+    'm'
+  ).test(source.replace(/(^|[^\\])%.*$/gm, '$1'));
+}
+
 export function scanMissingPackages(source: string): DetectedMissingPackage[] {
   if (!source || typeof source !== 'string') return [];
 
@@ -82,7 +95,7 @@ export function scanMissingPackages(source: string): DetectedMissingPackage[] {
   const missing: DetectedMissingPackage[] = [];
 
   for (const rule of COMMON_PACKAGE_RULES) {
-    const isDeclared = new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${rule.packageName}\\}`, 'i').test(preamble);
+    const isDeclared = isPackageLoaded(preamble, rule.packageName);
     if (!isDeclared) {
       if (rule.pattern.test(source)) {
         missing.push({
@@ -103,9 +116,7 @@ export function injectPackagesIntoPreamble(content: string, packages: DetectedMi
 
   let updatedContent = content;
 
-  const toAdd = packages.filter(
-    (pkg) => !new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${pkg.packageName}\\}`, 'i').test(updatedContent)
-  );
+  const toAdd = packages.filter((pkg) => !isPackageLoaded(updatedContent, pkg.packageName));
 
   if (toAdd.length === 0) return content;
 

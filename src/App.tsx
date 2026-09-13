@@ -5,14 +5,18 @@ import { StatusBar } from './components/StatusBar/StatusBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor } from './components/Editor/Editor';
-import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix } from './components/PDFViewer/PDFViewer';
+import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt } from './components/PDFViewer/PDFViewer';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
+import { ImageQuickPicker, ImageQuickPickerHandle } from './components/Modals/ImageQuickPicker';
+import { ImageAtCursor, isImageFile, pastedImageName, uploadProjectImage } from './utils/imageHelper';
+import { applyImagePick, insertFigures, needsGraphicx, placeImagesAt, FigureOptions } from './utils/figureInsertion';
+import type { ImageDrop } from './components/Editor/Editor';
 import { InsertTableModal } from './components/Modals/InsertTableModal';
 import { NewProjectModal } from './components/Modals/NewProjectModal';
 import { UploadProgressModal, UploadFileItem } from './components/Modals/UploadProgressModal';
 import { NewItemModal } from './components/Modals/NewItemModal';
-import { DependencyDoctor, DependencyItem } from './components/DependencyDoctor/DependencyDoctor';
+import { DependencyDoctor, DependencyItem, DoctorFixOutcome } from './components/DependencyDoctor/DependencyDoctor';
 import { HistoryDrawer } from './components/History/HistoryDrawer';
 import { GitSyncModal } from './components/GitSync/GitSyncModal';
 import { CommentsDrawer, CommentThread } from './components/Comments/CommentsDrawer';
@@ -31,7 +35,9 @@ import {
   scanMissingPackages,
   injectPackagesIntoPreamble,
   wrapMathEnvironment,
+  isPackageLoaded,
 } from './utils/latexPackages';
+import { minimalReplacement, setMagicEngine } from './utils/fixPreview';
 import {
   wrapOrToggleFormatting,
   wrapOrToggleSelection,
@@ -152,9 +158,11 @@ export const App: React.FC = () => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [lastValidPdfUrl, setLastValidPdfUrl] = useState<string | null>(null);
   const [compileErrors, setCompileErrors] = useState<CompileErrorItem[]>([]);
-  // 1-Click Quick-Fix & Auto-Remedy State
-  const lastPreFixContentRef = useRef<string | null>(null);
-  const [canUndoFix, setCanUndoFix] = useState<boolean>(false);
+  // Quick-fix state. The receipt is what the user sees; the snapshot ref holds
+  // the text on either side of the fix so Undo can refuse to clobber edits
+  // made after it.
+  const [fixReceipt, setFixReceipt] = useState<FixReceipt | null>(null);
+  const fixSnapshotRef = useRef<{ before: string; after: string; targetMessage?: string } | null>(null);
   const [detectedMissingPackages, setDetectedMissingPackages] = useState<DetectedMissingPackage[]>([]);
 
   // Live KaTeX Math State
@@ -165,9 +173,13 @@ export const App: React.FC = () => {
     return readSetting('live-math-enabled') !== 'false';
   });
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number }>({ line: 1, column: 1 });
+  const [activeImageCursor, setActiveImageCursor] = useState<ImageAtCursor | null>(null);
+  const [pickerUploadingName, setPickerUploadingName] = useState<string | null>(null);
 
   // Modals State
   const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
+  const [imageModalInitialPath, setImageModalInitialPath] = useState<string | undefined>(undefined);
+  const [imageModalNeedsGraphicx, setImageModalNeedsGraphicx] = useState<boolean>(false);
   const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState<boolean>(false);
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
@@ -240,9 +252,15 @@ export const App: React.FC = () => {
   const [doctorDeps, setDoctorDeps] = useState<DependencyItem[]>([]);
   const [isDoctorHealthy, setIsDoctorHealthy] = useState<boolean | null>(null);
   const [isRefreshingDoctor, setIsRefreshingDoctor] = useState<boolean>(false);
+  const [doctorCheckedAt, setDoctorCheckedAt] = useState<string | null>(null);
 
   // Refs
   const monacoEditorRef = useRef<any>(null);
+  const imagePickerRef = useRef<ImageQuickPickerHandle>(null);
+  const imagePickerApiRef = useRef<{ dismiss: () => void } | null>(null);
+  const pickerUploadInputRef = useRef<HTMLInputElement>(null);
+  // The \includegraphics{} an in-flight picker upload will fill once it lands.
+  const pendingPickRef = useRef<ImageAtCursor | null>(null);
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
   const fileTreePanelRef = useRef<ImperativePanelHandle>(null);
   const pdfPanelRef = useRef<ImperativePanelHandle>(null);
@@ -257,6 +275,7 @@ export const App: React.FC = () => {
         const data = await res.json();
         setDoctorDeps(data.dependencies);
         setIsDoctorHealthy(data.allHealthy);
+        setDoctorCheckedAt(data.timestamp ?? null);
         if (!data.allHealthy) {
           setIsDoctorOpen(true);
         }
@@ -271,6 +290,25 @@ export const App: React.FC = () => {
   useEffect(() => {
     checkDependencies();
   }, [checkDependencies]);
+
+  // Runs an allow-listed Doctor repair. The server re-scans afterwards, so
+  // the report shown is the result of the repair, not an assumption about it.
+  const handleRunDoctorFix = useCallback(async (actionId: string, dependencyId: string): Promise<DoctorFixOutcome> => {
+    const res = await fetch('/api/system/doctor/fix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.report) {
+      return { ok: false, resolved: false, ranCommand: '', output: data.error || `Request failed with status ${res.status}` };
+    }
+    setDoctorDeps(data.report.dependencies);
+    setIsDoctorHealthy(data.report.allHealthy);
+    setDoctorCheckedAt(data.report.timestamp ?? null);
+    const resolved = !!data.report.dependencies.find((d: DependencyItem) => d.id === dependencyId)?.installed;
+    return { ok: !!data.ok, resolved, ranCommand: data.ranCommand ?? '', output: data.output ?? '' };
+  }, []);
 
   // Load Projects List
   const loadProjects = useCallback(async () => {
@@ -708,10 +746,11 @@ export const App: React.FC = () => {
   // Dynamic context for Monaco completions (\cite, \label, \includegraphics)
   const getProjectContext = useCallback((): ProjectContext => {
     return {
+      projectId,
       citations,
       files,
     };
-  }, [citations, files]);
+  }, [projectId, citations, files]);
 
   // Revert Success Handler
   const handleRevertSuccess = useCallback(async () => {
@@ -834,6 +873,14 @@ export const App: React.FC = () => {
     setCompileErrors([]);
     setDetectedMissingPackages([]);
 
+    // Once the user has edited past a fix, its receipt describes a document
+    // that no longer exists and its Undo would discard their work. Retire it.
+    // (Only with a live editor: without one, state can trail the fix by a render.)
+    if (monacoEditorRef.current && fixSnapshotRef.current && getLiveContent() !== fixSnapshotRef.current.after) {
+      fixSnapshotRef.current = null;
+      setFixReceipt((r) => (r && r.status !== 'compiling' && r.status !== 'working' ? null : r));
+    }
+
     try {
       // Flush any pending save first, using the editor's live buffer
       if (autoSaveTimerRef.current) {
@@ -864,11 +911,18 @@ export const App: React.FC = () => {
           setDetectedMissingPackages([]);
         }
 
-        if (errors.length === 0 && lastPreFixContentRef.current) {
-          addToast('Compilation succeeded with 0 errors.', 'success');
-          setCanUndoFix(false);
-          lastPreFixContentRef.current = null;
-        }
+        // Close the loop on a pending fix: report whether the error it targeted
+        // is actually gone, not just that a compile finished.
+        setFixReceipt((r) => {
+          if (!r || r.status !== 'compiling') return r;
+          const rootErrors = errors.filter((e: CompileErrorItem) => !e.isCascading).length;
+          if (rootErrors === 0) return { ...r, status: 'resolved' };
+          const target = fixSnapshotRef.current?.targetMessage;
+          const stillThere = target !== undefined && errors.some((e: CompileErrorItem) => e.message === target);
+          return stillThere
+            ? { ...r, status: 'unchanged' }
+            : { ...r, status: 'progress', detail: `${rootErrors} other issue${rootErrors === 1 ? '' : 's'} remain${rootErrors === 1 ? 's' : ''}` };
+        });
 
         if (result.pdfUrl) {
           const freshPdfUrl = `${result.pdfUrl}&t=${Date.now()}`;
@@ -886,7 +940,9 @@ export const App: React.FC = () => {
         // not a compile error, so don't dress it up as one.
         setCompileStatus('idle');
         addToast('A compile is already running for this project. Try again in a moment.', 'warning');
+        setFixReceipt((r) => (r?.status === 'compiling' ? { ...r, status: 'failed', detail: 'applied, but another compile was running, so it has not been checked yet' } : r));
       } else {
+        setFixReceipt((r) => (r?.status === 'compiling' ? { ...r, status: 'failed', detail: 'applied, but the server did not return a compile result' } : r));
         setCompileStatus('failed');
         setCompileErrors([
           {
@@ -898,6 +954,7 @@ export const App: React.FC = () => {
         ]);
       }
     } catch {
+      setFixReceipt((r) => (r?.status === 'compiling' ? { ...r, status: 'failed', detail: 'applied, but the local server could not be reached to recompile' } : r));
       setCompileStatus('failed');
       setCompileErrors([
         {
@@ -912,219 +969,226 @@ export const App: React.FC = () => {
     }
   };
 
-  // 1-Click Intelligent Quick-Fix Handler
-  const handleApplyFix = async (fix: SuggestedFix) => {
-    if (fix.type === 'add_preamble') {
-      const currentLiveContent = getLiveContent();
+  // Writes a fix into the editor as the smallest possible edit. executeEdits,
+  // unlike setValue, keeps Monaco's undo stack, so Ctrl+Z steps back through a
+  // fix like any other change, and collaborators receive a small delta. The
+  // changed text is then selected and scrolled into view, so what the button
+  // did is visible in the document itself rather than only described in a toast.
+  const writeEditorContent = useCallback((updated: string): number | undefined => {
+    const editor = monacoEditorRef.current;
+    const model = editor?.getModel?.();
+    if (!editor || !model) {
+      setEditorContent(updated);
+      return undefined;
+    }
 
-      // Check if package is already declared in preamble
-      const pkgRegex = new RegExp(`\\\\usepackage(?:\\[.*?\\])?\\{${fix.packageName}\\}`, 'i');
-      if (pkgRegex.test(currentLiveContent)) {
-        addToast(`\\usepackage{${fix.packageName}} is already in your document preamble!`, 'warning');
+    const span = minimalReplacement(model.getValue(), updated);
+    if (!span) return undefined;
+
+    const start = model.getPositionAt(span.start);
+    const end = model.getPositionAt(span.endBefore);
+    editor.pushUndoStop();
+    editor.executeEdits('quick-fix', [
+      {
+        range: {
+          startLineNumber: start.lineNumber,
+          startColumn: start.column,
+          endLineNumber: end.lineNumber,
+          endColumn: end.column,
+        },
+        text: span.text,
+        forceMoveMarkers: true,
+      },
+    ]);
+    editor.pushUndoStop();
+
+    const insertedEnd = model.getPositionAt(span.start + span.text.length);
+    editor.setSelection({
+      startLineNumber: start.lineNumber,
+      startColumn: start.column,
+      endLineNumber: insertedEnd.lineNumber,
+      endColumn: insertedEnd.column,
+    });
+    editor.revealLineInCenter(start.lineNumber);
+    setEditorContent(model.getValue());
+    return start.lineNumber;
+  }, []);
+
+  // Applies an edit-type fix: write, remember both sides for Undo, save, and
+  // recompile so the receipt can report whether the error actually went away.
+  const commitFix = async (label: string, updated: string, targetMessage?: string): Promise<boolean> => {
+    const before = getLiveContent();
+    if (updated === before) return false;
+
+    const line = writeEditorContent(updated);
+    const after = monacoEditorRef.current ? getLiveContent() : updated;
+    fixSnapshotRef.current = { before, after, targetMessage };
+    setFixReceipt({ id: Date.now(), label, status: 'compiling', undoable: true, line });
+
+    await saveActiveFile(after);
+    setTimeout(() => {
+      handleCompile();
+    }, 50);
+    return true;
+  };
+
+  // 1-Click Intelligent Quick-Fix Handler
+  const handleApplyFix = async (fix: SuggestedFix, error?: CompileErrorItem) => {
+    const targetMessage = error?.message;
+    const current = getLiveContent();
+
+    switch (fix.type) {
+      case 'add_preamble': {
+        if (fix.packageName && isPackageLoaded(current, fix.packageName)) {
+          addToast(`\\usepackage{${fix.packageName}} is already loaded, so this error has a different cause.`, 'warning');
+          return;
+        }
+        const updated = injectPackagesIntoPreamble(current, [
+          {
+            packageName: fix.packageName ?? '',
+            codeSnippet: fix.codeSnippet,
+            label: fix.label,
+            description: fix.description,
+          },
+        ]);
+        await commitFix(fix.label, updated, targetMessage);
         return;
       }
 
-      // Record snapshot for 1-click rollback
-      lastPreFixContentRef.current = currentLiveContent;
-      setCanUndoFix(true);
-
-      let updatedContent = currentLiveContent;
-      const docClassMatch = updatedContent.match(/(\\documentclass(?:\[.*?\])?\{.*?\})/);
-      const usePackageMatches = [...updatedContent.matchAll(/\\usepackage(?:\[.*?\])?\{.*?\}/g)];
-
-      if (fix.packageName === 'hyperref') {
-        // hyperref should be placed towards the end of the package block before \begin{document}
-        const beginDocMatch = updatedContent.match(/\\begin\{document\}/);
-        if (beginDocMatch && beginDocMatch.index !== undefined) {
-          const insertPos = beginDocMatch.index;
-          updatedContent = updatedContent.slice(0, insertPos) + `${fix.codeSnippet}\n\n` + updatedContent.slice(insertPos);
-        } else if (usePackageMatches.length > 0) {
-          const lastPkg = usePackageMatches[usePackageMatches.length - 1];
-          const insertPos = lastPkg.index! + lastPkg[0].length;
-          updatedContent = updatedContent.slice(0, insertPos) + `\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
-        } else if (docClassMatch && docClassMatch.index !== undefined) {
-          const insertPos = docClassMatch.index + docClassMatch[0].length;
-          updatedContent = updatedContent.slice(0, insertPos) + `\n\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
-        } else {
-          updatedContent = `${fix.codeSnippet}\n${updatedContent}`;
+      case 'wrap_math_mode': {
+        const envName = fix.targetEnvironment || 'bmatrix';
+        const updated = wrapMathEnvironment(current, fix.line || 0, envName);
+        if (!(await commitFix(fix.label, updated, targetMessage))) {
+          addToast(`Could not find \\begin{${envName}} near line ${fix.line || 1}. Nothing was changed.`, 'warning');
         }
-      } else {
-        // Standard package: append after the last \usepackage or after \documentclass
-        if (usePackageMatches.length > 0) {
-          const lastPkg = usePackageMatches[usePackageMatches.length - 1];
-          const insertPos = lastPkg.index! + lastPkg[0].length;
-          updatedContent = updatedContent.slice(0, insertPos) + `\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
-        } else if (docClassMatch && docClassMatch.index !== undefined) {
-          const insertPos = docClassMatch.index + docClassMatch[0].length;
-          updatedContent = updatedContent.slice(0, insertPos) + `\n\n${fix.codeSnippet}` + updatedContent.slice(insertPos);
-        } else {
-          updatedContent = `${fix.codeSnippet}\n${updatedContent}`;
-        }
+        return;
       }
 
-      // Update Monaco editor buffer and React state
-      if (monacoEditorRef.current) {
-        monacoEditorRef.current.setValue(updatedContent);
+      case 'set_engine': {
+        await commitFix(fix.label, setMagicEngine(current, fix.engine || 'xelatex'), targetMessage);
+        return;
       }
-      setEditorContent(updatedContent);
-      await saveActiveFile(updatedContent);
 
-      addToast(`Added ${fix.codeSnippet} to preamble. Recompiling...`, 'info');
+      case 'replace_line': {
+        // Find the target line by its text (whitespace- and CRLF-tolerant),
+        // preferring the hinted line's neighbourhood, then replace or remove it.
+        const lines = current.split('\n');
+        const hintIdx = (fix.line ?? 1) - 1;
 
-      // Trigger recompile
-      setTimeout(() => {
-        handleCompile();
-      }, 50);
-    } else if (fix.type === 'install_package') {
-      addToast(`Installing '${fix.packageName}' package via TeX distribution...`, 'info');
-      try {
-        const res = await fetch(`/api/projects/${projectId}/packages/install`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ packageName: fix.packageName }),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          addToast(`${data.message} Recompiling...`, 'success');
-          setTimeout(() => {
-            handleCompile();
-          }, 100);
-        } else {
-          addToast(`Failed to install package: ${data.error || 'Unknown error'}`, 'error');
-        }
-      } catch (err: any) {
-        addToast(`Install request failed: ${err.message}`, 'error');
-      }
-    } else if (fix.type === 'wrap_math_mode') {
-      const currentLiveContent = getLiveContent();
-      lastPreFixContentRef.current = currentLiveContent;
-      setCanUndoFix(true);
-
-      const envName = fix.targetEnvironment || 'bmatrix';
-      const updatedContent = wrapMathEnvironment(currentLiveContent, fix.line || 0, envName);
-
-      if (updatedContent !== currentLiveContent) {
-        if (monacoEditorRef.current) {
-          monacoEditorRef.current.setValue(updatedContent);
-        }
-        setEditorContent(updatedContent);
-        await saveActiveFile(updatedContent);
-
-        addToast(`Wrapped \\begin{${envName}} in display math mode (\\[ ... \\]). Recompiling...`, 'info');
-        setTimeout(() => {
-          handleCompile();
-        }, 50);
-      } else {
-        addToast(`Could not locate \\begin{${envName}} around line ${fix.line || 1} to wrap.`, 'warning');
-      }
-    } else if (fix.type === 'replace_line') {
-      // replace_line: find the target line by its text (with whitespace tolerance
-      // and CRLF resilience) then replace or remove it.
-      const currentLiveContent = getLiveContent();
-      lastPreFixContentRef.current = currentLiveContent;
-      setCanUndoFix(true);
-
-      const lines = currentLiveContent.split('\n');
-      const hintIdx = (fix.line ?? 1) - 1; // 0-based hint from server
-
-      // Search within ±4 lines of hint for text match (ignoring \r and outer whitespace)
-      let targetIdx = -1;
-      if (fix.find !== undefined) {
-        const cleanFind = fix.find.replace(/\r$/, '').trim();
-        const searchStart = Math.max(0, hintIdx - 4);
-        const searchEnd = Math.min(lines.length - 1, hintIdx + 4);
-        for (let i = searchStart; i <= searchEnd; i++) {
-          if (lines[i].replace(/\r$/, '').trim() === cleanFind) {
-            targetIdx = i;
-            break;
+        let targetIdx = -1;
+        if (fix.find !== undefined) {
+          const cleanFind = fix.find.replace(/\r$/, '').trim();
+          const searchStart = Math.max(0, hintIdx - 4);
+          const searchEnd = Math.min(lines.length - 1, hintIdx + 4);
+          for (let i = searchStart; i <= searchEnd; i++) {
+            if (lines[i].replace(/\r$/, '').trim() === cleanFind) {
+              targetIdx = i;
+              break;
+            }
           }
-        }
-        // Fallback: search across entire document
-        if (targetIdx < 0) {
-          targetIdx = lines.findIndex((l) => l.replace(/\r$/, '').trim() === cleanFind);
-        }
-        // Fallback: use hinted line directly
-        if (targetIdx < 0 && hintIdx >= 0 && hintIdx < lines.length) {
+          if (targetIdx < 0) {
+            targetIdx = lines.findIndex((l) => l.replace(/\r$/, '').trim() === cleanFind);
+          }
+        } else if (hintIdx >= 0 && hintIdx < lines.length) {
           targetIdx = hintIdx;
         }
-      } else {
-        targetIdx = hintIdx;
-      }
 
-      if (targetIdx >= 0 && targetIdx < lines.length) {
+        // A find string that no longer matches means the line was edited since
+        // the compile. Replacing whatever now sits at the hinted line would
+        // overwrite text the fix was never computed for.
+        if (targetIdx < 0 || targetIdx >= lines.length) {
+          addToast('That line has changed since the last compile. Recompile to get an up-to-date fix.', 'warning');
+          return;
+        }
+
         const replacement = fix.replace ?? '';
         if (replacement === '') {
-          // Delete the line entirely
           lines.splice(targetIdx, 1);
         } else {
-          // Preserve original indentation if replacement has no leading indentation
+          // Preserve the original indentation when the replacement has none
           const origIndent = lines[targetIdx].match(/^(\s*)/)?.[1] || '';
           const repIndent = replacement.match(/^(\s*)/)?.[1] || '';
-          const finalRep =
-            repIndent === '' && origIndent !== ''
-              ? origIndent + replacement.trimStart()
-              : replacement;
-          lines[targetIdx] = finalRep;
+          const eol = lines[targetIdx].endsWith('\r') ? '\r' : '';
+          lines[targetIdx] =
+            (repIndent === '' && origIndent !== '' ? origIndent + replacement.trimStart() : replacement) + eol;
         }
-        const updatedContent = lines.join('\n');
-        if (monacoEditorRef.current) {
-          monacoEditorRef.current.setValue(updatedContent);
-          const targetLineNum = Math.min(lines.length, targetIdx + 1);
-          monacoEditorRef.current.revealLineInCenter(targetLineNum);
-          monacoEditorRef.current.setPosition({ lineNumber: targetLineNum, column: 1 });
-        }
-        setEditorContent(updatedContent);
-        await saveActiveFile(updatedContent);
-        addToast(`Applied fix on line ${(fix.line ?? targetIdx + 1)}. Recompiling…`, 'info');
-        setTimeout(() => { handleCompile(); }, 50);
-      } else {
-        addToast('Could not locate the target line to fix. Please fix it manually.', 'warning');
+        await commitFix(fix.label, lines.join('\n'), targetMessage);
+        return;
       }
+
+      case 'install_package': {
+        const id = Date.now();
+        setFixReceipt({
+          id,
+          label: fix.label,
+          status: 'working',
+          detail: `Installing ${fix.packageName}; this can take a minute`,
+          undoable: false,
+        });
+        try {
+          const res = await fetch(`/api/projects/${projectId}/packages/install`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ packageName: fix.packageName }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            // Nothing to undo, but keep the target so the receipt can still
+            // say whether the install cleared the error.
+            fixSnapshotRef.current = { before: current, after: current, targetMessage };
+            setFixReceipt({ id, label: data.message || fix.label, status: 'compiling', undoable: false });
+            setTimeout(() => {
+              handleCompile();
+            }, 100);
+          } else {
+            setFixReceipt({ id, label: fix.label, status: 'failed', detail: data.error || 'the package manager reported an error', undoable: false });
+          }
+        } catch (err: any) {
+          setFixReceipt({ id, label: fix.label, status: 'failed', detail: `the install request failed (${err.message})`, undoable: false });
+        }
+        return;
+      }
+
+      case 'open_doctor':
+        setIsDoctorOpen(true);
+        return;
     }
   };
 
   // 1-Click Proactive Batch Fix: Injects all detected missing packages into preamble
   const handleApplyBatchFix = async (pkgs: DetectedMissingPackage[]) => {
     if (!pkgs || pkgs.length === 0) return;
-
-    const currentLiveContent = getLiveContent();
-    lastPreFixContentRef.current = currentLiveContent;
-    setCanUndoFix(true);
-
-    const updatedContent = injectPackagesIntoPreamble(currentLiveContent, pkgs);
-
-    if (monacoEditorRef.current) {
-      monacoEditorRef.current.setValue(updatedContent);
-    }
-    setEditorContent(updatedContent);
-    await saveActiveFile(updatedContent);
-
-    const names = pkgs.map((p) => `\\usepackage{${p.packageName}}`).join(', ');
-    addToast(`Added ${names} to preamble. Recompiling...`, 'info');
-
-    setTimeout(() => {
-      handleCompile();
-    }, 50);
+    const updated = injectPackagesIntoPreamble(getLiveContent(), pkgs);
+    await commitFix(`Add ${pkgs.length} packages to the preamble`, updated);
   };
 
-  // 1-Click Rollback Handler
+  // Undo for the most recent fix. Refuses when the document has changed since,
+  // because restoring the snapshot would silently discard those edits.
   const handleUndoFix = async () => {
-    if (!lastPreFixContentRef.current) return;
-    const reverted = lastPreFixContentRef.current;
-    lastPreFixContentRef.current = null;
-    setCanUndoFix(false);
+    const snapshot = fixSnapshotRef.current;
+    if (!snapshot) return;
 
-    if (monacoEditorRef.current) {
-      monacoEditorRef.current.setValue(reverted);
+    if (getLiveContent() !== snapshot.after) {
+      addToast('The document changed after this fix, so Undo here would discard those edits. Use Ctrl+Z in the editor instead.', 'warning');
+      return;
     }
-    setEditorContent(reverted);
+
+    writeEditorContent(snapshot.before);
+    const reverted = monacoEditorRef.current ? getLiveContent() : snapshot.before;
+    fixSnapshotRef.current = null;
+    setFixReceipt(null);
     await saveActiveFile(reverted);
 
-    addToast('Reverted previous automatic change. Recompiling...', 'info');
+    addToast('Fix undone. Recompiling...', 'info');
     setTimeout(() => {
       handleCompile();
     }, 50);
   };
+
+  const handleDismissFixReceipt = useCallback(() => {
+    fixSnapshotRef.current = null;
+    setFixReceipt(null);
+  }, []);
 
   // Insert snippet helper into Monaco editor
   const handleInsertSnippet = (snippet: string, preambleAddition?: string) => {
@@ -1161,6 +1225,116 @@ export const App: React.FC = () => {
       setEditorContent((prev) => prev + '\n' + snippet);
     }
   };
+
+  // Upload images into figures/ and hand back their project paths. Failures are
+  // reported per file so one bad file does not lose the rest.
+  const uploadImages = useCallback(
+    async (images: File[], opts: { pasted?: boolean } = {}): Promise<string[]> => {
+      const paths: string[] = [];
+      for (const file of images) {
+        try {
+          paths.push(await uploadProjectImage(projectId, file, opts.pasted ? pastedImageName(file) : file.name));
+        } catch (err: any) {
+          addToast(err.message || `Could not upload ${file.name}.`, 'error');
+        }
+      }
+      if (paths.length > 0) loadProjectFiles(projectId);
+      return paths;
+    },
+    [projectId, addToast, loadProjectFiles]
+  );
+
+  const reportGraphicx = useCallback(
+    (added: boolean) => {
+      if (added) addToast('Added \\usepackage{graphicx} to the preamble.', 'info');
+    },
+    [addToast]
+  );
+
+  const handleSelectImageFromPicker = useCallback(
+    (relativePath: string) => {
+      if (!activeImageCursor || !monacoEditorRef.current) return;
+      reportGraphicx(applyImagePick(monacoEditorRef.current, activeImageCursor, relativePath).addedGraphicx);
+    },
+    [activeImageCursor, reportGraphicx]
+  );
+
+  // Drop onto the editor, drag from the file tree, or paste a screenshot.
+  const handleDropImages = useCallback(
+    async ({ files: dropped, projectPath, position }: ImageDrop) => {
+      const editor = monacoEditorRef.current;
+      const model = editor?.getModel();
+      if (!editor || !model) return;
+
+      if (projectPath) {
+        reportGraphicx(placeImagesAt(editor, [projectPath], position).addedGraphicx);
+        return;
+      }
+
+      const images = dropped.filter(isImageFile);
+      const skipped = dropped.length - images.length;
+      if (skipped > 0) {
+        addToast(`${skipped} file${skipped === 1 ? ' is' : 's are'} not an image and ${skipped === 1 ? 'was' : 'were'} not inserted.`, 'info');
+      }
+      if (images.length === 0) return;
+
+      // The user can keep typing during the upload; track the drop point through edits.
+      const [tracker] = model.deltaDecorations([], [
+        {
+          range: { startLineNumber: position.lineNumber, startColumn: position.column, endLineNumber: position.lineNumber, endColumn: position.column },
+          options: { stickiness: 1 },
+        },
+      ]);
+      const pasted = images.every((f) => /^image\.\w+$/i.test(f.name));
+      const paths = await uploadImages(images, { pasted });
+      const range = editor.getModel() === model ? model.getDecorationRange(tracker) : null;
+      if (editor.getModel() === model) model.deltaDecorations([tracker], []);
+      if (paths.length === 0 || !range) return;
+
+      reportGraphicx(
+        placeImagesAt(editor, paths, { lineNumber: range.startLineNumber, column: range.startColumn }).addedGraphicx
+      );
+    },
+    [addToast, uploadImages, reportGraphicx]
+  );
+
+  // Upload from inside the picker: the new image goes straight into the braces it was opened for.
+  const handlePickerUpload = useCallback(
+    async (images: File[]) => {
+      const target = pendingPickRef.current ?? activeImageCursor;
+      if (!target || images.length === 0) return;
+      setPickerUploadingName(images[0].name);
+      try {
+        const [path] = await uploadImages([images[0]]);
+        if (path && monacoEditorRef.current) {
+          reportGraphicx(applyImagePick(monacoEditorRef.current, target, path).addedGraphicx);
+        }
+      } finally {
+        setPickerUploadingName(null);
+        pendingPickRef.current = null;
+      }
+    },
+    [activeImageCursor, uploadImages, reportGraphicx]
+  );
+
+  const handleInsertFigureFromModal = useCallback(
+    (relativePath: string, options: FigureOptions) => {
+      const editor = monacoEditorRef.current;
+      const position = editor?.getPosition();
+      if (!editor || !position) return;
+      reportGraphicx(insertFigures(editor, [relativePath], position, options).addedGraphicx);
+    },
+    [reportGraphicx]
+  );
+
+  const openImageModal = useCallback(
+    (initialPath?: string) => {
+      setImageModalInitialPath(initialPath);
+      setImageModalNeedsGraphicx(needsGraphicx(getLiveContent()));
+      setIsImageModalOpen(true);
+    },
+    [getLiveContent]
+  );
 
   const handleBold = useCallback(() => {
     const editor = monacoEditorRef.current;
@@ -1286,9 +1460,9 @@ export const App: React.FC = () => {
       const textExts = ['.tex', '.bib', '.txt', '.sty', '.cls', '.md'];
 
       if (!textExts.includes(ext)) {
-        if (['.png', '.jpg', '.jpeg', '.svg', '.webp'].includes(ext)) {
-          // If user clicked an image, open Insert Image modal
-          setIsImageModalOpen(true);
+        if (['.png', '.jpg', '.jpeg', '.svg', '.webp', '.pdf', '.eps'].includes(ext)) {
+          // Clicking an image offers to insert that image, not whichever sorts first.
+          openImageModal(relPath);
         }
         return;
       }
@@ -1313,7 +1487,7 @@ export const App: React.FC = () => {
       }
       setActiveFilePath(relPath);
     },
-    [activeFilePath, flushPendingSave, projectId, loadFileContent, addToast]
+    [activeFilePath, flushPendingSave, projectId, loadFileContent, addToast, openImageModal]
   );
 
   // Last line of defence against losing the debounce window. The editor
@@ -1781,7 +1955,7 @@ export const App: React.FC = () => {
               <EditorToolbar
                 onInsertSnippet={handleInsertSnippet}
                 onWrapSelection={handleWrapSelection}
-                onOpenImageModal={() => setIsImageModalOpen(true)}
+                onOpenImageModal={() => openImageModal()}
                 onOpenTableModal={() => setIsTableModalOpen(true)}
                 onOpenCitationModal={() => setIsCitationModalOpen(true)}
                 onJumpToPdf={handleJumpToPdf}
@@ -1812,6 +1986,10 @@ export const App: React.FC = () => {
                       setLiveEquationDisplay(isDisplay ?? true);
                     }
                   }}
+                  onImageCursorChange={setActiveImageCursor}
+                  onImagePickerKey={(key) => imagePickerRef.current?.handleKey(key) ?? false}
+                  imagePickerApiRef={imagePickerApiRef}
+                  onDropImages={handleDropImages}
                   editorRefOut={monacoEditorRef}
                   getProjectContext={getProjectContext}
                   onJumpToPdf={handleJumpToPdf}
@@ -1887,7 +2065,9 @@ export const App: React.FC = () => {
                 compileErrors={compileErrors}
                 onApplyFix={handleApplyFix}
                 onUndoFix={handleUndoFix}
-                canUndoFix={canUndoFix}
+                fixReceipt={fixReceipt}
+                onDismissFixReceipt={handleDismissFixReceipt}
+                isFixBusy={isCompiling || fixReceipt?.status === 'working' || fixReceipt?.status === 'compiling'}
                 detectedMissingPackages={detectedMissingPackages}
                 onApplyBatchFix={handleApplyBatchFix}
                 onSelectErrorLine={(line) => {
@@ -1953,15 +2133,44 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* In-Editor Image Quick-Picker */}
+      <ImageQuickPicker
+        ref={imagePickerRef}
+        projectId={projectId}
+        files={files}
+        imageContext={activeImageCursor}
+        uploadingName={pickerUploadingName}
+        onSelectImage={handleSelectImageFromPicker}
+        onRequestUpload={() => {
+          // The file dialog blurs the editor and closes the picker; remember the target first.
+          pendingPickRef.current = activeImageCursor;
+          pickerUploadInputRef.current?.click();
+        }}
+        onDropFiles={handlePickerUpload}
+        onDismiss={() => imagePickerApiRef.current?.dismiss()}
+      />
+      <input
+        ref={pickerUploadInputRef}
+        type="file"
+        className="hidden"
+        accept=".png,.jpg,.jpeg,.svg,.webp,.pdf,.eps"
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          handlePickerUpload(picked);
+        }}
+      />
+
       {/* Insert Image Modal */}
       <InsertImageModal
         isOpen={isImageModalOpen}
         onClose={() => setIsImageModalOpen(false)}
         files={files}
         projectId={projectId}
-        editorContent={editorContent}
-        onInsert={handleInsertSnippet}
-        onUploadFiles={handleUploadFiles}
+        willAddGraphicx={imageModalNeedsGraphicx}
+        initialPath={imageModalInitialPath}
+        onInsertFigure={handleInsertFigureFromModal}
+        onUploadImages={(images) => uploadImages(images)}
       />
 
       {/* Insert Table Modal */}
@@ -2019,6 +2228,8 @@ export const App: React.FC = () => {
         allHealthy={isDoctorHealthy ?? false}
         onRefresh={checkDependencies}
         isRefreshing={isRefreshingDoctor}
+        onRunFix={handleRunDoctorFix}
+        checkedAt={doctorCheckedAt}
       />
 
       {/* Version History & Checkpoints Drawer */}

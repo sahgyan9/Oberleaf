@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 
 import { DetectedMissingPackage } from '../../utils/latexPackages';
+import { buildFixPreview } from '../../utils/fixPreview';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
@@ -35,8 +36,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 const CSS_UNITS = 96 / 72;
 
 export interface SuggestedFix {
-  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line';
+  type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line' | 'set_engine' | 'open_doctor';
   packageName?: string;
+  /** For set_engine: the engine the magic comment selects */
+  engine?: 'pdflatex' | 'xelatex' | 'lualatex';
   codeSnippet: string;
   label: string;
   description: string;
@@ -57,6 +60,21 @@ export interface CompileErrorItem {
   isCascading?: boolean;
   cascadingFromLine?: number;
   raw?: string;
+}
+
+/**
+ * What happened after the user applied a fix. It outlives the error card it
+ * came from: a fix that works makes its card disappear, and without this the
+ * only evidence of what changed (and the way back) would vanish with it.
+ */
+export interface FixReceipt {
+  id: number;
+  label: string;
+  status: 'working' | 'compiling' | 'resolved' | 'progress' | 'unchanged' | 'failed';
+  /** Extra context: remaining issue count, or why recompiling failed */
+  detail?: string;
+  undoable: boolean;
+  line?: number;
 }
 
 export interface SyncTexTarget {
@@ -99,12 +117,175 @@ interface PDFViewerProps {
   onSyncTexBackward?: (page: number, x: number, y: number, text?: string) => void;
   isSyncingBackward?: boolean;
   downloadFileName?: string;
-  onApplyFix?: (fix: SuggestedFix) => void;
+  onApplyFix?: (fix: SuggestedFix, error: CompileErrorItem) => void;
   onUndoFix?: () => void;
-  canUndoFix?: boolean;
+  fixReceipt?: FixReceipt | null;
+  onDismissFixReceipt?: () => void;
+  /** True while a fix or compile is running; fix buttons are disabled so a fix cannot be applied twice */
+  isFixBusy?: boolean;
   detectedMissingPackages?: DetectedMissingPackage[];
   onApplyBatchFix?: (pkgs: DetectedMissingPackage[]) => void;
 }
+
+const RECEIPT_TONE: Record<FixReceipt['status'], string> = {
+  working: 'bg-surface-lightPanel dark:bg-surface-darkPanel border-surface-lightBorder dark:border-surface-darkBorder',
+  compiling: 'bg-surface-lightPanel dark:bg-surface-darkPanel border-surface-lightBorder dark:border-surface-darkBorder',
+  resolved: 'bg-scholarly-subtle/70 dark:bg-scholarly-darkSubtle/50 border-scholarly/30 dark:border-scholarly-dark/30',
+  progress: 'bg-scholarly-subtle/70 dark:bg-scholarly-darkSubtle/50 border-scholarly/30 dark:border-scholarly-dark/30',
+  unchanged: 'bg-diagnostic-subtle/70 dark:bg-diagnostic-darkSubtle/40 border-diagnostic/30',
+  failed: 'bg-crimson-subtle/70 dark:bg-crimson-darkSubtle/60 border-crimson/30',
+};
+
+function receiptMessage(r: FixReceipt): string {
+  switch (r.status) {
+    case 'working':
+      return `${r.detail ?? r.label}…`;
+    case 'compiling':
+      return `Applied: ${r.label}. Recompiling…`;
+    case 'resolved':
+      return `Applied: ${r.label}. The document compiles with no errors.`;
+    case 'progress':
+      return `Applied: ${r.label}. That error is gone${r.detail ? `; ${r.detail}` : ''}.`;
+    case 'unchanged':
+      return `Applied: ${r.label}. The same error is still reported, so this fix did not address the cause.`;
+    case 'failed':
+      return `${r.label}: ${r.detail ?? 'did not complete'}.`;
+  }
+}
+
+const FixReceiptBar: React.FC<{
+  receipt: FixReceipt;
+  onUndo?: () => void;
+  onDismiss?: () => void;
+  onShowLine?: (line: number) => void;
+}> = ({ receipt, onUndo, onDismiss, onShowLine }) => {
+  const busy = receipt.status === 'working' || receipt.status === 'compiling';
+  const Icon = busy ? Loader2 : receipt.status === 'resolved' || receipt.status === 'progress' ? CheckCircle2 : AlertTriangle;
+  const iconTone = busy
+    ? 'text-stone-400 animate-spin'
+    : receipt.status === 'resolved' || receipt.status === 'progress'
+    ? 'text-scholarly dark:text-scholarly-dark'
+    : receipt.status === 'unchanged'
+    ? 'text-diagnostic dark:text-diagnostic-dark'
+    : 'text-crimson dark:text-crimson-dark';
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`w-full max-w-2xl mb-3 px-3 py-2 rounded-lg border text-xs font-sans flex items-center gap-2.5 flex-shrink-0 ${RECEIPT_TONE[receipt.status]}`}
+    >
+      <Icon className={`w-4 h-4 flex-shrink-0 ${iconTone}`} />
+      <span className="flex-1 min-w-0 text-stone-800 dark:text-stone-200 leading-snug">{receiptMessage(receipt)}</span>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {receipt.line && onShowLine && !busy && (
+          <button
+            onClick={() => onShowLine(receipt.line!)}
+            className="px-2 py-0.5 rounded text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-200/70 dark:hover:bg-stone-800 transition btn-tactile"
+          >
+            Show line {receipt.line}
+          </button>
+        )}
+        {receipt.undoable && onUndo && !busy && (
+          <button
+            onClick={onUndo}
+            aria-label="Undo this fix and recompile"
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition btn-tactile ${
+              receipt.status === 'unchanged'
+                ? 'bg-stone-900 text-white border-stone-900 hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:border-stone-100'
+                : 'bg-surface-lightPanel dark:bg-surface-darkPanel text-stone-700 dark:text-stone-200 border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Undo2 className="w-3 h-3" />
+            <span>Undo</span>
+          </button>
+        )}
+        {!busy && onDismiss && (
+          <button
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            className="p-0.5 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * One place per error to act on its fix. It shows the exact edit before the
+ * click (feedforward), names the button after the action it performs, states
+ * whether it can be undone, and disables itself while anything is running.
+ */
+const FixPanel: React.FC<{
+  fix: SuggestedFix;
+  busy: boolean;
+  onApply: () => void;
+}> = ({ fix, busy, onApply }) => {
+  const preview = buildFixPreview(fix);
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="rounded-md border border-scholarly/25 dark:border-scholarly-dark/30 bg-surface-lightSubtle dark:bg-surface-darkSubtle font-sans cursor-default overflow-hidden"
+    >
+      <div className="px-2.5 pt-2 pb-1.5 space-y-0.5">
+        <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
+          <span className="flex items-center gap-1">
+            <Wrench className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
+            <span>Suggested fix · {preview.location}</span>
+          </span>
+          <span className="normal-case tracking-normal">
+            {preview.undoable ? 'Can be undone' : 'Not an edit to your document'}
+          </span>
+        </div>
+        <p className="text-[12px] font-medium text-stone-900 dark:text-stone-100">{fix.label}</p>
+        <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-snug">{fix.description}</p>
+      </div>
+
+      {preview.lines.length > 0 && (
+        <div className="mx-2.5 mb-2 rounded border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel overflow-x-auto">
+          {preview.lines.map((l, i) => (
+            <div
+              key={i}
+              // pre-wrap, not pre: the viewport wrapper is min-w-fit, so one
+              // unbreakable paragraph line here would widen the whole pane.
+              className={`flex font-mono text-[11px] leading-5 whitespace-pre-wrap [overflow-wrap:anywhere] ${
+                l.kind === 'add'
+                  ? 'bg-scholarly-subtle/60 dark:bg-scholarly-darkSubtle/40 text-stone-900 dark:text-stone-100'
+                  : l.kind === 'remove'
+                  ? 'bg-crimson-subtle/60 dark:bg-crimson-darkSubtle/40 text-stone-500 dark:text-stone-400 line-through decoration-crimson/40'
+                  : 'text-stone-500 dark:text-stone-400 font-sans whitespace-normal'
+              }`}
+            >
+              <span className="w-5 flex-shrink-0 text-center select-none text-stone-400" aria-hidden="true">
+                {l.kind === 'add' ? '+' : l.kind === 'remove' ? '−' : ''}
+              </span>
+              <span className="pr-2">{l.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-2.5 py-1.5 border-t border-surface-lightBorder dark:border-surface-darkBorder flex items-center gap-2.5">
+        <button
+          onClick={onApply}
+          disabled={busy}
+          aria-label={`${preview.actionLabel}: ${fix.description}`}
+          className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+          <span>{busy ? 'Working…' : preview.actionLabel}</span>
+        </button>
+        <span className="text-[10px] text-stone-500 dark:text-stone-400">
+          {fix.type === 'open_doctor' ? 'Opens the diagnostics dialog' : 'Recompiles automatically afterwards'}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   pdfUrl,
@@ -121,7 +302,9 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   downloadFileName,
   onApplyFix,
   onUndoFix,
-  canUndoFix,
+  fixReceipt,
+  onDismissFixReceipt,
+  isFixBusy = false,
   detectedMissingPackages,
   onApplyBatchFix,
 }, ref) => {
@@ -914,6 +1097,15 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
         className="flex-1 overflow-auto p-4 relative"
       >
         <div className="min-w-fit w-full flex flex-col items-center justify-start">
+        {fixReceipt && (
+          <FixReceiptBar
+            receipt={fixReceipt}
+            onUndo={onUndoFix}
+            onDismiss={onDismissFixReceipt}
+            onShowLine={onSelectErrorLine}
+          />
+        )}
+
         {/* Error Diagnostics Banner */}
         {compileErrors.length > 0 && (() => {
           const rootErrorsCount = compileErrors.filter((e) => !e.isCascading).length;
@@ -930,20 +1122,6 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                   </span>
                 </span>
                 <div className="flex items-center space-x-2">
-                  {canUndoFix && onUndoFix && (
-                    <button
-                      aria-label="Revert previous automatic fix and restore code"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUndoFix();
-                      }}
-                      title="Revert previous automatic fix and restore code"
-                      className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700 transition shadow-xs btn-tactile"
-                    >
-                      <Undo2 className="w-3 h-3" />
-                      <span>Undo Fix</span>
-                    </button>
-                  )}
                   <span className="text-[10px] text-stone-500 font-normal">
                     {isShowingStalePdf ? 'Showing last valid PDF below' : 'Fix errors to generate PDF'}
                   </span>
@@ -952,32 +1130,48 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
 
               {/* Proactive Batch Fix Banner: when multiple missing packages are detected */}
               {detectedMissingPackages && detectedMissingPackages.length > 1 && onApplyBatchFix && (
-                <div className="p-2.5 rounded-md bg-scholarly-subtle/80 dark:bg-scholarly-darkSubtle/70 border border-scholarly/30 dark:border-scholarly-dark/40 flex items-center justify-between shadow-xs">
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <Wrench className="w-4 h-4 text-scholarly dark:text-scholarly-dark flex-shrink-0" />
-                    <span className="text-stone-800 dark:text-stone-200 text-xs truncate">
-                      Detected <strong>{detectedMissingPackages.length}</strong> missing packages across document:{' '}
-                      <span className="font-mono font-medium text-scholarly dark:text-scholarly-dark">
-                        {detectedMissingPackages.map((p) => `\\usepackage{${p.packageName}}`).join(', ')}
-                      </span>
+                <div className="rounded-md bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-scholarly/25 dark:border-scholarly-dark/30 font-sans overflow-hidden">
+                  <div className="px-2.5 pt-2 pb-1.5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                    <span className="flex items-center gap-1">
+                      <Wrench className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
+                      <span>Suggested fix · Preamble</span>
                     </span>
+                    <span className="normal-case tracking-normal">Can be undone</span>
                   </div>
-                  <button
-                    aria-label="Inject all missing packages into preamble in one operation"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onApplyBatchFix(detectedMissingPackages);
-                    }}
-                    title="Inject all missing packages into preamble in one operation"
-                    className="flex items-center space-x-1.5 px-3 py-1 rounded text-[11px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile flex-shrink-0 ml-3"
-                  >
-                    <Wrench className="w-3.5 h-3.5" />
-                    <span>Add All ({detectedMissingPackages.length})</span>
-                  </button>
+                  <p className="px-2.5 text-[12px] font-medium text-stone-900 dark:text-stone-100">
+                    {detectedMissingPackages.length} packages are used in the document but never loaded
+                  </p>
+                  <div className="mx-2.5 my-2 rounded border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel overflow-x-auto">
+                    {detectedMissingPackages.map((p) => (
+                      <div
+                        key={p.packageName}
+                        title={p.description}
+                        className="flex font-mono text-[11px] leading-5 whitespace-pre-wrap [overflow-wrap:anywhere] bg-scholarly-subtle/60 dark:bg-scholarly-darkSubtle/40 text-stone-900 dark:text-stone-100"
+                      >
+                        <span className="w-5 flex-shrink-0 text-center select-none text-stone-400" aria-hidden="true">+</span>
+                        <span className="pr-2">{p.codeSnippet}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-2.5 py-1.5 border-t border-surface-lightBorder dark:border-surface-darkBorder flex items-center gap-2.5">
+                    <button
+                      aria-label={`Add all ${detectedMissingPackages.length} packages to the preamble and recompile`}
+                      disabled={isFixBusy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onApplyBatchFix(detectedMissingPackages);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isFixBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                      <span>{isFixBusy ? 'Working…' : `Add all ${detectedMissingPackages.length}`}</span>
+                    </button>
+                    <span className="text-[10px] text-stone-500 dark:text-stone-400">Recompiles automatically afterwards</span>
+                  </div>
                 </div>
               )}
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                 {compileErrors.map((err, idx) => {
                   const isFigureError =
                     err.message.toLowerCase().includes('figure') ||
@@ -1016,22 +1210,6 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                         </div>
 
                         <div className="flex items-center space-x-2 flex-shrink-0">
-                          {/* 1-Click Quick Fix Button */}
-                          {err.suggestedFix && onApplyFix && (
-                            <button
-                              aria-label={err.suggestedFix.description}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onApplyFix(err.suggestedFix!);
-                              }}
-                              title={err.suggestedFix.description}
-                              className="flex items-center space-x-1.5 px-2.5 py-1 rounded text-[10px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile"
-                            >
-                              <Wrench className="w-3 h-3 flex-shrink-0" />
-                              <span>{err.suggestedFix.label}</span>
-                            </button>
-                          )}
-
                           {/* 1-Click Copy Prompt Button */}
                           <button
                             aria-label="Copy error prompt to clipboard"
@@ -1064,32 +1242,19 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                         {err.message}
                       </p>
 
-                      {/* Recommended Fix Box */}
-                      {err.suggestedFix && (
-                        <div className="p-2 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center justify-between">
-                          <span className="flex items-center space-x-1.5">
-                            <Wrench className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark flex-shrink-0" />
-                            <span><strong>Recommended fix:</strong> {err.suggestedFix.description}</span>
-                          </span>
-                          {onApplyFix && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onApplyFix(err.suggestedFix!);
-                              }}
-                              className="underline text-[10px] font-medium text-scholarly dark:text-scholarly-dark hover:opacity-80 flex-shrink-0 ml-2"
-                            >
-                              Apply Fix →
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {err.friendlyExplanation && !err.suggestedFix && (
+                      {err.friendlyExplanation && (err.isCascading || !err.suggestedFix || err.suggestedFix.type === 'replace_line') && (
                         <div className="p-1.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center space-x-1.5">
                           <Info className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
                           <span>{err.friendlyExplanation}</span>
                         </div>
+                      )}
+
+                      {err.suggestedFix && onApplyFix && (
+                        <FixPanel
+                          fix={err.suggestedFix}
+                          busy={isFixBusy}
+                          onApply={() => onApplyFix(err.suggestedFix!, err)}
+                        />
                       )}
                     </div>
                   );

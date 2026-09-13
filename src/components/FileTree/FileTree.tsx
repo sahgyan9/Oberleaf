@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from 'lucide-react';
+import { isImagePath, PROJECT_IMAGE_DRAG_TYPE } from '../../utils/imageHelper';
 
 export interface FileEntry {
   name: string;
@@ -86,6 +87,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
   }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
+    // Only OS files are uploads; an image row dragged out of this tree is not.
+    if (!e.dataTransfer.types.includes('Files')) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(true);
@@ -200,6 +203,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
           key={item.path}
           onContextMenu={(e) => handleContextMenu(e, item)}
           onClick={() => onSelectFile(item.relativePath || item.name)}
+          draggable={isImagePath(item.name)}
+          onDragStart={(e) => {
+            // Dragging an image row into the editor inserts it as a figure.
+            e.dataTransfer.setData(PROJECT_IMAGE_DRAG_TYPE, item.relativePath);
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
+          title={isImagePath(item.name) ? 'Drag into the editor to insert as a figure' : undefined}
           className={`group flex items-center justify-between px-2.5 py-1.5 rounded text-xs cursor-pointer transition select-none btn-tactile ${
             isSelected
               ? 'bg-stone-200/70 dark:bg-stone-800 text-[#1C1917] dark:text-[#F5F5F4] font-medium border-l-2 border-scholarly dark:border-scholarly-dark shadow-xs'

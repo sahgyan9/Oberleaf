@@ -1,6 +1,9 @@
 import type * as Monaco from 'monaco-editor';
+import { findProjectImages, formatBytes } from './imageHelper';
+import { FileEntry } from '../components/FileTree/FileTree';
 
 export interface ProjectContext {
+  projectId?: string;
   citations: Array<{
     key: string;
     type?: string;
@@ -8,15 +11,12 @@ export interface ProjectContext {
     author?: string;
     year?: string;
   }>;
-  files: Array<{
-    name: string;
-    relativePath: string;
-    type: string;
-  }>;
+  files: FileEntry[];
 }
 
 let completionDisposable: Monaco.IDisposable | null = null;
 let inlineCompletionDisposable: Monaco.IDisposable | null = null;
+let hoverDisposable: Monaco.IDisposable | null = null;
 
 // Cache document words by model URI and version to make word-completions instant & multi-tab safe
 let cachedDocKey = '';
@@ -103,6 +103,10 @@ export function registerLatexCompletions(
   if (inlineCompletionDisposable) {
     inlineCompletionDisposable.dispose();
     inlineCompletionDisposable = null;
+  }
+  if (hoverDisposable) {
+    hoverDisposable.dispose();
+    hoverDisposable = null;
   }
 
   completionDisposable = monaco.languages.registerCompletionItemProvider('latex', {
@@ -255,33 +259,40 @@ export function registerLatexCompletions(
         const rawPrefix = graphicMatch[1];
         const graphicRange = rangeForPrefix(rawPrefix);
         const queryPrefix = rawPrefix.trim().toLowerCase();
-        const imageExtensions = ['.png', '.jpg', '.jpeg', '.pdf', '.svg', '.webp'];
 
-        // Helper to collect all files recursively
-        const collectImages = (items: typeof context.files): string[] => {
-          const imgs: string[] = [];
-          for (const item of items) {
-            const ext = '.' + item.name.split('.').pop()?.toLowerCase();
-            if (imageExtensions.includes(ext)) {
-              imgs.push(item.relativePath);
-            }
-          }
-          return imgs;
-        };
+        const imageFiles = findProjectImages(context.files);
+        const imageItems: Monaco.languages.CompletionItem[] = imageFiles
+          .filter((img) => {
+            if (!queryPrefix) return true;
+            const nameLower = img.name.toLowerCase();
+            const relLower = img.relativePath.toLowerCase();
+            const baseLower = img.name.replace(/\.[^/.]+$/, '').toLowerCase();
+            return nameLower.includes(queryPrefix) || relLower.includes(queryPrefix) || baseLower.includes(queryPrefix);
+          })
+          .map((img, idx) => {
+            const previewUrl = context.projectId
+              ? `/api/projects/${context.projectId}/preview-image?path=${encodeURIComponent(img.relativePath)}`
+              : '';
+            const sizeStr = formatBytes(img.size);
+            const baseName = img.name.replace(/\.[^/.]+$/, '');
 
-        const imagePaths = collectImages(context.files);
-        const imageItems: Monaco.languages.CompletionItem[] = imagePaths
-          .filter((p) => !queryPrefix || p.toLowerCase().includes(queryPrefix))
-          .map((p) => ({
-            label: p,
-            kind: monaco.languages.CompletionItemKind.File,
-            insertText: p,
-            detail: 'Project Graphic',
-            documentation: {
-              value: `Include graphic file \`${p}\``,
-            },
-            range: graphicRange,
-          }));
+            return {
+              label: img.name,
+              kind: monaco.languages.CompletionItemKind.File,
+              insertText: img.relativePath,
+              filterText: `${img.name} ${img.relativePath} ${baseName}`,
+              sortText: `00_${String(idx).padStart(4, '0')}`,
+              detail: sizeStr ? `${sizeStr} · ${img.relativePath}` : img.relativePath,
+              documentation: {
+                value: `**${img.name}**\n\n\`${img.relativePath}\`${sizeStr ? ` · ${sizeStr}` : ''}\n\n${
+                  previewUrl ? `![${img.name}](${previewUrl})` : ''
+                }`,
+                isTrusted: true,
+                supportHtml: true,
+              },
+              range: graphicRange,
+            };
+          });
 
         return { suggestions: imageItems };
       }
@@ -413,9 +424,11 @@ export function registerLatexCompletions(
           insertText: [
             '\\begin{figure}[htbp]',
             '\t\\centering',
-            '\t\\includegraphics[width=${1:0.8}\\linewidth]{${2:figure}}',
-            '\t\\caption{${3:Caption text}}',
-            '\t\\label{fig:${4:label}}',
+            // Path first and empty: the image picker opens in the braces, and
+            // choosing an image fills the label and moves on to the caption.
+            '\t\\includegraphics[width=0.8\\linewidth]{$1}',
+            '\t\\caption{$2}',
+            '\t\\label{fig:$3}',
             '\\end{figure}',
           ].join('\n'),
           isSnippet: true,
@@ -820,5 +833,61 @@ export function registerLatexCompletions(
       return { items: [] };
     },
     disposeInlineCompletions: () => {},
+  });
+
+  // 3. Register Hover Provider for \includegraphics
+  hoverDisposable = monaco.languages.registerHoverProvider('latex', {
+    provideHover: (model, position) => {
+      const lineContent = model.getLineContent(position.lineNumber);
+      const regex = /\\includegraphics(?:\s*\[[^\]]*\])?\s*\{([^}]+)\}/g;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(lineContent)) !== null) {
+        const imagePath = match[1].trim();
+        const openBraceIdx = lineContent.indexOf('{', match.index);
+        const pathStartCol = openBraceIdx + 2; // 1-based column after {
+        const pathEndCol = pathStartCol + imagePath.length; // 1-based column before }
+
+        if (position.column >= pathStartCol && position.column <= pathEndCol) {
+          const context = getContext();
+          const allImages = findProjectImages(context.files);
+          const matchedImage = allImages.find(
+            (img) =>
+              img.relativePath.toLowerCase() === imagePath.toLowerCase() ||
+              img.name.toLowerCase() === imagePath.toLowerCase() ||
+              img.relativePath.replace(/\.[^/.]+$/, '').toLowerCase() === imagePath.toLowerCase()
+          );
+
+          const previewPath = matchedImage ? matchedImage.relativePath : imagePath;
+          const previewUrl = context.projectId && matchedImage
+            ? `/api/projects/${context.projectId}/preview-image?path=${encodeURIComponent(previewPath)}`
+            : '';
+          const sizeStr = matchedImage?.size ? formatBytes(matchedImage.size) : '';
+
+          const contents: Monaco.IMarkdownString[] = [
+            {
+              value: `**${matchedImage ? matchedImage.name : imagePath}**${matchedImage ? '' : ' (not found in project)'}\n\n` +
+                (sizeStr ? `**Size:** ${sizeStr}  \n` : '') +
+                `**Path:** \`${previewPath}\`\n\n` +
+                (previewUrl ? `![${imagePath}](${previewUrl})` : ''),
+              isTrusted: true,
+              supportHtml: true,
+            },
+          ];
+
+          return {
+            range: new monaco.Range(
+              position.lineNumber,
+              pathStartCol,
+              position.lineNumber,
+              pathEndCol
+            ),
+            contents,
+          };
+        }
+      }
+
+      return null;
+    },
   });
 }

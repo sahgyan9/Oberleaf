@@ -970,3 +970,26 @@ overleaf-copy/
 
 
 
+
+---
+
+### Session 024 — 2026-09-13 · Agent: Claude Code (Claude Opus 5)
+- **Prompt**: "right now when importing figure and inserting figure by typing \begin{figure} and writting the name of the figure is good but still not a good design from user experience. I want you to imporve that"
+- **Diagnosis (why the old flow felt wrong)**:
+  1. Inside `\includegraphics{}` two popups competed: the thumbnail quick-picker and Monaco's suggest list. Returning no items does not help: Monaco falls back to word-based suggestions when a provider group is empty, so the built-in widget has to be switched off while the picker is open.
+  2. The picker was mouse-only and had its own search box, so the user typed in the braces and then had to reach for the mouse.
+  3. The `\begin{figure}` snippet started on the width tab stop with a `figure` placeholder path, so the user had to remember and type the file name, then write the label by hand.
+  4. Importing and inserting were separate trips: upload in the file tree, then write the environment. The uploaded file was never inserted.
+  5. Insert Figure dialog bugs: claimed `\usepackage{graphicx}` "will be added automatically" but nothing added it; state leaked between opens ("My figure caption"); upload did not select the new image; clicking an image in the file tree did not preselect it.
+  6. `@monaco-editor/react` re-applied the inline `options` object on every render, which would silently undo any runtime option change.
+- **What was done**:
+  - `src/utils/figureInsertion.ts` (new): `insertFigures` (block placement that never splits a line, never nests inside another figure, adds `graphicx` only to root documents that lack it, caption tab stops), `applyImagePick` (fills the path, derives a unique `fig:<file-name>` label when the label is still a placeholder, moves the caret to the caption), `placeImagesAt` (drop onto `\includegraphics{...}` replaces the path).
+  - `src/utils/imageHelper.ts`: `uploadProjectImage` (uploads with `overwrite: false`, so a second `plot.png` never replaces a figure already in use), `resolveProjectImage`, `figureLabelFromPath`, timestamped names for pasted screenshots; the cursor right after `}` no longer counts as inside the path.
+  - `ImageQuickPicker.tsx` rewritten: one list filtered by what is typed in the braces, Up/Down/Enter/Tab/Esc routed from Monaco via context-keyed commands, large preview pane, upload and drop-to-upload that fill the braces on completion, non-raster (PDF/SVG/EPS) placeholders instead of blank tiles.
+  - `Editor.tsx`: picker opens for empty or unresolved paths and while typing, not while walking the caret through a valid path; Ctrl+Space reopens; Esc keeps it closed until the caret leaves; built-in suggestions suppressed only while open; stable `EDITOR_OPTIONS`; drag from the OS or the file tree and clipboard paste insert figures, with a drop-position indicator.
+  - `InsertImageModal.tsx`: resets per open, preselects, label auto-derived until edited, empty caption means "write it in the editor", double-click inserts, accurate graphicx note, drop anywhere in the dialog.
+  - `latexCompletions.ts`: figure snippet tab stops are path, caption, label; removed emoji from image hover/completion docs; hover no longer requests a preview for a missing file.
+  - `FileTree.tsx`: image rows are draggable into the editor; the tree's upload highlight ignores internal drags.
+- **Verification**: `npx tsc --noEmit` 0 errors. Browser-tested against a sandbox projects directory (OBERLEAF_PROJECTS_DIR in the scratchpad, never the real OneDrive projects): snippet + picker keyboard pick, unresolved/empty/valid path open rules, Esc/Ctrl+Space, suggest suppression and restore, OS file drop (graphicx added, placed below paragraph), screenshot paste, text paste passthrough, file-tree drag replacing a path with single-step undo, picker drop-upload, dialog insert with `$ \ % {}` in the caption while the caret was inside another figure. Compiled the result: both images embedded (including a file name with spaces), no errors.
+- **Status at end**: Complete in `Downloads/overleaf-copy`; not committed; not synced to the installed runtime at `AppData/Local/Programs/Oberleaf`.
+- **Next agent should**: Consider a missing-image diagnostic (squiggle when an `\includegraphics` path resolves to no file, honouring `\graphicspath`). `handleInsertSnippet`'s `preambleAddition` branch has no callers and its `setEditorContent` + `executeEdits` sequence would drop one of the two edits; remove or fix it.
