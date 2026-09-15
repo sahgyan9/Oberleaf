@@ -355,12 +355,14 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   const prevScaleRef = useRef<number>(scale);
   const lastHandledSyncTargetRef = useRef<number | null>(null);
 
-  const updateViewportAnchor = useCallback(() => {
+  const updateViewportAnchor = useCallback((customScreenOffset?: number) => {
     const container = containerRef.current;
     if (!container || pageDims.length === 0 || scale <= 0) return;
 
-    // Anchor at user focus zone (~30% from container top)
-    const anchorScreenOffset = Math.min(220, container.clientHeight * 0.3);
+    // Anchor at user focus zone (~30% from container top) or cursor offset if provided
+    const anchorScreenOffset = typeof customScreenOffset === 'number'
+      ? Math.max(0, Math.min(container.clientHeight, customScreenOffset))
+      : Math.min(220, container.clientHeight * 0.3);
     const targetDocY = container.scrollTop + anchorScreenOffset;
 
     let targetPageIdx = 0;
@@ -383,6 +385,107 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
       };
     }
   }, [pageDims, scale]);
+
+  const updateViewportAnchorRef = useRef(updateViewportAnchor);
+  updateViewportAnchorRef.current = updateViewportAnchor;
+
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  // Handle two-finger trackpad pinch (wheel + ctrlKey), Ctrl + Mouse Wheel, and touchscreen pinch gestures
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Two-finger pinch on trackpads synthesizes a WheelEvent with ctrlKey === true
+      // Also handles Ctrl + Mouse Wheel
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const cursorOffsetY = e.clientY - rect.top;
+        updateViewportAnchorRef.current(cursorOffsetY);
+
+        setIsFitWidth(false);
+        localStorage.setItem('overleaf-copy:pdf-fit-width', 'false');
+
+        let dy = e.deltaY;
+        if (e.deltaMode === 1) dy *= 20;
+        else if (e.deltaMode === 2) dy *= 100;
+
+        const clampedDy = Math.max(-120, Math.min(120, dy));
+        // Mouse wheel notches produce larger dy steps, trackpad pinch produces smooth continuous values
+        const zoomStep = Math.abs(clampedDy) >= 40
+          ? -Math.sign(clampedDy) * 10
+          : -clampedDy * 0.25;
+
+        setZoom((prev) => Math.max(40, Math.min(250, Math.round(prev + zoomStep))));
+      }
+    };
+
+    // Safari trackpad gesture prevention
+    const handleGestureStart = (e: Event) => {
+      e.preventDefault();
+    };
+
+    // Touchscreen two-finger pinch-to-zoom
+    let touchStartDist = 0;
+    let touchStartZoom = 80;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        touchStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        touchStartZoom = zoomRef.current;
+
+        const rect = container.getBoundingClientRect();
+        const midY = (t1.clientY + t2.clientY) / 2 - rect.top;
+        updateViewportAnchorRef.current(midY);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && touchStartDist > 0) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        if (currentDist > 0) {
+          const factor = currentDist / touchStartDist;
+          const nextZoom = Math.max(40, Math.min(250, Math.round(touchStartZoom * factor)));
+          setIsFitWidth(false);
+          localStorage.setItem('overleaf-copy:pdf-fit-width', 'false');
+          setZoom(nextZoom);
+        }
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        touchStartDist = 0;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('gesturestart', handleGestureStart as any, { passive: false });
+    container.addEventListener('gesturechange', handleGestureStart as any, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('gesturestart', handleGestureStart as any);
+      container.removeEventListener('gesturechange', handleGestureStart as any);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []);
 
   const computeFitWidthZoom = useCallback(() => {
     if (!containerRef.current || pageDims.length === 0) return 80;
@@ -903,21 +1006,21 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
               updateViewportAnchor();
               setIsFitWidth(false);
               localStorage.setItem('overleaf-copy:pdf-fit-width', 'false');
-              setZoom((z) => Math.max(50, z - 10));
+              setZoom((z) => Math.max(40, z - 10));
             }}
             title="Zoom Out"
             className="p-1 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 transition btn-tactile"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
-          <span className="font-mono w-10 text-center text-[11px] text-stone-700 dark:text-stone-300">{zoom}%</span>
+          <span className="font-mono w-10 text-center text-[11px] text-stone-700 dark:text-stone-300">{Math.round(zoom)}%</span>
           <button
             aria-label="Zoom In"
             onClick={() => {
               updateViewportAnchor();
               setIsFitWidth(false);
               localStorage.setItem('overleaf-copy:pdf-fit-width', 'false');
-              setZoom((z) => Math.min(200, z + 10));
+              setZoom((z) => Math.min(250, z + 10));
             }}
             title="Zoom In"
             className="p-1 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 transition btn-tactile"
@@ -1094,7 +1197,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
       <div
         ref={containerRef}
         onScroll={handleContainerScroll}
-        className="flex-1 overflow-auto p-4 relative"
+        className="flex-1 overflow-auto p-4 relative touch-pan-x touch-pan-y"
       >
         <div className="min-w-fit w-full flex flex-col items-center justify-start">
         {fixReceipt && (

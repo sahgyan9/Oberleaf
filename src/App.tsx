@@ -24,7 +24,9 @@ import { CollabModal } from './components/Collaboration/CollabModal';
 import { CollabSessionConfig, broadcastRemoteCompile, leaveCollabSession } from './utils/yjsCollab';
 import { InsertCitationModal, CitationItem } from './components/Modals/InsertCitationModal';
 import { ProjectContext } from './utils/latexCompletions';
-import { PanelLeftOpen, FolderClosed, ChevronRight, Loader2 } from 'lucide-react';
+import { OutlinePanel } from './components/Outline/OutlinePanel';
+import { computeSectionMove } from './utils/latexOutline';
+import { PanelLeftOpen, FolderClosed, ChevronRight, Loader2, ListTree } from 'lucide-react';
 import { ProjectsDashboard } from './components/Dashboard/ProjectsDashboard';
 import { UpdateModal, UpdateInfo } from './components/Update/UpdateModal';
 import { extractLatexTitle, getLatexPdfFilename } from './utils/latexTitle';
@@ -142,6 +144,7 @@ export const App: React.FC = () => {
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState<boolean>(() => {
     return readSetting('filetree-collapsed') === 'true';
   });
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'outline'>('files');
   const [pdfCollapsed, setPdfCollapsed] = useState<boolean>(() => {
     return readSetting('pdf-collapsed') === 'true';
   });
@@ -1014,6 +1017,41 @@ export const App: React.FC = () => {
     return start.lineNumber;
   }, []);
 
+  // Jump to section in Monaco and trigger line pulse decoration
+  const handleJumpToSectionLine = useCallback(
+    (line: number) => {
+      if (viewMode === 'pdf') {
+        setViewMode('split');
+      }
+      if (monacoEditorRef.current) {
+        monacoEditorRef.current.revealLineInCenter(line);
+        monacoEditorRef.current.setPosition({ lineNumber: line, column: 1 });
+        monacoEditorRef.current.focus();
+      }
+      setHighlightLine({ line, timestamp: Date.now() });
+    },
+    [viewMode]
+  );
+
+  // Drag-and-drop section reorder in active document
+  const handleReorderSection = useCallback(
+    async (sourceId: string, targetId: string, position: 'before' | 'after') => {
+      const current = getLiveContent();
+      const result = computeSectionMove(current, sourceId, targetId, position);
+      if (!result) return;
+
+      const line = writeEditorContent(result.newContent);
+      const after = monacoEditorRef.current ? getLiveContent() : result.newContent;
+      if (line) {
+        setHighlightLine({ line, timestamp: Date.now() });
+      }
+
+      await saveActiveFile(after);
+      addToast('Section reordered', 'info');
+    },
+    [getLiveContent, writeEditorContent, saveActiveFile, addToast]
+  );
+
   // Applies an edit-type fix: write, remember both sides for Undo, save, and
   // recompile so the receipt can report whether the error actually went away.
   const commitFix = async (label: string, updated: string, targetMessage?: string): Promise<boolean> => {
@@ -1881,14 +1919,39 @@ export const App: React.FC = () => {
           <div className="w-10 h-full border-r border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col items-center py-3 space-y-3 z-10 flex-shrink-0 select-none transition-colors">
             <button
               onClick={() => setFileTreeCollapsed(false)}
-              title="Expand Files Sidebar (Ctrl+B)"
+              title="Expand Sidebar (Ctrl+B)"
               className="p-1.5 rounded hover:bg-stone-200/80 dark:hover:bg-stone-800 text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
             >
               <PanelLeftOpen className="w-4 h-4" />
             </button>
-            <div className="text-stone-400 p-1">
+            <button
+              onClick={() => {
+                setSidebarTab('files');
+                setFileTreeCollapsed(false);
+              }}
+              title="Files"
+              className={`p-1.5 rounded transition ${
+                sidebarTab === 'files'
+                  ? 'text-scholarly dark:text-scholarly-dark bg-stone-200/60 dark:bg-stone-800'
+                  : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'
+              }`}
+            >
               <FolderClosed className="w-4 h-4" />
-            </div>
+            </button>
+            <button
+              onClick={() => {
+                setSidebarTab('outline');
+                setFileTreeCollapsed(false);
+              }}
+              title="Document Outline"
+              className={`p-1.5 rounded transition ${
+                sidebarTab === 'outline'
+                  ? 'text-scholarly dark:text-scholarly-dark bg-stone-200/60 dark:bg-stone-800'
+                  : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'
+              }`}
+            >
+              <ListTree className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -1915,21 +1978,34 @@ export const App: React.FC = () => {
                 collapsible={false}
                 className="h-full"
               >
-                <FileTree
-                  files={files}
-                  selectedFilePath={activeFilePath}
-                  hasUnsavedChanges={saveStatus !== 'saved'}
-                  onSelectFile={handleSelectFile}
-                  onUploadFiles={handleUploadFiles}
-                  onNewFile={handleNewFile}
-                  onNewFolder={handleNewFolder}
-                  onRenameItem={handleRenameItem}
-                  onDeleteItem={handleDeleteItem}
-                  onDuplicateItem={handleDuplicateItem}
-                  onToggleCollapse={() => setFileTreeCollapsed(true)}
-                  onRevealInExplorer={handleRevealInExplorer}
-                  onShowToast={addToast}
-                />
+                {sidebarTab === 'files' ? (
+                  <FileTree
+                    files={files}
+                    selectedFilePath={activeFilePath}
+                    hasUnsavedChanges={saveStatus !== 'saved'}
+                    onSelectFile={handleSelectFile}
+                    onUploadFiles={handleUploadFiles}
+                    onNewFile={handleNewFile}
+                    onNewFolder={handleNewFolder}
+                    onRenameItem={handleRenameItem}
+                    onDeleteItem={handleDeleteItem}
+                    onDuplicateItem={handleDuplicateItem}
+                    onToggleCollapse={() => setFileTreeCollapsed(true)}
+                    onRevealInExplorer={handleRevealInExplorer}
+                    onShowToast={addToast}
+                    activeTab={sidebarTab}
+                    onTabChange={setSidebarTab}
+                  />
+                ) : (
+                  <OutlinePanel
+                    content={editorContent}
+                    onJumpToLine={handleJumpToSectionLine}
+                    onReorderSection={handleReorderSection}
+                    onToggleCollapse={() => setFileTreeCollapsed(true)}
+                    activeTab={sidebarTab}
+                    onTabChange={setSidebarTab}
+                  />
+                )}
               </Panel>
 
               {/* Resize Handle between FileTree and Editor */}

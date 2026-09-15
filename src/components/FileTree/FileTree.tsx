@@ -50,6 +50,8 @@ interface FileTreeProps {
   onToggleCollapse?: () => void;
   onRevealInExplorer?: (path?: string) => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  activeTab?: 'files' | 'outline';
+  onTabChange?: (tab: 'files' | 'outline') => void;
 }
 
 export const FileTree: React.FC<FileTreeProps> = ({
@@ -66,6 +68,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onToggleCollapse,
   onRevealInExplorer,
   onShowToast,
+  activeTab = 'files',
+  onTabChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -264,9 +268,34 @@ export const FileTree: React.FC<FileTreeProps> = ({
 
       {/* Header */}
       <div className="p-3 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between flex-shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 font-sans">
-          Files
-        </span>
+        {onTabChange ? (
+          <div className="flex items-center bg-stone-200/60 dark:bg-stone-800 rounded-md p-0.5 text-xs">
+            <button
+              onClick={() => onTabChange('files')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                activeTab === 'files'
+                  ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+            >
+              Files
+            </button>
+            <button
+              onClick={() => onTabChange('outline')}
+              className={`px-2 py-0.5 rounded font-medium transition ${
+                activeTab === 'outline'
+                  ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+            >
+              Outline
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 font-sans">
+            Files
+          </span>
+        )}
         <div className="flex items-center space-x-0.5">
           <button
             aria-label="Import Files (or Drag & Drop multiple)"
