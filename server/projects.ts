@@ -62,7 +62,7 @@ export interface FileItem {
   children?: FileItem[];
 }
 
-const TEMPLATES: Record<string, { mainTex: string; files?: Record<string, string> }> = {
+export const TEMPLATES: Record<string, { mainTex: string; files?: Record<string, string> }> = {
   cv: {
     mainTex: `\\documentclass[a4paper, 10pt]{article}
 

@@ -1,177 +1,200 @@
-# Oberleaf 🍃
+# Oberleaf
 
 <p align="center">
   <img src="assets/icon.svg" width="128" height="128" alt="Oberleaf Logo" />
 </p>
 
 <p align="center">
-  <b>The open-source, local-first LaTeX suite with instant equation preview, side-by-side PDF rendering, and zero compute timeouts.</b>
+  <b>A local-first LaTeX editor with live equation preview, side-by-side PDF rendering, and compiles that run on your own CPU.</b>
 </p>
 
 <p align="center">
+  <a href="#why-oberleaf">Why Oberleaf</a> •
+  <a href="#measured-performance">Performance</a> •
   <a href="#features">Features</a> •
   <a href="#quickstart">Quickstart</a> •
-  <a href="#windows-integration">Windows Search</a> •
-  <a href="#don-norman-ux">UX Philosophy</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#network-and-privacy">Network &amp; Privacy</a> •
+  <a href="#architecture">Architecture</a>
 </p>
 
 ---
 
-## 💡 Why Oberleaf?
+## Why Oberleaf?
 
-Overleaf's free tier imposes strict compilation timeouts (typically 60–120 seconds). Large documents with dense bibliographies, high-resolution figures, or extensive PGFPlots/TikZ environments frequently hit compute walls and freeze.
+Overleaf's free tier stops a compile after a fixed time limit. Large documents with long bibliographies, high-resolution figures or heavy TikZ/PGFPlots can hit that limit and fail.
 
-**Oberleaf** compiles directly on your local CPU:
-- 🚀 **1–2 Second Compilations:** Uses your multi-core processor for near-instant builds.
-- ♾️ **Unlimited Compute Time:** Zero timeout errors, compile 500-page theses or complex graphics with no limits.
-- ⚡ **Instant Equation Preview:** KaTeX renders math formulas live beneath your cursor with 0ms latency as you type.
-- 🔒 **100% Offline & Private:** Your research papers, formulas, and intellectual property never leave your machine.
-- ☁️ **Cloud-Ready Architecture:** Clean separation of concerns allows deploying to the cloud (Docker + Supabase) whenever needed.
+Oberleaf compiles with the TeX distribution installed on your machine:
 
----
-
-## 🎨 Brand Identity & Design System
-
-Oberleaf is built around a distinct, modern 4-color palette designed for high legibility and eye comfort in both Light and Dark modes:
-
-| Color | Hex | Role |
-| :--- | :--- | :--- |
-| **Deep Indigo** | `#2F39A9` | Brand identity, primary modal headers, deep elevation |
-| **Ocean Blue** | `#2E6FA0` | Active tabs, panel borders, secondary controls |
-| **Cyan Teal** | `#49A4BB` | Equation preview frame, syntax tags, line numbers |
-| **Electric Mint** | `#15D8B3` | Recompile CTA, success indicators, logo aura |
+- **Local compiles.** A recompile while writing takes about 1.3 to 1.8 seconds for the bundled templates on a 2021 laptop CPU; a build from an empty cache takes 2 to 3 seconds. See [Measured performance](#measured-performance).
+- **Your time limit, not ours.** A compile is stopped after 10 minutes by default so a stuck TeX process cannot hang the app. Set `OVERLEAF_COPY_COMPILE_TIMEOUT_MS` to change it, or to `0` to disable the limit.
+- **Live equation preview.** KaTeX renders the formula under your cursor as you type, a few milliseconds of work per keystroke.
+- **Documents stay on disk.** Projects are stored and compiled locally. The network is used only for the things listed under [Network & Privacy](#network-and-privacy).
 
 ---
 
-## ✨ Features
+## Measured performance
 
-- **Side-by-Side Split View:** Monaco code editor on the left, interactive PDF viewer on the right with resizable divider.
-- **3-Way Viewport Modes:**
-  - `Split View`: Default side-by-side writing and previewing.
-  - `Code-Only Fullscreen`: Distraction-free editing across 100% of your monitor.
-  - `PDF-Only Fullscreen`: Clean reading/presentation mode for proofreading.
-- **Live Equation Preview:** Floating KaTeX tooltip detects inline (`$...$`) and display (`\begin{equation}`) math environments at your cursor.
-- **Overleaf Authoring Parity:**
-  - **Insert Image Modal:** Browse uploaded project figures, set width (`0.8\textwidth`), caption, and label with 1 click.
-  - **Visual Table Generator:** Interactive grid selector ($M \times N$), header toggles, and border controls.
-  - **Project Templates:** Pre-bundled with Blank Document, IEEE Conference Paper, and Master's Thesis.
-  - **Asset Upload:** Drag & drop images (`.png`, `.jpg`, `.pdf`) directly from Windows Explorer into the file tree.
-- **PDF Night Filter:** Eye-friendly canvas inversion filter for late-night reading in dark mode without altering the exported PDF.
-- **Dependency Doctor:** Diagnostic screen inspired by Don Norman principles that tests your system PATH for TeX tools and gives 1-click `winget` installation commands.
+Numbers come from `npm run bench` ([scripts/benchmark.ts](scripts/benchmark.ts)), which compiles every bundled template through the same code path as the Recompile button. The full report, including the environment, is in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+Measured on an Intel Core i7-1165G7, 16 GB RAM, Windows 10, MiKTeX 26.5 with latexmk, 5 runs each:
+
+| Template | Recompile after an edit (median) | Build from empty cache (median) |
+| :--- | ---: | ---: |
+| Blank document | 1.3 s | 2.0 s |
+| CV | 1.5 s | 2.5 s |
+| IEEE conference paper | 1.8 s | 2.7 s |
+| Thesis | 1.7 s | 2.9 s |
+
+Equation preview, per keystroke (math detection over the whole buffer plus KaTeX render, excluding the browser's paint):
+
+| Document size | Median | p95 |
+| :--- | ---: | ---: |
+| 10 pages (29 KB) | 0.8 ms | 1.8 ms |
+| 100 pages (293 KB) | 1.8 ms | 2.9 ms |
+| 500 pages (1.4 MB) | 4.4 ms | 7.0 ms |
+
+Your numbers will differ with CPU, TeX distribution, antivirus scanning and document content. The first compile on a fresh MiKTeX install also downloads packages, which the benchmark excludes. Run `npm run bench` to measure your own machine, or `npm run bench -- --write` to update the report.
 
 ---
 
-## 🚀 Quickstart
+## Features
+
+- **Side-by-side split view:** Monaco code editor on the left, PDF viewer on the right, resizable divider.
+- **Three view modes:** split, code only and PDF only.
+- **Live equation preview:** a floating KaTeX card for inline (`$...$`), `\[...\]` and display environments (`equation`, `align`, `gather`, `multline` and their starred forms) at the cursor.
+- **Authoring tools:**
+  - **Insert Image:** pick an uploaded figure, set width, caption and label.
+  - **Insert Table:** grid-size picker with header and border options.
+  - **Project templates:** Blank Document, CV, IEEE Conference Paper and Master's/PhD Thesis.
+  - **File upload:** drag and drop `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.pdf`, `.bib`, `.tex`, `.sty`, `.cls` and `.txt` files into the file tree.
+- **Auto-save:** edits are saved 800 ms after you stop typing, and any pending save is flushed before each compile.
+- **Error explanations:** common TeX errors (undefined commands, missing `$`, unbalanced braces, missing packages, option clashes, locked output files, fontspec under pdfLaTeX, and others) are shown with a plain-English explanation, and some offer a one-click fix. Errors outside that set show the raw TeX message.
+- **PDF night filter:** inverts the PDF canvas for dark mode without changing the exported PDF.
+- **TeX Diagnostics:** checks for Node.js, pdflatex, latexmk (and Perl), xelatex and biber; whether MiKTeX installs missing packages silently; whether microtype font expansion works; and whether two TeX distributions are on PATH. Two MiKTeX problems (silent install off, stale font maps) can be repaired from the dialog. For the rest it shows the command to run.
+
+---
+
+## Quickstart
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- A local LaTeX distribution (e.g. **MiKTeX** or **TeX Live**)
+- [Node.js](https://nodejs.org/) 18 or later
+- A LaTeX distribution: **MiKTeX** or **TeX Live**
 
-> **Don't have LaTeX installed yet?**  
-> On Windows, run:
-> ```powershell
-> winget install MiKTeX.MiKTeX
-> ```
-> *(The built-in Dependency Doctor will also check this for you on first launch).*
+On Windows, MiKTeX can be installed with:
+```powershell
+winget install MiKTeX.MiKTeX
+```
+TeX Diagnostics checks the installation on first launch.
 
-### Installation & Launch
+### Install and run
 
-1. **Clone the repository** (or copy this folder to your preferred location):
+1. Clone the repository:
    ```bash
    git clone https://github.com/sahgyan9/Oberleaf.git
    cd Oberleaf
    ```
 
-2. **Install dependencies:**
+2. Install dependencies:
    ```bash
    npm install
    ```
 
-3. **Start the local suite:**
+3. Start the app:
    ```bash
    npm start
    ```
-   *Your browser will open to `http://localhost:5173` with the local compiler running on port `3001`.*
+   The editor opens at `http://localhost:5173`; the local compile server runs on port `3001`.
 
 ---
 
-## 🪟 Windows Integration & User Experience
+## Windows Integration
 
-Oberleaf provides first-class Windows 10 & 11 integration:
-- **Interactive Setup Wizard**: Allows selecting install destination and toggling Desktop & Start Menu shortcuts.
-- **Windows Search & Start Menu**: Press the **Windows Key** and type `oberleaf` to launch with custom icon.
-- **Projects Location Discovery**: Your documents stay 100% private in `Documents\Oberleaf Projects` (or local `projects/`), with 1-click **Reveal in File Explorer** available in the Dashboard, File Tree, and bottom Status Bar.
-- **App Observability**: The bottom Status Bar gives continuous visibility into the local server daemon (`:3001`), compiler status, active file path, and diagnostic health.
-- **Clean Uninstallation**: Fully registered in **Windows Settings > Installed Apps** (`ms-settings:appsfeatures`) with an uninstaller that protects and preserves your research documents.
-- **Web Download Host**: The official download portal is hosted via [`friendly-learning-srmap`](https://friendly-learning-srmap.vercel.app/oberleaf) (repository located at `C:\Users\sahgy\Downloads\friendly-learning-srmap`).
-
----
-
-## 🧠 Don Norman UX Philosophy
-
-1. **Immediate Visibility:** You always know the exact state of the system. The compile button displays duration timers (`1.42s`), active spinners, and clear success/warning badges.
-2. **Error Forgiveness & Translation:** Cryptic LaTeX log output (e.g., `! LaTeX Error: File 'foo.sty' not found`) is translated into plain, human-friendly English with 1-click package installation advice.
-3. **Natural Mapping:** Spatial layout mirrors your mental model—code edits on the left instantly reflect in the rendered document on the right.
-4. **Safety & Auto-Recovery:** Code auto-saves on compilation; your work is safely persisted in the local filesystem.
+- **Setup wizard:** choose the install location and whether to add Desktop and Start Menu shortcuts.
+- **Start Menu search:** press the Windows key and type `oberleaf`.
+- **Projects folder:** projects live in `Documents\Oberleaf Projects` (or the local `projects/` folder). **Reveal in File Explorer** is available from the Dashboard, File Tree and Status Bar.
+- **Status Bar:** shows the local server (`:3001`), compiler status, active file path and diagnostic health.
+- **Uninstall:** registered in **Settings > Apps > Installed apps**. The uninstaller leaves your documents in place.
+- **Download page:** hosted at [friendly-learning-srmap.vercel.app/oberleaf](https://friendly-learning-srmap.vercel.app/oberleaf).
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Network and Privacy
+
+Projects are stored and compiled on your machine. Oberleaf makes these network requests:
+
+| When | What | Destination |
+| :--- | :--- | :--- |
+| Every launch | UI fonts | Google Fonts (`fonts.googleapis.com`) |
+| Shortly after launch | Check for a newer version | GitHub API (`api.github.com`) |
+| First compile that needs a missing package (MiKTeX) | Package download | MiKTeX package repositories |
+| Only when you start collaboration | Peer discovery; edits then travel peer-to-peer | Public y-webrtc signaling servers |
+| Only when you start a share tunnel | Expose the local app at a public URL | Cloudflare (`cloudflared`) |
+
+No document content is sent anywhere unless you start collaboration or a share tunnel.
+
+---
+
+## Design Principles
+
+1. **Visible state:** the compile button shows a timer during the build, and the result shows its duration and a success or warning badge.
+2. **Errors in plain language:** recognised TeX errors are explained in English with a suggested fix, and missing packages come with install advice.
+3. **Natural mapping:** source on the left, rendered output on the right.
+4. **Safety:** edits auto-save, and compiles always run on the saved file.
+
+---
+
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
-| `Ctrl + Enter` (or `Cmd + Enter`) | **Recompile Document** |
-| `Ctrl + 7` (or `Cmd + 7`) | **Full Code Mode** (Maximize Editor) |
-| `Ctrl + 8` (or `Cmd + 8`) | **Split Mode** (Editor + PDF Preview) |
-| `Ctrl + 9` (or `Cmd + 9`) | **Full PDF Mode** (Maximize Preview; double/triple/continuous press toggles between all 3 views) |
-| `Ctrl + B` (or `Cmd + B`) | **Toggle Sidebar** (File Tree) |
-| `Ctrl + S` (or `Cmd + S`) | **Save Active File** |
-| `Ctrl + Alt + J` | **SyncTeX Forward** (Jump from cursor to PDF location) |
+| `Ctrl + Enter` (or `Cmd + Enter`) | Recompile |
+| `Ctrl + 7` (or `Cmd + 7`) | Code only |
+| `Ctrl + 8` (or `Cmd + 8`) | Split view |
+| `Ctrl + 9` (or `Cmd + 9`) | PDF only (repeated presses cycle through all three views) |
+| `Ctrl + B` (or `Cmd + B`) | Bold (`\textbf`) in the editor; toggles the file tree sidebar elsewhere |
+| `Ctrl + I` (or `Cmd + I`) | Italic (`\textit`) in the editor |
+| `Ctrl + S` (or `Cmd + S`) | Save active file |
+| `Ctrl + Alt + J` | SyncTeX forward search (cursor to PDF) |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 Oberleaf/
-├── assets/                  # High-res SVG and Windows ICO logos
-├── scripts/                 # Windows Start Menu installer & silent launcher
-├── server/                  # Local Node.js / Express compiler daemon
-│   ├── compiler.ts          # latexmk process runner & log parser
-│   ├── doctor.ts            # System PATH diagnostic doctor
-│   └── projects.ts          # Local project filesystem CRUD
-├── src/                     # React 18 + Vite + Tailwind CSS Frontend
+├── assets/                  # SVG and ICO logos
+├── docs/                    # Benchmark report
+├── scripts/                 # Installer, launcher, benchmark, probe generator
+├── server/                  # Local Node.js / Express compile server
+│   ├── compiler.ts          # latexmk/pdflatex runner, log parser, error explanations
+│   ├── doctor.ts            # TeX Diagnostics checks and repairs
+│   └── projects.ts          # Project storage and templates
+├── src/                     # React 18 + Vite + Tailwind CSS frontend
 │   ├── components/
 │   │   ├── Editor/          # Monaco editor integration
-│   │   ├── EditorToolbar/   # Formatting & modal insert triggers
+│   │   ├── EditorToolbar/   # Formatting and insert actions
 │   │   ├── EquationPreview/ # Live KaTeX preview card
-│   │   ├── PDFViewer/       # Canvas PDF viewer with zoom & night filter
-│   │   └── Modals/          # Image and Table insert generators
-│   └── context/             # Dark/Light theme provider
+│   │   ├── PDFViewer/       # PDF viewer with zoom and night filter
+│   │   └── Modals/          # Image and table insert dialogs
+│   └── context/             # Light/dark theme provider
 └── README.md
 ```
 
-### Future Cloud Deployment Path
-The compiler and storage layers are written against decoupled interfaces (`ICompilerService`, `IStorageService`). To deploy to the cloud:
-1. Host the React frontend on **Vercel**.
-2. Store projects and auth using **Supabase** (Postgres + Storage buckets).
-3. Deploy the TeX Live compiler container on **Railway / Fly.io / Hetzner** using Docker.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details. Oberleaf runs locally only; there is no hosted or cloud version.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are warmly welcomed! Please feel free to open issues, submit pull requests, or suggest new templates.
+Issues and pull requests are welcome.
 
 ```bash
-# Run typecheck
-npm run typecheck
+npm run typecheck   # TypeScript check
+npm run bench       # Measure compile and preview performance on your machine
 ```
 
 ---
 
-## 📄 License
+## License
 
-Distributed under the **MIT License**. Free for personal, academic, and commercial use.
+Distributed under the **MIT License**.
