@@ -3,6 +3,10 @@ import { ArrowDownToLine, CheckCircle2, ArrowUpCircle, Loader2, X, RefreshCw, Al
 
 export interface UpdateInfo {
   hasUpdate: boolean;
+  /** See server/updater.ts: only 'behind' can be updated */
+  state?: 'up-to-date' | 'behind' | 'ahead' | 'diverged';
+  aheadBy?: number;
+  behindBy?: number;
   currentCommit: string;
   latestCommit: string;
   commitMessage?: string;
@@ -39,12 +43,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       const res = await fetch('/api/system/apply-update', { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.success) {
-        setUpdateSuccess('Update installed successfully! Reloading Oberleaf...');
+        setUpdateSuccess(`${data.message} Reloading Oberleaf...`);
         setTimeout(() => {
           window.location.reload();
         }, 1500);
       } else {
-        setUpdateError(data.error || data.message || 'Failed to apply update.');
+        setUpdateError([data.message, data.error].filter(Boolean).join(' ') || 'Failed to apply update.');
       }
     } catch (err: any) {
       setUpdateError(`Could not reach local server: ${err.message}`);
@@ -54,6 +58,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   };
 
   const hasUpdate = updateInfo?.hasUpdate;
+  const localCommits = updateInfo?.aheadBy ?? 0;
+  const plural = (n: number) => (n === 1 ? '' : 's');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 select-none">
@@ -79,7 +85,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           </div>
           <div>
             <h3 className="font-serif font-bold text-base text-stone-900 dark:text-stone-100">
-              {hasUpdate ? 'Update Available' : 'Oberleaf is Up to Date'}
+              {hasUpdate
+                ? 'Update Available'
+                : updateInfo?.state === 'ahead'
+                ? 'Local Changes Not on GitHub'
+                : updateInfo?.state === 'diverged'
+                ? 'Local and GitHub Versions Differ'
+                : 'Oberleaf is Up to Date'}
             </h3>
             <p className="text-xs text-stone-500 dark:text-stone-400">
               Oberleaf Update Manager
@@ -116,8 +128,19 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         {/* Status / Notice Messages */}
         {hasUpdate ? (
           <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed mb-5">
-            A new version of Oberleaf is available with new features and compiler improvements. Your research documents in <code className="text-emerald-600 dark:text-emerald-400 font-mono">projects/</code> will be safely preserved.
+            {updateInfo?.behindBy ?? 'New'} commit{plural(updateInfo?.behindBy ?? 2)} on GitHub. Updating fast-forwards this copy; it stops without changing anything if that would overwrite local edits. Your documents in <code className="text-emerald-600 dark:text-emerald-400 font-mono">projects/</code> are not part of the update.
           </p>
+        ) : updateInfo?.state === 'ahead' ? (
+          <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed mb-5">
+            This copy has {localCommits} commit{plural(localCommits)} that GitHub does not have, so there is nothing to download. Push them to share them.
+          </p>
+        ) : updateInfo?.state === 'diverged' ? (
+          <div className="flex items-start space-x-2 text-xs text-amber-600 dark:text-amber-400 mb-5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>
+              This copy has {localCommits} local commit{plural(localCommits)} and GitHub has {updateInfo.behindBy ?? 0} new one{plural(updateInfo.behindBy ?? 0)}. Combining them needs a git merge, so Oberleaf will not update automatically.
+            </span>
+          </div>
         ) : updateInfo?.isOffline ? (
           <div className="flex items-center space-x-2 text-xs text-amber-600 dark:text-amber-400 mb-5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />

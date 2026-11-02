@@ -125,7 +125,7 @@ Projects are stored and compiled on your machine. Oberleaf makes these network r
 | When | What | Destination |
 | :--- | :--- | :--- |
 | Every launch | UI fonts | Google Fonts (`fonts.googleapis.com`) |
-| Shortly after launch | Check for a newer version | GitHub API (`api.github.com`) |
+| Shortly after launch | Check for a newer version (`git fetch` of `main`; an update is only offered, and only applied, as a fast-forward that cannot discard local commits or edits) | GitHub (`github.com`) |
 | First compile that needs a missing package (MiKTeX) | Package download | MiKTeX package repositories |
 | Only when you start collaboration | Peer discovery; edits then travel peer-to-peer | Public y-webrtc signaling servers |
 | Only when you start a share tunnel | Expose the local app at a public URL | Cloudflare (`cloudflared`) |
