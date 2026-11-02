@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The gate: typecheck, every test (the error corpus runs against the TeX logs
+  # recorded in tests/fixtures/logs, so no TeX is needed), and the production
+  # build. Windows is where Oberleaf is used; Ubuntu catches code that only
+  # works because of Windows path or line-ending behaviour.
+  checks:
+    name: Checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # A measurement, not a gate: compiles every case in tests/errorCorpus.ts
+  # with TeX Live instead of the MiKTeX the logs were recorded with, and
+  # uploads the resulting coverage table. Log wording differs between
+  # distributions, so this shows how far the rules carry over. Make it a
+  # required check once its results have been reviewed and the gaps fixed.
+  tex-live:
+    name: Error corpus on TeX Live
+    runs-on: ubuntu-latest
+    container: texlive/texlive:latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Compile every corpus case with TeX Live
+        run: npm run test:live
+      - name: Record TeX Live logs and coverage table
+        if: always()
+        run: npm run test:record
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: texlive-error-coverage
+          path: |
+            docs/ERROR_COVERAGE.md
+            tests/fixtures/logs/

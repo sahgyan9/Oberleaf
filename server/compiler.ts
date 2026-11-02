@@ -1050,11 +1050,17 @@ function enrichErrorsWithSourceContext(
   // file and line (fontspec.sty:101), so "Jump" would land on line 101 of the
   // user's document. Point it at the \usepackage line that loaded the package.
   const errors = rawErrors.map((err) => {
-    const ext = path.extname(err.file).toLowerCase();
+    // Log paths can be Windows paths even when this runs elsewhere (a recorded
+    // MiKTeX log parsed on Linux in CI), and MiKTeX mixes \ and / in them.
+    // path.win32 splits on both separators, so use it for the file name.
+    const ext = path.win32.extname(err.file).toLowerCase();
     if (ext !== '.sty' && ext !== '.cls') return err;
     // A .sty the user keeps in the project is their own file; its line is right.
-    if (projectDir && path.resolve(projectDir, err.file).startsWith(path.resolve(projectDir) + path.sep)) return err;
-    const name = path.basename(err.file, ext).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // A drive-letter path is absolute even where `path` does not know it, and
+    // path.resolve would otherwise file C:/.../fontspec.sty under the project.
+    const windowsAbsolute = /^[A-Za-z]:[\\/]/.test(err.file) && !path.isAbsolute(err.file);
+    if (projectDir && !windowsAbsolute && path.resolve(projectDir, err.file).startsWith(path.resolve(projectDir) + path.sep)) return err;
+    const name = path.win32.basename(err.file, ext).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const loader = new RegExp(
       ext === '.cls'
         ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${name}\\s*\\}`

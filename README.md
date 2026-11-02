@@ -218,7 +218,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for details. Oberleaf runs locally only; 
 
 Issues and pull requests are welcome.
 
-The most useful contribution needs no code: a LaTeX error that Oberleaf explained badly or not at all. Open an issue with the smallest document that produces it. It becomes a case in the [error corpus](docs/ERROR_COVERAGE.md), compiled with real TeX on every test run, before a rule is written for it.
+The most useful contribution needs no code: a LaTeX error that Oberleaf explained badly or not at all. Open an issue with the smallest document that produces it. It becomes a case in the [error corpus](docs/ERROR_COVERAGE.md) before a rule is written for it: compiled once with real TeX, its log is saved and every test run checks the rule against that log.
 
 ```bash
 npm run typecheck   # TypeScript check
@@ -227,6 +227,8 @@ npm run test:live   # Same corpus, compiled with your installed TeX
 npm run test:record # Re-record the corpus logs and regenerate docs/ERROR_COVERAGE.md
 npm run bench       # Measure compile and preview performance on your machine
 ```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the typecheck, the tests and the production build on Windows and Ubuntu for every push and pull request. A second job compiles the whole error corpus with TeX Live and uploads the resulting coverage table. It is not a required check yet: the corpus was recorded with MiKTeX, and that job measures how far the rules carry over to TeX Live.
 
 ---
 
