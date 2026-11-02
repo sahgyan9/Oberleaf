@@ -77,7 +77,7 @@ Your numbers will differ with CPU, TeX distribution, antivirus scanning and docu
   - **Project templates:** Blank Document, CV, IEEE Conference Paper and Master's/PhD Thesis.
   - **File upload:** drag and drop `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.pdf`, `.bib`, `.tex`, `.sty`, `.cls` and `.txt` files into the file tree.
 - **Auto-save:** edits are saved 800 ms after you stop typing, and any pending save is flushed before each compile.
-- **Error explanations:** 52 common LaTeX and BibTeX mistakes, drawn from Overleaf's error guide and l2tabu, are explained in plain English. 27 of them come with a one-click fix you can preview first: a typo correction such as `\textbff` to `\textbf`, the missing package, an escaped `&`, a matching `\end{...}`, or a unit for `width=0.5`. Each one is a test case compiled with real TeX; [docs/ERROR_COVERAGE.md](docs/ERROR_COVERAGE.md) lists them. Errors outside that list show the raw TeX message with a generic hint.
+- **Error explanations:** 52 common LaTeX and BibTeX mistakes, drawn from Overleaf's error guide and l2tabu, are explained in plain English. 27 of them come with a one-click fix you can preview first: a typo correction such as `\textbff` to `\textbf`, the missing package, an escaped `&`, a matching `\end{...}`, or a unit for `width=0.5`. Each one is a test case compiled with real TeX, with logs recorded on both MiKTeX and TeX Live; [docs/ERROR_COVERAGE.md](docs/ERROR_COVERAGE.md) lists them. Errors outside that list show the raw TeX message with a generic hint.
 - **Document outline:** a section tree in the sidebar. Click a heading to jump to it, or drag a section to move it and everything under it.
 - **SyncTeX:** `Ctrl + Alt + J` jumps from the cursor to the matching place in the PDF, and double-clicking the PDF jumps back to the source.
 - **Citations and references:** autocomplete for `\cite`, `\ref`, `\eqref` and `\includegraphics`, and an Insert Citation dialog that lists the project's bibliography and can add a new BibTeX entry.
@@ -228,7 +228,7 @@ npm run test:record # Re-record the corpus logs and regenerate docs/ERROR_COVERA
 npm run bench       # Measure compile and preview performance on your machine
 ```
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the typecheck, the tests and the production build on Windows and Ubuntu for every push and pull request. A second job compiles the whole error corpus with TeX Live and uploads the resulting coverage table. It is not a required check yet: the corpus was recorded with MiKTeX, and that job measures how far the rules carry over to TeX Live.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the typecheck, the tests and the production build on Windows and Ubuntu for every push and pull request. The tests check every error case against logs recorded with both MiKTeX and TeX Live. A second job recompiles the corpus with the current TeX Live image and uploads fresh logs. It is not a required check: it exists to catch a newer TeX Live wording a message differently.
 
 ---
 

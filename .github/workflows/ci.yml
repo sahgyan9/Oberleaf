@@ -10,9 +10,10 @@ permissions:
 
 jobs:
   # The gate: typecheck, every test (the error corpus runs against the TeX logs
-  # recorded in tests/fixtures/logs, so no TeX is needed), and the production
-  # build. Windows is where Oberleaf is used; Ubuntu catches code that only
-  # works because of Windows path or line-ending behaviour.
+  # recorded with MiKTeX and with TeX Live in tests/fixtures/, so no TeX is
+  # needed), and the production build. Windows is where Oberleaf is used;
+  # Ubuntu catches code that only works because of Windows path or
+  # line-ending behaviour.
   checks:
     name: Checks (${{ matrix.os }})
     strategy:
@@ -32,10 +33,12 @@ jobs:
       - run: npm run build
 
   # A measurement, not a gate: compiles every case in tests/errorCorpus.ts
-  # with TeX Live instead of the MiKTeX the logs were recorded with, and
-  # uploads the resulting coverage table. Log wording differs between
-  # distributions, so this shows how far the rules carry over. Make it a
-  # required check once its results have been reviewed and the gaps fixed.
+  # with today's TeX Live image and uploads the fresh logs and coverage
+  # table. The committed TeX Live logs are already checked by `checks`; this
+  # catches a newer TeX Live wording or wrapping a message differently. When
+  # it fails, copy the artifact's logs into tests/fixtures/logs-texlive/ and
+  # fix the rule. Its first run found that hard-wrapped messages lost the
+  # space at the wrap, which broke six cases.
   tex-live:
     name: Error corpus on TeX Live
     runs-on: ubuntu-latest
@@ -58,4 +61,4 @@ jobs:
           name: texlive-error-coverage
           path: |
             docs/ERROR_COVERAGE.md
-            tests/fixtures/logs/
+            tests/fixtures/logs-texlive/

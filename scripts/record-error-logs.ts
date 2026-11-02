@@ -1,22 +1,33 @@
 // Compiles every case in tests/errorCorpus.ts with the local TeX installation
 // and stores the resulting logs as test fixtures, then writes
-// docs/ERROR_COVERAGE.md from what the parser makes of them.
+// docs/ERROR_COVERAGE.md from what the parser makes of every recorded set.
 //
 //   npx tsx scripts/record-error-logs.ts            all cases
 //   npx tsx scripts/record-error-logs.ts env-mismatch ampersand-in-text
 //
-// Re-record after adding a case, or to check a different TeX distribution.
+// Logs go to the folder of the distribution that produced them (MiKTeX:
+// tests/fixtures/logs, TeX Live: tests/fixtures/logs-texlive), so recording
+// on one never overwrites the other. Re-record after adding a case.
 
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
-import { compileDocument } from '../server/compiler.js';
+import { compileDocument, GENERIC_EXPLANATION } from '../server/compiler.js';
 import { ERROR_CASES } from '../tests/errorCorpus.js';
-import { LOG_DIR, analyzeRecorded, anonymize, materialize, pickError } from '../tests/errorHarness.js';
-import { GENERIC_EXPLANATION } from '../server/compiler.js';
+import {
+  DISTRIBUTIONS,
+  analyzeRecorded,
+  anonymize,
+  distributionOf,
+  hasRecording,
+  materialize,
+  pickError,
+  type Distribution,
+} from '../tests/errorHarness.js';
 
 const only = process.argv.slice(2);
 const cases = only.length ? ERROR_CASES.filter((c) => only.includes(c.id)) : ERROR_CASES;
+const VERSION_FILE = 'RECORDED_WITH.txt';
 
 function texVersion(): string {
   try {
@@ -27,16 +38,21 @@ function texVersion(): string {
 }
 
 async function main() {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+  const version = texVersion();
+  const distribution = distributionOf(version);
+  const logDir = DISTRIBUTIONS[distribution].dir;
+  fs.mkdirSync(logDir, { recursive: true });
+  fs.writeFileSync(path.join(logDir, VERSION_FILE), `${version}\n`, 'utf8');
+  console.log(`Recording with ${version} into ${path.relative(process.cwd(), logDir)}`);
 
   for (const c of cases) {
     const dir = materialize(c);
     try {
       await compileDocument(dir, 'main.tex', 'pdflatex');
       const log = fs.readFileSync(path.join(dir, '.build', 'main.log'), 'utf8');
-      fs.writeFileSync(path.join(LOG_DIR, `${c.id}.log`), anonymize(log), 'utf8');
+      fs.writeFileSync(path.join(logDir, `${c.id}.log`), anonymize(log), 'utf8');
       const blg = path.join(dir, '.build', 'main.blg');
-      const blgTarget = path.join(LOG_DIR, `${c.id}.blg`);
+      const blgTarget = path.join(logDir, `${c.id}.blg`);
       if (fs.existsSync(blg)) fs.writeFileSync(blgTarget, anonymize(fs.readFileSync(blg, 'utf8')), 'utf8');
       else fs.rmSync(blgTarget, { force: true });
       console.log(`recorded ${c.id}`);
@@ -50,57 +66,80 @@ async function main() {
   writeCoverage();
 }
 
-// One row per case: does the parser find the error, explain it specifically,
-// point at the right line and offer the expected fix.
-function writeCoverage() {
-  const rows: string[] = [];
-  let found = 0;
-  let explained = 0;
-  let fixable = 0;
-  let fixed = 0;
+interface CaseResult {
+  found: boolean;
+  explained: boolean;
+  /** undefined when the case expects no fix */
+  fixed?: boolean;
+}
 
+function evaluate(distribution: Distribution): Map<string, CaseResult> {
+  const results = new Map<string, CaseResult>();
   for (const c of ERROR_CASES) {
-    if (!fs.existsSync(path.join(LOG_DIR, `${c.id}.log`))) continue;
+    if (!hasRecording(c, distribution)) continue;
     const dir = materialize(c);
     try {
-      const err = pickError(c, analyzeRecorded(c, dir));
-      const isFound = Boolean(err);
-      const isExplained = Boolean(err && err.friendlyExplanation !== GENERIC_EXPLANATION && c.expect.explanation.test(err.friendlyExplanation ?? ''));
-      const wantsFix = Boolean(c.expect.fix);
-      const hasFix = Boolean(err?.suggestedFix && c.expect.fix && err.suggestedFix.type === c.expect.fix.type);
-      found += Number(isFound);
-      explained += Number(isExplained);
-      fixable += Number(wantsFix);
-      fixed += Number(wantsFix && hasFix);
-      const yes = (v: boolean) => (v ? 'yes' : '**no**');
-      rows.push(
-        `| ${c.title.replace(/\|/g, '\\|')} | ${c.origin} | ${yes(isFound)} | ${yes(isExplained)} | ${wantsFix ? yes(hasFix) : 'n/a'} |`
-      );
+      const err = pickError(c, analyzeRecorded(c, dir, distribution));
+      results.set(c.id, {
+        found: Boolean(err),
+        explained: Boolean(err && err.friendlyExplanation !== GENERIC_EXPLANATION && c.expect.explanation.test(err.friendlyExplanation ?? '')),
+        fixed: c.expect.fix ? Boolean(err?.suggestedFix && err.suggestedFix.type === c.expect.fix.type) : undefined,
+      });
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   }
+  return results;
+}
 
-  const total = rows.length;
+// One row per case and one column per recorded distribution: is the error
+// found, explained specifically, and given the expected fix.
+function writeCoverage() {
+  const sets = (Object.keys(DISTRIBUTIONS) as Distribution[])
+    .map((d) => ({ d, results: evaluate(d) }))
+    .filter((s) => s.results.size > 0);
+
+  const summary = sets.flatMap(({ d, results }) => {
+    const all = [...results.values()];
+    const withFix = all.filter((r) => r.fixed !== undefined);
+    const versionPath = path.join(DISTRIBUTIONS[d].dir, VERSION_FILE);
+    const version = fs.existsSync(versionPath) ? fs.readFileSync(versionPath, 'utf8').trim() : 'version not recorded';
+    return [
+      `**${DISTRIBUTIONS[d].label}** (${version}), ${all.length} cases:`,
+      `- Error found in the log: ${all.filter((r) => r.found).length}/${all.length}`,
+      `- Specific explanation (not the generic fallback): ${all.filter((r) => r.explained).length}/${all.length}`,
+      `- One-click fix offered where one is expected: ${withFix.filter((r) => r.fixed).length}/${withFix.length}`,
+      '',
+    ];
+  });
+
+  const cell = (r: CaseResult | undefined) => {
+    if (!r) return 'not recorded';
+    if (!r.found) return '**not found**';
+    if (!r.explained) return '**not explained**';
+    if (r.fixed === false) return '**no fix**';
+    return r.fixed ? 'explained, fix' : 'explained';
+  };
+
+  const rows = ERROR_CASES.map(
+    (c) => `| ${c.title.replace(/\|/g, '\\|')} | ${c.origin} | ${sets.map((s) => cell(s.results.get(c.id))).join(' | ')} |`
+  );
+
   const md = [
     '# Error coverage',
     '',
     'Generated by `npm run test:record` from the corpus in [tests/errorCorpus.ts](../tests/errorCorpus.ts).',
-    'Each row is a minimal document that makes the mistake, compiled with a real TeX engine; the',
-    'recorded logs are in `tests/fixtures/logs/`. `npm test` checks the same expectations on every run.',
+    'Each row is a minimal document that makes the mistake, compiled with a real TeX engine. The logs',
+    'are recorded once per distribution (`tests/fixtures/logs/` for MiKTeX, `tests/fixtures/logs-texlive/`',
+    'for TeX Live), and `npm test` checks every case against every set on each run.',
     '',
-    `- TeX used for recording: ${texVersion()}`,
-    `- Cases: ${total}`,
-    `- Error found in the log: ${found}/${total}`,
-    `- Specific explanation (not the generic fallback): ${explained}/${total}`,
-    `- One-click fix offered where one is expected: ${fixed}/${fixable}`,
-    '',
+    ...summary,
     'These numbers describe this corpus, not every possible TeX error. Errors outside it fall back',
     'to the raw TeX message plus a generic hint. To extend coverage, add the failing document to the',
     'corpus first, record it, watch the test fail, then add the rule.',
     '',
-    '| Mistake | Source | Found | Explained | Fix |',
-    '| :-- | :-- | :-: | :-: | :-: |',
+    `| Mistake | Source | ${sets.map((s) => DISTRIBUTIONS[s.d].label).join(' | ')} |`,
+    `| :-- | :-- | ${sets.map(() => ':-:').join(' | ')} |`,
     ...rows,
     '',
   ].join('\n');
@@ -108,7 +147,7 @@ function writeCoverage() {
   const target = path.join(process.cwd(), 'docs', 'ERROR_COVERAGE.md');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, md, 'utf8');
-  console.log(`\nExplained ${explained}/${total}, fixes ${fixed}/${fixable}. Wrote docs/ERROR_COVERAGE.md`);
+  console.log(`\n${summary.filter((l) => l).join('\n')}\nWrote docs/ERROR_COVERAGE.md`);
 }
 
 main().catch((err) => {

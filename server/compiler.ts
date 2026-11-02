@@ -667,19 +667,25 @@ function diagnose(
   return { suggestedFix, friendlyExplanation: translateTeXError(combined) };
 }
 
+// TeX's max_print_line: a log line this long was cut there, mid-word or
+// right before a space, and the next line continues the same text.
+const TEX_LOG_WIDTH = 79;
+
 // Reconstructs messages that TeX hard-wraps at 79 columns or across linebreaks
 function extractFullErrorMessage(initialMsg: string, subsequentLines: string[], fullLine: string): string {
   let msg = initialMsg;
+  let previous = fullLine;
 
   for (let k = 0; k < Math.min(subsequentLines.length, 3); k++) {
     const next = subsequentLines[k];
     if (!next || next.trim() === '') break;
-    // Stop if next line is a new error indicator, file location, or TeX line pointer
+    // Stop if next line is a new error indicator, file location, TeX line
+    // pointer or context line (<recently read>, <to be read again>, <argument>)
     if (
       next.startsWith('! ') ||
       /^[A-Za-z]:.*?:\d+:/.test(next) ||
       /^l\.\d+/.test(next) ||
-      /^<inserted text>/.test(next) ||
+      /^<[^>]*>/.test(next) ||
       next.startsWith('See the LaTeX manual') ||
       next.startsWith('Type  H <return>') ||
       next.startsWith('Your command was ignored')
@@ -687,18 +693,21 @@ function extractFullErrorMessage(initialMsg: string, subsequentLines: string[], 
       break;
     }
 
-    if (fullLine.length >= 78 || /:\s*$/.test(msg) || !/[.!?]$/.test(msg)) {
-      if (msg.endsWith(' ') || /:\s*$/.test(msg)) {
-        msg = msg.trim() + ' ' + next.trim();
-      } else {
-        msg = msg + next.trim();
-      }
-      if (/[.!?]$/.test(msg)) {
-        break;
-      }
+    if (previous.length >= TEX_LOG_WIDTH) {
+      // A hard wrap: append verbatim. Trimming here turned "Environment" +
+      // " lstlisting undefined." into "Environmentlstlisting undefined.",
+      // which no rule recognises; it showed up once TeX Live's short /tmp
+      // paths moved the wrap point onto a space.
+      msg = msg + next.replace(/\s+$/, '');
+    } else if (msg.endsWith(' ') || /:\s*$/.test(msg)) {
+      msg = msg.trim() + ' ' + next.trim();
+    } else if (!/[.!?]$/.test(msg)) {
+      msg = msg + next.trim();
     } else {
       break;
     }
+    previous = next;
+    if (/[.!?]$/.test(msg.trim())) break;
   }
 
   return msg.trim();

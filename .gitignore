@@ -8,7 +8,9 @@ dist/
 texput.log
 launch_test.log
 projects/
-logs/
+# The launcher's runtime logs (scripts/launch.ps1). Anchored to the root:
+# unanchored, it also ignored tests/fixtures/logs/.
+/logs/
 .tmp/
 .claude/
 *.lnk
@@ -16,3 +18,6 @@ CV_*
 *.pdf
 *.log
 *.out
+# Recorded TeX logs the error-corpus tests replay (scripts/record-error-logs.ts)
+!tests/fixtures/logs/*.log
+!tests/fixtures/logs-texlive/*.log

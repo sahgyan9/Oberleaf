@@ -1,0 +1,3826 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.11.1)  2 NOV 2026 03:30
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex
+(/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex
+LaTeX2e <2026-11-01>
+L3 programming layer <2026-09-09>
+(/usr/local/texlive/2026/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2026-06-04 v1.4n Standard LaTeX document class
+(/usr/local/texlive/2026/texmf-dist/tex/latex/base/size10.clo
+File: size10.clo 2026-06-04 v1.4n Standard LaTeX file (size option)
+)
+\c@part=\count276
+\c@section=\count277
+\c@subsection=\count278
+\c@subsubsection=\count279
+\c@paragraph=\count280
+\c@subparagraph=\count281
+\c@figure=\count282
+\c@table=\count283
+\abovecaptionskip=\skip49
+\belowcaptionskip=\skip50
+\bibindent=\dimen150
+)
+(/usr/local/texlive/2026/texmf-dist/tex/latex/l3kernel/l3backend-pdftex.def
+File: l3backend-pdftex.def 2026-09-09 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count284
+)
+(.build/main.aux)
+\openout1 = `main.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.55 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.55 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.55 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:55: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.55 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.56 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.56 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.56 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:56: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.56 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.57 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.57 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.57 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:57: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.57 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.58 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.58 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.58 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:58: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.58 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.59 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.59 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.59 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:59: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.59 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.60 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.60 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.60 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:60: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.60 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.61 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.61 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.61 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:61: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.61 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.62 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.62 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.62 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:62: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.62 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.63 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.63 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.63 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:63: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.63 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.64 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.64 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.64 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:64: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.64 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.65 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.65 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.65 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:65: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.65 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.66 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.66 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.66 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:66: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.66 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.67 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.67 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.67 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:67: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.67 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.68 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.68 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.68 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:68: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.68 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.69 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.69 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.69 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:69: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.69 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.70 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.70 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.70 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing = inserted for \
+ifnum.
+<to be read again> 
+                   \@elt 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I was expecting to see `<', `=', or `>'. Didn't.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \@elt 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: LaTeX Error: This may be
+ a LaTeX bug.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Call for help
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...advance \@tempdima \ht \@marbox 
+                                                  \ifdim \@tempdima >\z@ \@l...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \protect 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+LaTeX Warning: Marginpar on page 1 moved.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...vance \@mparbottom \dp \@marbox 
+                                                  \global \advance \@mparbot...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...dvance \@tempdima -\ht \@marbox 
+                                                  \global \setbox \@marbox \...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \global \setbox \@marbox 
+                                                  \vbox {\vskip \@tempdima \...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...\vskip \@tempdima \box \@marbox 
+                                                  }\global \ht \@marbox \z@ ...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   }
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ... \@marbox }\global \ht \@marbox 
+                                                  \z@ \global \dp \@marbox \...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \global 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \global 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...marbox \z@ \global \dp \@marbox 
+                                                  \z@ \kern -\@pagedp \noint...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \kern 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Illegal unit of measure 
+(pt inserted).
+<to be read again> 
+                   \kern 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Undefined control sequen
+ce.
+\@addmarginpar ...arginparwidth \fi \box \@marbox 
+                                                  \hss }\nointerlineskip \hb...
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:70: Missing number, treated 
+as zero.
+<to be read again> 
+                   \hss 
+l.70 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: LaTeX Error: Too many un
+processed floats.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.71 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+You've lost some text.  Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Undefined control sequen
+ce.
+\@xfloat ...@fltovf \fi \global \setbox \@currbox 
+                                                  \color@vbox \normalcolor \...
+l.71 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Missing number, treated 
+as zero.
+<to be read again> 
+                   \vbox 
+l.71 \begin{figure}[b]
+                      \rule{1cm}{12cm}\caption{x}\end{figure}
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Undefined control sequen
+ce.
+\@largefloatcheck ->\ifdim \ht \@currbox 
+                                         >\textheight \@tempdima -\textheigh...
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Missing number, treated 
+as zero.
+<to be read again> 
+                   >
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Undefined control sequen
+ce.
+<argument> \@currbox 
+                     
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Argument of \@xnext has 
+an extra }.
+<inserted text> 
+                \par 
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've run across a `}' that doesn't seem to match anything.
+For example, `\def\a#1{...}' and `\a}' would produce
+this error. If you simply proceed now, the `\par' that
+I've just inserted will cause me to report a runaway
+argument that might be the root of the problem. But if
+your `}' was spurious, just type `2' and it will go away.
+
+Runaway argument?
+\@currbox \@currlist \ifnum \count \@currbox >\z@ \advance \@pageht \@pagedp \E
+TC.
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Paragraph ended before \
+@xnext was complete.
+<to be read again> 
+                   \par 
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I suspect you've forgotten a `}', causing me to apply this
+control sequence to too much text. How can we recover?
+My plan is to forget the whole thing and hope for the best.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Extra \else.
+\end@float ...pdima \penalty \@floatpenalty \else 
+                                                  \vadjust {\penalty -\@Miv ...
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I'm ignoring this; it doesn't match any \if.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: You can't use `\vadjust'
+ in vertical mode.
+\end@float ...nalty \@floatpenalty \else \vadjust 
+                                                  {\penalty -\@Miv \vbox {}\...
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Sorry, but I'm not programmed to handle this case;
+I'll just pretend that you didn't ask for it.
+If you're in the wrong mode, you might be able to
+return to the right one by typing `I}' or `I$' or `I\par'.
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Output loop---100 consec
+utive dead cycles.
+\end@float ...lty \else \vadjust {\penalty -\@Miv 
+                                                  \vbox {}\penalty \@floatpe...
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+I've concluded that your \output is awry; it never does a
+\shipout, so I'm shipping \box255 out myself. Next time
+increase \maxdeadcycles if you want me to be more patient!
+
+[1
+
+
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71: Emergency stop.
+<inserted text> }\endwrite 
+                           
+l.71 ...[b]\rule{1cm}{12cm}\caption{x}\end{figure}
+                                                  
+Unbalanced write command
+
+ 
+Here is how much of TeX's memory you used:
+ 431 strings out of 466968
+ 8235 string characters out of 5403488
+ 447368 words of memory out of 5000000
+ 29979 multiletter control sequences out of 15000+600000
+ 628489 words of font info for 40 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 35i,3n,38p,187b,148s stack positions out of 10000i,1000n,20000p,200000b,200000s
+/tmp/oberleaf-case-too-many-floats-H4Yvf6/main.tex:71:  ==> Fatal error occurre
+d, no output PDF file produced!
