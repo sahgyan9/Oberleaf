@@ -2,7 +2,8 @@
   "name": "oberleaf",
   "private": true,
   "version": "1.0.0",
-  "description": "The open-source, local-first LaTeX suite with instant equation preview, side-by-side PDF rendering, and zero compute timeouts.",
+  "description": "A local-first LaTeX editor with live equation preview, side-by-side PDF rendering, and compiles that run on your own CPU.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -17,18 +17,27 @@
   <a href="#architecture">Architecture</a>
 </p>
 
+<p align="center">
+  <b>Windows 10/11 installer:</b> <a href="https://friendly-learning-srmap.vercel.app/oberleaf">friendly-learning-srmap.vercel.app/oberleaf</a>
+  &nbsp;·&nbsp; <a href="LICENSE">MIT License</a>
+</p>
+
+> Oberleaf is an independent open-source project. It is not affiliated with, endorsed by or connected to Overleaf or Digital Science.
+
 ---
 
 ## Why Oberleaf?
 
-Overleaf's free tier stops a compile after a fixed time limit. Large documents with long bibliographies, high-resolution figures or heavy TikZ/PGFPlots can hit that limit and fail.
+Cloud LaTeX editors run every compile on their servers, so free plans have to ration them. On Overleaf's free plan that shows up as a compile limit ("You've reached the compile limit on your current plan") and as a time limit per compile, which long bibliographies, high-resolution figures or heavy TikZ/PGFPlots can exceed. Both are a reasonable way to pay for shared servers. They are also a bad surprise the night before a deadline.
 
-Oberleaf compiles with the TeX distribution installed on your machine:
+Your laptop already has a CPU that can compile LaTeX. Oberleaf uses it:
 
-- **Local compiles.** A recompile while writing takes about 1.3 to 1.8 seconds for the bundled templates on a 2021 laptop CPU; a build from an empty cache takes 2 to 3 seconds. See [Measured performance](#measured-performance).
+- **No compile quota.** Compiles run on your machine, so there is no count to run out of. A recompile while writing takes about 1.3 to 1.8 seconds for the bundled templates on a 2021 laptop CPU; a build from an empty cache takes 2 to 3 seconds. See [Measured performance](#measured-performance).
 - **Your time limit, not ours.** A compile is stopped after 10 minutes by default so a stuck TeX process cannot hang the app. Set `OVERLEAF_COPY_COMPILE_TIMEOUT_MS` to change it, or to `0` to disable the limit.
 - **Live equation preview.** KaTeX renders the formula under your cursor as you type, a few milliseconds of work per keystroke.
-- **Documents stay on disk.** Projects are stored and compiled locally. The network is used only for the things listed under [Network & Privacy](#network-and-privacy).
+- **Errors you can act on.** 52 common TeX mistakes are explained in plain English, and 27 of them have a one-click fix. See [Features](#features).
+- **Works offline.** Writing and compiling need no internet connection once the TeX packages a document uses are installed.
+- **Documents stay on disk.** Unpublished results and work under NDA are never uploaded. The network is used only for the things listed under [Network & Privacy](#network-and-privacy).
 
 ---
 
@@ -69,12 +78,23 @@ Your numbers will differ with CPU, TeX distribution, antivirus scanning and docu
   - **File upload:** drag and drop `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.pdf`, `.bib`, `.tex`, `.sty`, `.cls` and `.txt` files into the file tree.
 - **Auto-save:** edits are saved 800 ms after you stop typing, and any pending save is flushed before each compile.
 - **Error explanations:** 52 common LaTeX and BibTeX mistakes, drawn from Overleaf's error guide and l2tabu, are explained in plain English. 27 of them come with a one-click fix you can preview first: a typo correction such as `\textbff` to `\textbf`, the missing package, an escaped `&`, a matching `\end{...}`, or a unit for `width=0.5`. Each one is a test case compiled with real TeX; [docs/ERROR_COVERAGE.md](docs/ERROR_COVERAGE.md) lists them. Errors outside that list show the raw TeX message with a generic hint.
+- **Document outline:** a section tree in the sidebar. Click a heading to jump to it, or drag a section to move it and everything under it.
+- **SyncTeX:** `Ctrl + Alt + J` jumps from the cursor to the matching place in the PDF, and double-clicking the PDF jumps back to the source.
+- **Citations and references:** autocomplete for `\cite`, `\ref`, `\eqref` and `\includegraphics`, and an Insert Citation dialog that lists the project's bibliography and can add a new BibTeX entry.
+- **Review comments:** press `Alt + M` on a line or selection to start a comment thread anchored to it. Threads can be replied to and resolved, and are stored in the project folder.
+- **History and GitHub sync:** each project is a Git repository. Commit with a message, mark milestones, compare any version in a side-by-side diff, and push to or pull from a GitHub remote.
+- **Live collaboration:** share a project over the local network or through a temporary public link, and edit it together with live cursors. See [Network & Privacy](#network-and-privacy) for what this sends where.
+- **Export:** download the compiled PDF, named after the document's `\title`, or the whole project as a `.zip`.
 - **PDF night filter:** inverts the PDF canvas for dark mode without changing the exported PDF.
 - **TeX Diagnostics:** checks for Node.js, pdflatex, latexmk (and Perl), xelatex and biber; whether MiKTeX installs missing packages silently; whether microtype font expansion works; and whether two TeX distributions are on PATH. Two MiKTeX problems (silent install off, stale font maps) can be repaired from the dialog. For the rest it shows the command to run.
 
 ---
 
 ## Quickstart
+
+### Platform support
+- **Windows 10/11:** supported, with a setup wizard from the [download page](https://friendly-learning-srmap.vercel.app/oberleaf).
+- **macOS and Linux:** running from source with `npm start` is expected to work but is untested, and there is no installer yet. Reports are welcome.
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) 18 or later
@@ -190,6 +210,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for details. Oberleaf runs locally only; 
 
 Issues and pull requests are welcome.
 
+The most useful contribution needs no code: a LaTeX error that Oberleaf explained badly or not at all. Open an issue with the smallest document that produces it. It becomes a case in the [error corpus](docs/ERROR_COVERAGE.md), compiled with real TeX on every test run, before a rule is written for it.
+
 ```bash
 npm run typecheck   # TypeScript check
 npm test            # Error corpus (recorded logs) and unit tests, no TeX needed
@@ -200,6 +222,12 @@ npm run bench       # Measure compile and preview performance on your machine
 
 ---
 
+## Acknowledgements
+
+Most of the error corpus is drawn from Overleaf's guide to common LaTeX errors and from l2tabu. The editor is [Monaco](https://microsoft.github.io/monaco-editor/), equations are rendered with [KaTeX](https://katex.org/), PDFs with [PDF.js](https://mozilla.github.io/pdf.js/), and collaboration uses [Yjs](https://yjs.dev/).
+
+---
+
 ## License
 
-Distributed under the **MIT License**.
+Distributed under the [MIT License](LICENSE). "Overleaf" is a trademark of its owner and is used here only to describe what Oberleaf is an alternative to.
