@@ -11,7 +11,11 @@ import {
   ExternalLink,
   Wrench,
   Loader2,
+  MinusCircle,
+  FileText,
+  CornerDownRight,
 } from 'lucide-react';
+import type { LintFinding } from '../../utils/latexLint';
 
 export interface DependencyItem {
   id: string;
@@ -29,6 +33,8 @@ export interface DependencyItem {
     label: string;
     effect: string;
   };
+  /** The check did not run or does not apply; not evidence that anything works */
+  skipped?: boolean;
 }
 
 export interface DoctorFixOutcome {
@@ -49,9 +55,16 @@ interface DependencyDoctorProps {
   isRefreshing: boolean;
   onRunFix: (actionId: string, dependencyId: string) => Promise<DoctorFixOutcome>;
   checkedAt?: string | null;
+  /** Document checks for the open file; undefined when no .tex file is open */
+  documentFindings?: LintFinding[];
+  documentName?: string;
+  /** Applies one finding's fix to the editor; false when the line has changed since */
+  onApplyDocumentFix?: (finding: LintFinding) => Promise<boolean>;
+  onJumpToLine?: (line: number) => void;
 }
 
 type FixState = { status: 'running' } | ({ status: 'done' } & DoctorFixOutcome);
+type Tab = 'installation' | 'document';
 
 export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
   isOpen,
@@ -61,9 +74,16 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
   isRefreshing,
   onRunFix,
   checkedAt,
+  documentFindings,
+  documentName,
+  onApplyDocumentFix,
+  onJumpToLine,
 }) => {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [fixStates, setFixStates] = useState<Record<string, FixState>>({});
+  const [tab, setTab] = useState<Tab>('installation');
+  const [applying, setApplying] = useState<string | null>(null);
+  const [staleFix, setStaleFix] = useState<string | null>(null);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -105,8 +125,21 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
   const attention = dependencies
     .filter((d) => !d.installed)
     .sort((a, b) => Number(b.required) - Number(a.required));
-  const working = dependencies.filter((d) => d.installed);
+  const working = dependencies.filter((d) => d.installed && !d.skipped);
+  const notChecked = dependencies.filter((d) => d.installed && d.skipped);
   const missingRequired = attention.filter((d) => d.required);
+
+  const findingKey = (f: LintFinding) => `${f.rule}:${f.line}:${f.title}`;
+  const applyDocumentFix = async (f: LintFinding) => {
+    if (!onApplyDocumentFix || applying) return;
+    setApplying(findingKey(f));
+    setStaleFix(null);
+    try {
+      if (!(await onApplyDocumentFix(f))) setStaleFix(findingKey(f));
+    } finally {
+      setApplying(null);
+    }
+  };
 
   // The summary has to match what the user can do: a missing engine blocks
   // every compile, while a stale setting only breaks some documents.
@@ -127,7 +160,9 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
     : {
         tone: 'ok' as const,
         title: 'Everything Oberleaf compiles with is installed and working.',
-        body: 'Compiles run locally, with no time limit.',
+        body: notChecked.length
+          ? `${notChecked.length} check${notChecked.length === 1 ? '' : 's'} could not run here; see "Not checked" below.`
+          : 'Compiles run locally on this computer.',
       };
 
   const checkedLabel = checkedAt
@@ -150,7 +185,9 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
           <div>
             <h3 className="text-base font-serif font-semibold text-stone-900 dark:text-stone-100">TeX Diagnostics</h3>
             <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-              Checks the tools Oberleaf compiles with on this computer.
+              {tab === 'installation'
+                ? 'Checks the tools Oberleaf compiles with on this computer.'
+                : 'Checks the open document for mistakes that compile but print wrong.'}
             </p>
           </div>
           <button
@@ -162,6 +199,37 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div role="tablist" className="flex gap-1 text-xs">
+          {(
+            [
+              ['installation', 'Installation', attention.length],
+              ['document', 'Document', documentFindings?.length ?? 0],
+            ] as const
+          ).map(([id, label, count]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition ${
+                tab === id
+                  ? 'bg-surface-lightSubtle dark:bg-surface-darkSubtle text-stone-900 dark:text-stone-100 border border-surface-lightBorder dark:border-surface-darkBorder'
+                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 border border-transparent'
+              }`}
+            >
+              <span>{label}</span>
+              {count > 0 && (
+                <span className="text-[10px] px-1.5 rounded bg-diagnostic-subtle dark:bg-diagnostic-darkSubtle text-diagnostic dark:text-diagnostic-dark">
+                  {count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'installation' && (
+        <>
         {/* Summary */}
         <div
           role="status"
@@ -353,10 +421,104 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
               </div>
             </section>
           )}
+
+          {/* Not checked: kept apart so a skipped test never reads as a pass */}
+          {notChecked.length > 0 && (
+            <section className="space-y-1">
+              <h4 className="text-[10px] uppercase tracking-wide font-semibold text-stone-500 dark:text-stone-400">
+                Not checked
+              </h4>
+              <div className="rounded-lg border border-dashed border-surface-lightBorder dark:border-surface-darkBorder divide-y divide-surface-lightBorder dark:divide-surface-darkBorder">
+                {notChecked.map((dep) => (
+                  <div key={dep.id} className="px-3 py-2 text-xs space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <MinusCircle className="w-3.5 h-3.5 flex-shrink-0 text-stone-400" />
+                      <span className="text-stone-700 dark:text-stone-300">{dep.name}</span>
+                    </div>
+                    <p className="pl-5 text-[11px] text-stone-500 dark:text-stone-400 leading-snug">{dep.guidance}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
+        </>
+        )}
+
+        {tab === 'document' && (
+          <div className="space-y-2 max-h-[30rem] overflow-y-auto pr-1">
+            {!documentFindings ? (
+              <p className="text-xs text-stone-500 dark:text-stone-400 p-3">Open a .tex file to check it.</p>
+            ) : documentFindings.length === 0 ? (
+              <div role="status" className="p-3 rounded-lg border text-xs flex items-start gap-3 bg-scholarly-subtle/50 dark:bg-scholarly-darkSubtle/40 border-scholarly/30 dark:border-scholarly-dark/30 text-scholarly dark:text-scholarly-dark">
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">No problems found in {documentName ?? 'this document'}.</p>
+                  <p className="text-[11px] opacity-90 mt-0.5">Checks quotes, ellipses, references, citations, images, floats and obsolete commands.</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                  {documentFindings.length} finding{documentFindings.length === 1 ? '' : 's'} in {documentName ?? 'this document'}.
+                  These compile, but print differently from what was likely meant.
+                </p>
+                {documentFindings.map((f) => {
+                  const key = findingKey(f);
+                  return (
+                    <div key={key} className="rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs overflow-hidden">
+                      <div className="p-3 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 flex-shrink-0 text-diagnostic dark:text-diagnostic-dark" />
+                            <span className="font-semibold text-stone-900 dark:text-stone-100 truncate">{f.title}</span>
+                          </div>
+                          <button
+                            onClick={() => onJumpToLine?.(f.line)}
+                            className="flex-shrink-0 flex items-center gap-1 font-mono text-[10px] text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark"
+                            title="Show this line in the editor"
+                          >
+                            <CornerDownRight className="w-3 h-3" />
+                            Line {f.line}
+                          </button>
+                        </div>
+                        <p className="text-stone-600 dark:text-stone-300 text-[11px] leading-relaxed">{f.explanation}</p>
+                        <p className="text-[10px] text-stone-400">Source: {f.source}</p>
+                      </div>
+                      {f.fix && (
+                        <div className="px-3 py-2.5 border-t border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel space-y-2">
+                          <div className="font-mono text-[10px] rounded border border-surface-lightBorder dark:border-surface-darkBorder overflow-x-auto">
+                            <div className="px-2 py-1 bg-crimson-subtle/40 dark:bg-crimson-darkSubtle/30 text-stone-700 dark:text-stone-300 whitespace-pre">- {f.fix.find.trim()}</div>
+                            <div className="px-2 py-1 bg-scholarly-subtle/50 dark:bg-scholarly-darkSubtle/30 text-stone-800 dark:text-stone-200 whitespace-pre">+ {f.fix.replace.trim()}</div>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              onClick={() => applyDocumentFix(f)}
+                              disabled={applying !== null}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-scholarly dark:bg-scholarly-dark hover:bg-scholarly-dark dark:hover:bg-scholarly text-white shadow-xs transition btn-tactile disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {applying === key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
+                              <span>{f.fix.label}</span>
+                            </button>
+                            <span className="text-[10px] text-stone-500 dark:text-stone-400">Ctrl+Z in the editor undoes it.</span>
+                          </div>
+                          {staleFix === key && (
+                            <p className="text-[11px] text-crimson dark:text-crimson-dark">
+                              Line {f.line} has changed since this check ran. Close and reopen the dialog to check again.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-surface-lightBorder dark:border-surface-darkBorder text-xs">
+        <div className={`flex items-center justify-between pt-3 border-t border-surface-lightBorder dark:border-surface-darkBorder text-xs ${tab === 'installation' ? '' : 'hidden'}`}>
           <div className="flex items-center gap-3">
             <a
               href="https://miktex.org/download"

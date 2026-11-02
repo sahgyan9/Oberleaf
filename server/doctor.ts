@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { getProjectsRoot } from './projects.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -32,6 +33,12 @@ export interface DependencyStatus {
   wingetCommand?: string;
   /** Present when Oberleaf can run the repair itself */
   autoFix?: AutoFixAction;
+  /**
+   * The check did not run or does not apply here (no MiKTeX, test compile
+   * blocked by something else). Shown apart from "Working": a check that
+   * never ran is not evidence that anything works.
+   */
+  skipped?: boolean;
 }
 
 export type TexDistribution = 'miktex' | 'texlive' | 'unknown' | 'none';
@@ -163,7 +170,7 @@ export async function runDoctorAction(actionId: DoctorActionId): Promise<DoctorF
 
   // Re-run the whole report so the client sees the effect of the repair
   // rather than assuming it worked.
-  const report = await runDependencyCheck();
+  const report = await runDependencyCheck(true);
   return {
     ok,
     actionId,
@@ -196,6 +203,7 @@ async function checkMiktexAutoInstall(distribution: TexDistribution): Promise<De
       command: 'initexmf',
       installed: true,
       version: 'Not applicable',
+      skipped: true,
       required: false,
       guidance:
         distribution === 'texlive'
@@ -255,6 +263,7 @@ async function checkFontMaps(distribution: TexDistribution): Promise<DependencyS
       ...base,
       installed: true,
       version: 'Not applicable',
+      skipped: true,
       guidance: 'pdflatex is not available, so the font expansion check was skipped.',
     };
   }
@@ -344,6 +353,7 @@ async function checkFontMaps(distribution: TexDistribution): Promise<DependencyS
     return {
       ...base,
       installed: false,
+      version: TIMED_OUT,
       guidance:
         'The test compile did not finish within 30 seconds. A TeX process may be waiting on input, ' +
         'or antivirus is scanning the TeX binaries on first use. Re-scan to try again.',
@@ -356,6 +366,7 @@ async function checkFontMaps(distribution: TexDistribution): Promise<DependencyS
       ...base,
       installed: true,
       version: 'Skipped',
+      skipped: true,
       guidance: `The test needs ${missingFile[1]}, which is not installed yet, so font expansion could not be checked. It will be installed the first time a document uses it.`,
     };
   }
@@ -365,6 +376,7 @@ async function checkFontMaps(distribution: TexDistribution): Promise<DependencyS
     ...base,
     installed: true,
     version: 'Skipped',
+    skipped: true,
     guidance: `The test compile stopped for an unrelated reason${firstError ? `: ${firstError.slice(1).trim()}` : ''}. Font expansion could not be checked.`,
   };
 }
@@ -400,6 +412,7 @@ async function checkSingleDistribution(distribution: TexDistribution): Promise<D
       ...base,
       installed: true,
       version: hits.length ? (distribution === 'miktex' ? 'MiKTeX' : distribution === 'texlive' ? 'TeX Live' : 'One found') : 'Not applicable',
+      skipped: hits.length === 0,
       guidance: hits.length
         ? `Compiling with ${hits[0]}.`
         : 'No pdflatex on PATH yet.',
@@ -413,6 +426,115 @@ async function checkSingleDistribution(distribution: TexDistribution): Promise<D
       `pdflatex exists in more than one place (${[...roots].join(', ')}). Oberleaf uses the first one, ${hits[0]}. ` +
       'Packages installed with the other distribution\'s manager will not be found. ' +
       'Uninstall the distribution you do not use, or move the one you want to the top of PATH.',
+  };
+}
+
+// latexmk failing to run has two causes with different fixes: the package is
+// not installed, or it is installed but cannot start because it is a Perl
+// script and MiKTeX does not ship Perl. Telling them apart is the difference
+// between installing the right thing and installing Perl for nothing.
+async function checkLatexmk(distribution: TexDistribution): Promise<DependencyStatus> {
+  const base = { id: 'latexmk', name: 'Build Automator (latexmk)', command: 'latexmk', required: false };
+  const fallback = 'Without it, Oberleaf runs the pdflatex and BibTeX passes itself, so compiles still work.';
+
+  const version = await firstLineOf('latexmk', ['-v']);
+  if (version !== null) return { ...base, installed: true, version, guidance: 'Installed and runs.' };
+
+  const [found, perl] = await Promise.all([locate('latexmk'), locate('perl')]);
+  if (found && !perl) {
+    return {
+      ...base,
+      installed: false,
+      guidance: `latexmk is installed (${found}) but cannot start: it is a Perl script and no Perl is on PATH. MiKTeX does not include Perl. ${fallback}`,
+      wingetCommand: 'winget install StrawberryPerl.StrawberryPerl',
+    };
+  }
+  if (found) {
+    return {
+      ...base,
+      installed: false,
+      guidance: `latexmk is at ${found} and Perl is at ${perl}, but "latexmk -v" failed. Run it in a terminal to see the error. ${fallback}`,
+      wingetCommand: 'latexmk -v',
+    };
+  }
+  const install =
+    distribution === 'miktex'
+      ? (await hasMiktexCli()) ? 'miktex packages install latexmk' : 'mpm --install=latexmk'
+      : distribution === 'texlive'
+      ? 'tlmgr install latexmk'
+      : undefined;
+  return {
+    ...base,
+    installed: false,
+    guidance: `latexmk is not installed.${perl ? '' : ' It also needs Perl, which is not on PATH either.'} ${fallback}`,
+    wingetCommand: install,
+  };
+}
+
+// OneDrive locks a file while it uploads it, and with Files On-Demand a
+// figure can be an online-only placeholder TeX cannot read. Both surface as
+// compile failures ("I can't write on file", missing images) that look like
+// document problems.
+function checkProjectsFolder(): DependencyStatus {
+  const base = { id: 'projects-folder', name: 'Projects Folder', command: 'OBERLEAF_PROJECTS_DIR', required: false };
+  let root: string;
+  try {
+    root = getProjectsRoot();
+  } catch {
+    return { ...base, installed: true, version: 'Unknown', skipped: true, guidance: 'The projects folder could not be resolved.' };
+  }
+
+  if (/[\\/]OneDrive([ -][^\\/]*)?[\\/]/i.test(root + path.sep)) {
+    return {
+      ...base,
+      installed: false,
+      guidance:
+        `Projects are stored in OneDrive (${root}). OneDrive locks files while it syncs them, which makes a compile fail with ` +
+        '"I can\'t write on file", and online-only files cannot be read by TeX. Right-click the folder and choose "Always keep on this device", ' +
+        'or point OBERLEAF_PROJECTS_DIR at a folder outside OneDrive.',
+    };
+  }
+
+  // Build folders grow with every project; under ~500 MB TeX starts failing
+  // with "I can't write on file" for reasons unrelated to locking.
+  try {
+    const stats = fs.statfsSync(root);
+    const freeMb = Math.floor((Number(stats.bavail) * Number(stats.bsize)) / 1024 ** 2);
+    if (freeMb < 500) {
+      return {
+        ...base,
+        installed: false,
+        version: `${freeMb} MB free`,
+        guidance: `Only ${freeMb} MB is free on the drive that holds ${root}. Compiles write PDFs and build files there and fail when it fills up.`,
+      };
+    }
+    return {
+      ...base,
+      installed: true,
+      version: freeMb > 10240 ? `${(freeMb / 1024).toFixed(0)} GB free` : `${freeMb} MB free`,
+      guidance: `Projects are stored in ${root}, outside OneDrive.`,
+    };
+  } catch {
+    return { ...base, installed: true, version: 'Local folder', guidance: `Projects are stored in ${root}, outside OneDrive.` };
+  }
+}
+
+// pdfLaTeX turns .eps figures into PDF through epstopdf, which calls
+// Ghostscript. MiKTeX ships it as mgs and TeX Live as rungs, so this only
+// fails on a stripped-down install. Located, never run.
+async function checkGhostscript(distribution: TexDistribution): Promise<DependencyStatus> {
+  const base = { id: 'ghostscript', name: 'EPS Figure Support (Ghostscript)', command: 'gs', required: false };
+  if (distribution === 'none') {
+    return { ...base, installed: true, version: 'Not applicable', skipped: true, guidance: 'No TeX distribution found yet.' };
+  }
+  const candidates = ['mgs', 'rungs', 'gswin64c', 'gswin32c', 'gs'];
+  const found = (await Promise.all(candidates.map(locate))).find((p) => p !== null);
+  if (found) return { ...base, installed: true, version: path.basename(found), guidance: `.eps figures are converted with ${found}.` };
+  return {
+    ...base,
+    installed: false,
+    guidance: 'No Ghostscript found, so .eps figures cannot be converted and will fail to load. PNG, JPEG and PDF figures are unaffected.',
+    wingetCommand: 'winget install ArtifexSoftware.GhostScript',
   };
 }
 
@@ -432,17 +554,37 @@ async function checkBinary(
   return { id, name, command, installed: false, required, guidance, wingetCommand };
 }
 
-export async function runDependencyCheck(): Promise<DoctorReport> {
+// The font test is a real pdflatex run in a temp folder, and the report is
+// fetched every time the app opens. Its answer only changes when the TeX
+// installation does, so it is kept per pdflatex build until a Re-scan or a
+// repair asks for a fresh one. This is about not running TeX (and whatever
+// MiKTeX or antivirus does on a TeX start) on every launch, not speed:
+// measured on MiKTeX 26.5 it saves ~0.1 s of a ~2.3 s report, which is
+// dominated by starting the other probes. A timeout is never kept: it says
+// nothing about the fonts.
+const TIMED_OUT = 'Timed out';
+let fontCheckCache: { key: string; result: DependencyStatus; at: Date } | null = null;
+
+async function fontMapsCached(distribution: TexDistribution, pdflatexVersion: string, force: boolean): Promise<DependencyStatus> {
+  const key = `${distribution}|${pdflatexVersion}`;
+  if (!force && fontCheckCache?.key === key) {
+    const time = fontCheckCache.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return { ...fontCheckCache.result, guidance: `${fontCheckCache.result.guidance} (Test compile from ${time}; Re-scan repeats it.)` };
+  }
+  const result = await checkFontMaps(distribution);
+  fontCheckCache = result.version === TIMED_OUT ? null : { key, result, at: new Date() };
+  return result;
+}
+
+/** `force` repeats checks that are otherwise cached, such as the font test compile. */
+export async function runDependencyCheck(force = false): Promise<DoctorReport> {
   // Binaries first: the distribution they reveal decides which configuration
   // checks apply and which commands the repairs use.
-  const [node, pdflatex, latexmk, xelatex, biber] = await Promise.all([
+  const [node, pdflatex, xelatex, biber] = await Promise.all([
     checkBinary('node', 'Node.js Runtime', 'node', ['--version'], true,
       'Node.js is needed to run the local server.', 'winget install OpenJS.NodeJS.LTS'),
     checkBinary('pdflatex', 'LaTeX Engine (pdflatex)', 'pdflatex', ['--version'], true,
       'Required to compile LaTeX documents into PDF.', 'winget install MiKTeX.MiKTeX'),
-    checkBinary('latexmk', 'Build Automator (latexmk)', 'latexmk', ['-v'], false,
-      'Optional multi-pass compiler. latexmk is a Perl script, so it also needs Perl. Without it, Oberleaf runs pdflatex and bibtex passes itself.',
-      'winget install StrawberryPerl.StrawberryPerl'),
     checkBinary('xelatex', 'Modern TeX Engine (xelatex)', 'xelatex', ['--version'], false,
       'Needed for documents that use fontspec or system fonts. Ships with MiKTeX and TeX Live.'),
     locate('biber').then((found): DependencyStatus => ({
@@ -460,13 +602,18 @@ export async function runDependencyCheck(): Promise<DoctorReport> {
 
   const distribution = detectDistribution(pdflatex.installed ? pdflatex.version ?? null : null);
 
-  const [autoInstall, fontMaps, pathConflict] = await Promise.all([
+  const [latexmk, autoInstall, fontMaps, pathConflict, ghostscript] = await Promise.all([
+    checkLatexmk(distribution),
     checkMiktexAutoInstall(distribution),
-    checkFontMaps(distribution),
+    fontMapsCached(distribution, pdflatex.version ?? '', force),
     checkSingleDistribution(distribution),
+    checkGhostscript(distribution),
   ]);
+  const projectsFolder = checkProjectsFolder();
 
-  const dependencies = [node, pdflatex, latexmk, xelatex, biber, autoInstall, fontMaps, pathConflict];
+  const dependencies = [
+    node, pdflatex, latexmk, xelatex, biber, autoInstall, fontMaps, pathConflict, ghostscript, projectsFolder,
+  ];
   const allHealthy = dependencies.filter((d) => d.required).every((d) => d.installed);
 
   return {

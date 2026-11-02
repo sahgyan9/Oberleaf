@@ -40,6 +40,7 @@ import {
   isPackageLoaded,
 } from './utils/latexPackages';
 import { minimalReplacement, setMagicEngine } from './utils/fixPreview';
+import { lintLatex, type LintFinding } from './utils/latexLint';
 import {
   wrapOrToggleFormatting,
   wrapOrToggleSelection,
@@ -293,10 +294,12 @@ export const App: React.FC = () => {
   const autoSaveTimerRef = useRef<any>(null);
 
   // Fetch Dependency Doctor Report on Mount
-  const checkDependencies = useCallback(async () => {
+  // `force` (the Re-scan button) repeats checks the server otherwise caches,
+  // such as the font test compile.
+  const checkDependencies = useCallback(async (force = false) => {
     setIsRefreshingDoctor(true);
     try {
-      const res = await fetch('/api/doctor');
+      const res = await fetch(`/api/doctor${force ? '?force=1' : ''}`);
       if (res.ok) {
         const data = await res.json();
         setDoctorDeps(data.dependencies);
@@ -1095,6 +1098,48 @@ export const App: React.FC = () => {
     }, 50);
     return true;
   };
+
+  // ─── TeX Diagnostics: Document tab ─────────────────────────────────────────
+  // Runs on the editor's live text when the dialog opens and after each fix,
+  // so findings always describe what is on screen, saved or not.
+  const [lintFindings, setLintFindings] = useState<LintFinding[] | undefined>(undefined);
+  const runDocumentLint = useCallback(() => {
+    if (!activeFilePath.toLowerCase().endsWith('.tex')) {
+      setLintFindings(undefined);
+      return;
+    }
+    const projectFiles: string[] = [];
+    const walk = (list: FileEntry[]) =>
+      list.forEach((e) => (e.type === 'directory' ? walk(e.children ?? []) : projectFiles.push(e.relativePath.replace(/\\/g, '/'))));
+    walk(files);
+    setLintFindings(lintLatex(getLiveContent(), { bibKeys: citations.map((c) => c.key), projectFiles }));
+  }, [activeFilePath, files, citations, getLiveContent]);
+
+  useEffect(() => {
+    if (isDoctorOpen) runDocumentLint();
+  }, [isDoctorOpen, runDocumentLint]);
+
+  const handleApplyDocumentFix = useCallback(
+    async (finding: LintFinding): Promise<boolean> => {
+      if (!finding.fix) return false;
+      const lines = getLiveContent().split('\n');
+      const idx = finding.line - 1;
+      // The fix was computed for this exact line; anything else means the
+      // text moved or changed since the check, and editing it would be a guess.
+      if (lines[idx]?.replace(/\r$/, '') !== finding.fix.find) {
+        runDocumentLint();
+        return false;
+      }
+      const eol = lines[idx].endsWith('\r') ? '\r' : '';
+      lines[idx] = finding.fix.replace + eol;
+      const updated = lines.join('\n');
+      writeEditorContent(updated);
+      await saveActiveFile(monacoEditorRef.current ? getLiveContent() : updated);
+      runDocumentLint();
+      return true;
+    },
+    [getLiveContent, writeEditorContent, saveActiveFile, runDocumentLint]
+  );
 
   // 1-Click Intelligent Quick-Fix Handler
   const handleApplyFix = async (fix: SuggestedFix, error?: CompileErrorItem) => {
@@ -2340,10 +2385,18 @@ export const App: React.FC = () => {
         onClose={() => setIsDoctorOpen(false)}
         dependencies={doctorDeps}
         allHealthy={isDoctorHealthy ?? false}
-        onRefresh={checkDependencies}
+        onRefresh={() => checkDependencies(true)}
         isRefreshing={isRefreshingDoctor}
         onRunFix={handleRunDoctorFix}
         checkedAt={doctorCheckedAt}
+        documentFindings={lintFindings}
+        documentName={activeFilePath}
+        onApplyDocumentFix={handleApplyDocumentFix}
+        onJumpToLine={(line) => {
+          setIsDoctorOpen(false);
+          if (viewMode === 'pdf') setViewMode('split');
+          setHighlightLine({ line, timestamp: Date.now() });
+        }}
       />
 
       {/* Version History & Checkpoints Drawer */}

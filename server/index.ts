@@ -206,9 +206,9 @@ app.get('/health', (_req, res) => {
 });
 
 // 1. Dependency Doctor Endpoint
-app.get('/api/doctor', async (_req, res) => {
+app.get('/api/doctor', async (req, res) => {
   try {
-    const report = await runDependencyCheck();
+    const report = await runDependencyCheck(req.query.force === '1');
     res.json(report);
   } catch (error: any) {
     sendApiError(res, error);

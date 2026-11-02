@@ -86,7 +86,15 @@ Your numbers will differ with CPU, TeX distribution, antivirus scanning and docu
 - **Live collaboration:** share a project over the local network or through a temporary public link, and edit it together with live cursors. See [Network & Privacy](#network-and-privacy) for what this sends where.
 - **Export:** download the compiled PDF, named after the document's `\title`, or the whole project as a `.zip`.
 - **PDF night filter:** inverts the PDF canvas for dark mode without changing the exported PDF.
-- **TeX Diagnostics:** checks for Node.js, pdflatex, latexmk (and Perl), xelatex and biber; whether MiKTeX installs missing packages silently; whether microtype font expansion works; and whether two TeX distributions are on PATH. Two MiKTeX problems (silent install off, stale font maps) can be repaired from the dialog. For the rest it shows the command to run.
+- **TeX Diagnostics, Installation tab:** checks for Node.js, pdflatex, xelatex and biber. It tells apart latexmk being missing from latexmk being installed without Perl. It also checks whether MiKTeX installs missing packages silently, whether microtype font expansion works, whether two TeX distributions are on PATH, whether Ghostscript is there for `.eps` figures, and whether the projects folder is inside OneDrive (sync locks files during compiles) or low on disk space. Two MiKTeX problems (silent install off, stale font maps) can be repaired from the dialog; for the rest it shows the command to run. Checks that could not run are listed as "Not checked", never as working.
+- **TeX Diagnostics, Document tab:** checks the open `.tex` file for mistakes that compile but print wrong, based on l2tabu and ChkTeX:
+  - `$$`, `{\bf ...}`-style font commands, `eqnarray`, `\over` and obsolete packages
+  - a missing `~` before `\ref` / `\cite`, `...` instead of `\dots`, and straight `"quotes"`
+  - `\label` before `\caption`, and `center` inside a float
+  - duplicate labels, and `\ref` / `\cite` keys that point nowhere (with the near-miss suggested)
+  - images missing from the project
+
+  Most come with a fix that shows the line before and after, and Ctrl+Z undoes it. Math, verbatim, comments and the preamble are left out of the text rules, and the rules are tested in [tests/latexLint.test.ts](tests/latexLint.test.ts).
 
 ---
 
