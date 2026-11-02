@@ -68,7 +68,7 @@ Your numbers will differ with CPU, TeX distribution, antivirus scanning and docu
   - **Project templates:** Blank Document, CV, IEEE Conference Paper and Master's/PhD Thesis.
   - **File upload:** drag and drop `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.pdf`, `.bib`, `.tex`, `.sty`, `.cls` and `.txt` files into the file tree.
 - **Auto-save:** edits are saved 800 ms after you stop typing, and any pending save is flushed before each compile.
-- **Error explanations:** common TeX errors (undefined commands, missing `$`, unbalanced braces, missing packages, option clashes, locked output files, fontspec under pdfLaTeX, and others) are shown with a plain-English explanation, and some offer a one-click fix. Errors outside that set show the raw TeX message.
+- **Error explanations:** 52 common LaTeX and BibTeX mistakes, drawn from Overleaf's error guide and l2tabu, are explained in plain English. 27 of them come with a one-click fix you can preview first: a typo correction such as `\textbff` to `\textbf`, the missing package, an escaped `&`, a matching `\end{...}`, or a unit for `width=0.5`. Each one is a test case compiled with real TeX; [docs/ERROR_COVERAGE.md](docs/ERROR_COVERAGE.md) lists them. Errors outside that list show the raw TeX message with a generic hint.
 - **PDF night filter:** inverts the PDF canvas for dark mode without changing the exported PDF.
 - **TeX Diagnostics:** checks for Node.js, pdflatex, latexmk (and Perl), xelatex and biber; whether MiKTeX installs missing packages silently; whether microtype font expansion works; and whether two TeX distributions are on PATH. Two MiKTeX problems (silent install off, stale font maps) can be repaired from the dialog. For the rest it shows the command to run.
 
@@ -163,12 +163,14 @@ No document content is sent anywhere unless you start collaboration or a share t
 ```
 Oberleaf/
 ├── assets/                  # SVG and ICO logos
-├── docs/                    # Benchmark report
+├── docs/                    # Benchmark and error-coverage reports
 ├── scripts/                 # Installer, launcher, benchmark, probe generator
 ├── server/                  # Local Node.js / Express compile server
 │   ├── compiler.ts          # latexmk/pdflatex runner, log parser, error explanations
 │   ├── doctor.ts            # TeX Diagnostics checks and repairs
+│   ├── texKnowledge.ts      # Package/command tables the error rules look up
 │   └── projects.ts          # Project storage and templates
+├── tests/                   # Error corpus, recorded TeX logs, unit tests
 ├── src/                     # React 18 + Vite + Tailwind CSS frontend
 │   ├── components/
 │   │   ├── Editor/          # Monaco editor integration
@@ -190,6 +192,9 @@ Issues and pull requests are welcome.
 
 ```bash
 npm run typecheck   # TypeScript check
+npm test            # Error corpus (recorded logs) and unit tests, no TeX needed
+npm run test:live   # Same corpus, compiled with your installed TeX
+npm run test:record # Re-record the corpus logs and regenerate docs/ERROR_COVERAGE.md
 npm run bench       # Measure compile and preview performance on your machine
 ```
 

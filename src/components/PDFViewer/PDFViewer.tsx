@@ -110,7 +110,8 @@ interface PDFViewerProps {
   compileDuration: number | null;
   compileStatus: 'idle' | 'compiling' | 'success' | 'failed';
   compileErrors: CompileErrorItem[];
-  onSelectErrorLine?: (line: number) => void;
+  /** `file` is the error's file as the compiler reported it (absolute, ./main.tex or refs.bib) */
+  onSelectErrorLine?: (line: number, file?: string) => void;
   onToggleCollapse?: () => void;
   synctexTarget?: SyncTexTarget | null;
   onSyncTexHandled?: () => void;
@@ -1285,7 +1286,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                   return (
                     <div
                       key={idx}
-                      onClick={() => err.line && onSelectErrorLine?.(err.line)}
+                      onClick={() => err.line && onSelectErrorLine?.(err.line, err.file)}
                       className={`p-2.5 rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border cursor-pointer transition space-y-2 ${
                         err.isCascading
                           ? 'border-stone-200 dark:border-stone-800/80 opacity-85 hover:opacity-100'

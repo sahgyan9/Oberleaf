@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
+import { ENVIRONMENT_SOURCES, KNOWN_COMMANDS, XCOLOR_BASE_COLORS, closestMatch } from './texKnowledge.js';
 
 export interface SuggestedFix {
   type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line' | 'set_engine' | 'open_doctor';
@@ -79,7 +80,107 @@ function translateTeXError(rawText: string): string {
     if (isImage) {
       return `Figure could not be found.\nExpected: ${file}\nCheck that the image exists in the project and that the LaTeX path matches the File Tree.`;
     }
-    return `Missing package or file: "${file}". If it's a LaTeX package, verify \\usepackage or install it via your TeX package manager.`;
+    const sty = file.match(/^(.+)\.(sty|cls)$/);
+    if (sty) {
+      return (
+        `The ${sty[2] === 'cls' ? 'document class' : 'package'} "${sty[1]}" (${file}) is not installed. ` +
+        `Check the spelling first. If the name is right, install it from CTAN with your TeX package manager.`
+      );
+    }
+    return `Missing file: "${file}". Check that it exists in the project and that the name in the source matches, including the extension.`;
+  }
+
+  // Math-mode structure
+  if (/Double subscript/.test(raw)) {
+    return 'Two subscripts in a row, as in x_a_b. Group what belongs together with braces: x_{a_b} or x_{ab}.';
+  }
+  if (/Double superscript/.test(raw)) {
+    return 'Two superscripts in a row, as in x^2^3. Group them with braces, x^{2^3}, or use {x^2}^3.';
+  }
+  if (/Missing \\right\. inserted/.test(raw)) {
+    return 'A \\left delimiter has no matching \\right in the same formula. Add \\right) (or \\right. for an invisible one) before the formula ends.';
+  }
+  if (/Extra \\right/.test(raw)) {
+    return 'A \\right delimiter has no \\left before it in the same formula. Add the matching \\left, or remove \\right.';
+  }
+
+  // Arguments and grouping
+  const paragraphEnded = raw.match(/Paragraph ended before \\([A-Za-z@]+) was complete/);
+  if (paragraphEnded) {
+    return 'A blank line (or \\par) appears inside a command argument, which most commands do not allow. Look for a missing } before the blank line, or remove the blank line.';
+  }
+  if (/\\verb illegal in (command )?argument/.test(raw)) {
+    return '\\verb cannot be used inside another command\'s argument (a heading, caption or footnote). Use \\texttt{...} there, escaping special characters as \\_ or \\#.';
+  }
+  const envMismatch = raw.match(/\\begin\{([^}]+)\} on input line (\d+) ended by \\end\{([^}]+)\}/);
+  if (envMismatch) {
+    return envMismatch[3] === 'document'
+      ? `\\begin{${envMismatch[1]}} on line ${envMismatch[2]} is never closed. Add \\end{${envMismatch[1]}} where it should end.`
+      : `\\begin{${envMismatch[1]}} on line ${envMismatch[2]} is closed by \\end{${envMismatch[3]}}. Each \\begin needs an \\end with the same name.`;
+  }
+
+  // Lists
+  if (/Lonely \\item/.test(raw)) {
+    return '\\item is only valid inside a list. Put it between \\begin{itemize} and \\end{itemize} (or enumerate / description).';
+  }
+  if (/perhaps a missing \\item/.test(raw)) {
+    return 'A list has text before its first \\item, or \\item is missing. Every entry in itemize, enumerate or description has to start with \\item.';
+  }
+
+  // Tables and alignment
+  if (/Misplaced alignment tab character &/.test(raw)) {
+    return 'An & appears outside a table or alignment. In text, write \\& for an ampersand.';
+  }
+  if (/Extra alignment tab has been changed to \\cr/.test(raw)) {
+    return 'A table row has more cells (& separators) than the column specification declares. Remove the extra &, or add a column to the specification.';
+  }
+
+  // Lengths and numbers
+  if (/Illegal unit of measure/.test(raw)) {
+    return 'A length has no unit. TeX needs one: pt, cm, mm, in, em, or a multiple of a reference length such as 0.5\\linewidth.';
+  }
+  if (/Missing number, treated as zero/.test(raw)) {
+    return 'TeX expected a number or a length and found something else, often an empty argument such as \\vspace{} or \\\\ followed by text in [brackets].';
+  }
+  if (/Dimension too large/.test(raw)) {
+    return 'A length exceeds TeX\'s maximum of 16383.99pt (about 5.75 m). Check for a missing unit or a scale factor that is far too large.';
+  }
+
+  // Preamble and definitions
+  if (/Can be used only in preamble/.test(raw)) {
+    return 'This command (usually \\usepackage or \\documentclass) is only allowed in the preamble. Move it above \\begin{document}.';
+  }
+  const alreadyDefined = raw.match(/Command \\([A-Za-z@]+) already defined/);
+  if (alreadyDefined) {
+    return `\\${alreadyDefined[1]} already exists, so \\newcommand refuses to define it. Choose a different name, or use \\renewcommand if you mean to replace it.`;
+  }
+
+  // Floats
+  if (/Too many unprocessed floats/.test(raw)) {
+    // LaTeX since 2015 allocates float slots on demand, so this needs a few
+    // hundred stuck floats (18 on older kernels). They are stuck because their
+    // placement options cannot be satisfied.
+    return 'Too many figures or tables are waiting to be placed, usually because their placement options cannot be met (a tall float marked [b] or [h] only). Use [htbp], and add \\clearpage to flush waiting floats.';
+  }
+  if (/Not in outer par mode/.test(raw)) {
+    return 'A float (figure or table) or \\marginpar is inside a box, a minipage or another float. Floats can only appear in running text; use a plain \\includegraphics or the subcaption package instead.';
+  }
+
+  // Colours
+  const undefinedColor = raw.match(/Undefined color `([^']+)'/);
+  if (undefinedColor) {
+    return `The colour "${undefinedColor[1]}" is not defined. Use a name xcolor knows (red, blue, teal, ...) or define it with \\definecolor.`;
+  }
+
+  // Runaway expansion
+  if (/TeX capacity exceeded/.test(raw)) {
+    return 'TeX ran out of memory, almost always because a macro calls itself without end (for example \\renewcommand{\\x}{... \\x ...}). Check recently added definitions.';
+  }
+
+  // Environments with no known package
+  const unknownEnv = raw.match(/Environment ([A-Za-z*]+) undefined/);
+  if (unknownEnv) {
+    return `The ${unknownEnv[1]} environment is not defined by LaTeX or any loaded package. Check the spelling, or load the package that provides it.`;
   }
 
   // Corrupted or invalid image
@@ -141,8 +242,11 @@ function translateTeXError(rawText: string): string {
   if (raw.includes('Runaway argument')) {
     return "Unclosed bracket '{' or parenthesis. A command didn't find its closing delimiter.";
   }
-  return 'Review the line indicated for syntax errors.';
+  return GENERIC_EXPLANATION;
 }
+
+/** Shown when no rule recognises an error. The test suite treats it as "not explained". */
+export const GENERIC_EXPLANATION = 'Review the line indicated for syntax errors.';
 
 export const COMMON_PACKAGE_RULES: Array<{
   packageName: string;
@@ -306,11 +410,25 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
     };
   }
 
+  // 0c. Any environment LaTeX does not know, looked up by name. The table
+  // also covers declarations (theorem needs \newtheorem, not a package).
+  const undefinedEnv = combined.match(/Environment\s+([A-Za-z]+)\*?\s+undefined/);
+  const envSource = undefinedEnv ? ENVIRONMENT_SOURCES[undefinedEnv[1]] : undefined;
+  if (undefinedEnv && envSource) {
+    const name = undefinedEnv[1];
+    return {
+      type: 'add_preamble',
+      packageName: envSource.packageName || undefined,
+      codeSnippet: envSource.snippet,
+      label: envSource.packageName ? `Add \\usepackage{${envSource.packageName}}` : `Declare ${name}`,
+      description: envSource.packageName
+        ? `Provides the ${name} environment (${envSource.note}).`
+        : `The ${name} environment is not built in: ${envSource.note}. This adds ${envSource.snippet} to the preamble.`,
+    };
+  }
+
   // 1. Math packages (amsmath)
-  if (
-    /Environment\s+(align\*?|gather\*?|multline\*?|bmatrix|pmatrix|vmatrix|Vmatrix|Bmatrix|aligned|gathered)\s+undefined/i.test(combined) ||
-    (isUndefinedCtrl && /\\(eqref|DeclareMathOperator|substack)\b/i.test(combined))
-  ) {
+  if (isUndefinedCtrl && /\\(eqref|DeclareMathOperator|substack|text|dfrac|tfrac|binom|operatorname)\b/.test(combined)) {
     return {
       type: 'add_preamble',
       packageName: 'amsmath',
@@ -357,11 +475,22 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
     };
   }
 
-  // 5. Code Listings (listings)
+  // 1a. AMS symbol fonts (amssymb)
   if (
-    /Environment\s+lstlisting\s+undefined/i.test(combined) ||
-    (isUndefinedCtrl && /\\(lstinline|lstset)\b/i.test(combined))
+    isUndefinedCtrl &&
+    /\\(mathbb|mathfrak|checkmark|leqslant|geqslant|varnothing|blacksquare|square|lesssim|gtrsim|therefore|because|nmid|triangleq|subsetneq|supsetneq|subseteqq)\b/.test(combined)
   ) {
+    return {
+      type: 'add_preamble',
+      packageName: 'amssymb',
+      codeSnippet: '\\usepackage{amssymb}',
+      label: 'Add \\usepackage{amssymb}',
+      description: 'Provides blackboard bold (\\mathbb), fraktur and the extended AMS symbol set.',
+    };
+  }
+
+  // 5. Code Listings (listings)
+  if (isUndefinedCtrl && /\\(lstinline|lstset)\b/i.test(combined)) {
     return {
       type: 'add_preamble',
       packageName: 'listings',
@@ -387,10 +516,7 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
   }
 
   // 7. TikZ diagrams
-  if (
-    /Environment\s+tikzpicture\s+undefined/i.test(combined) ||
-    (isUndefinedCtrl && /\\(tikz|node)\b/i.test(combined))
-  ) {
+  if (isUndefinedCtrl && /\\(tikz|node)\b/i.test(combined)) {
     return {
       type: 'add_preamble',
       packageName: 'tikz',
@@ -412,10 +538,7 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
   }
 
   // 9. Subcaptions / Subfigures
-  if (
-    /Environment\s+(subfigure|subtable)\s+undefined/i.test(combined) ||
-    (isUndefinedCtrl && /\\subcaption/i.test(combined))
-  ) {
+  if (isUndefinedCtrl && /\\subcaption/i.test(combined)) {
     return {
       type: 'add_preamble',
       packageName: 'subcaption',
@@ -480,17 +603,16 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
     };
   }
 
-  // 15. Algorithms (algorithm2e)
-  if (
-    /Environment\s+(algorithm|algorithmic)\s+undefined/i.test(combined) ||
-    (isUndefinedCtrl && /\\(Require|Ensure|State)\b/i.test(combined))
-  ) {
+  // 15. Pseudocode commands. \State, \Require and \Ensure belong to
+  // algpseudocode; algorithm2e spells them differently (\KwIn, \;), so
+  // suggesting it here produced a second round of undefined commands.
+  if (isUndefinedCtrl && /\\(Require|Ensure|State|EndFor|EndIf|EndWhile|Procedure|EndProcedure)\b/.test(combined)) {
     return {
       type: 'add_preamble',
-      packageName: 'algorithm2e',
-      codeSnippet: '\\usepackage[ruled,vlined]{algorithm2e}',
-      label: 'Add \\usepackage{algorithm2e}',
-      description: 'Provides environments and formatting for pseudocode and algorithms.',
+      packageName: 'algpseudocode',
+      codeSnippet: '\\usepackage{algpseudocode}',
+      label: 'Add \\usepackage{algpseudocode}',
+      description: 'Provides \\State, \\If, \\For, \\Require and the algorithmic environment.',
     };
   }
 
@@ -519,6 +641,30 @@ export function detectSuggestedFix(rawText: string, message: string = '', lineNu
   }
 
   return undefined;
+}
+
+// The explanation and the fix button must tell the same story. When the fix is
+// "load package X", an explanation saying "probably a typo" sends the user the
+// wrong way, so a package fix supplies the explanation too.
+function diagnose(
+  combined: string,
+  message: string,
+  lineNumber: number
+): Pick<CompileError, 'friendlyExplanation' | 'suggestedFix'> {
+  const suggestedFix = detectSuggestedFix(combined, message, lineNumber);
+  // Only for "not defined" errors: graphicx is also suggested for "Cannot
+  // determine size of graphic", where the package may well be loaded.
+  if (suggestedFix?.type === 'add_preamble' && /Undefined control sequence|Environment\s+\S+\s+undefined/.test(combined)) {
+    const env = combined.match(/Environment\s+([A-Za-z*]+)\s+undefined/)?.[1];
+    const subject = env ? `The ${env} environment` : 'This command';
+    return {
+      suggestedFix,
+      friendlyExplanation: suggestedFix.packageName
+        ? `${subject} comes from the ${suggestedFix.packageName} package, which is not loaded. ${suggestedFix.description}`
+        : suggestedFix.description,
+    };
+  }
+  return { suggestedFix, friendlyExplanation: translateTeXError(combined) };
 }
 
 // Reconstructs messages that TeX hard-wraps at 79 columns or across linebreaks
@@ -620,8 +766,7 @@ export function parseLatexLog(
         file,
         line: parseInt(lineStr, 10),
         message: fullMessage,
-        friendlyExplanation: translateTeXError(combined),
-        suggestedFix: detectSuggestedFix(combined, fullMessage, parseInt(lineStr, 10)),
+        ...diagnose(combined, fullMessage, parseInt(lineStr, 10)),
         raw,
       });
       continue;
@@ -648,8 +793,7 @@ export function parseLatexLog(
         file,
         line: lineNumber,
         message: fullMessage,
-        friendlyExplanation: translateTeXError(combined),
-        suggestedFix: detectSuggestedFix(combined, fullMessage, lineNumber),
+        ...diagnose(combined, fullMessage, lineNumber),
         raw: lines.slice(i, i + 4).join('\n'),
       });
     }
@@ -664,8 +808,7 @@ export function parseLatexLog(
         file: 'main.tex',
         line: 1,
         message: line.substring(1).trim(),
-        friendlyExplanation: translateTeXError(combined),
-        suggestedFix: detectSuggestedFix(combined, line, 1),
+        ...diagnose(combined, line, 1),
         raw: lines.slice(i, i + 4).join('\n'),
       });
     }
@@ -682,6 +825,104 @@ export function parseLatexLog(
     : uniqueErrors;
 
   return { errors: markCascadingErrors(enrichedErrors), warnings: [...new Set(warnings)] };
+}
+
+// BibTeX writes its errors to main.blg, never to main.log, so a broken .bib
+// used to surface only as "Citation undefined" warnings. Its error lines end
+// in "---line N of file X" or "---while reading file X".
+const BIBTEX_ERROR = /^(.+?)---(?:line (\d+) of file (.+)|while reading file (.+))$/;
+
+function explainBibtexError(message: string, file: string): string {
+  const db = message.match(/couldn't open database file (.+)$/);
+  if (db) return `BibTeX cannot find ${db[1].trim()}. Check that the file is in the project and that \\bibliography{...} names it without the .bib extension.`;
+  const style = message.match(/couldn't open style file (.+)$/);
+  if (style) return `The bibliography style ${style[1].trim()} does not exist. Check \\bibliographystyle{...}; common styles are plain, alpha, abbrv, ieeetr and unsrt.`;
+  if (/found no \\citation commands/.test(message)) {
+    return 'The document has a bibliography but cites nothing, so BibTeX has no entries to print. Add \\cite{key} where you cite a source, or \\nocite{*} to list every entry in the .bib file.';
+  }
+  if (/found no \\bibdata command/.test(message)) return 'There is no \\bibliography{...} command, so BibTeX does not know which .bib file to read.';
+  if (/found no \\bibstyle command/.test(message)) return 'There is no \\bibliographystyle{...} command. Add one, for example \\bibliographystyle{plain}, next to \\bibliography.';
+  if (/expecting a `,' or a `\}'/.test(message)) {
+    return `An entry in ${file} is missing a comma between two fields, or a closing brace. The problem is on the reported line or the one before it.`;
+  }
+  if (/Repeated entry/.test(message)) return `Two entries in ${file} use the same citation key. Rename or delete one of them.`;
+  if (/expecting a `=' /.test(message) || /expecting a `='/.test(message)) return `A field in ${file} is missing its = sign, as in "title {X}" instead of "title = {X}".`;
+  if (/I was expecting/.test(message)) return `BibTeX could not parse an entry in ${file}. Check braces, quotes and commas around the reported line.`;
+  return `BibTeX reported a problem in ${file}.`;
+}
+
+export function parseBibtexLog(blg: string, sourceLines: string[] = []): CompileError[] {
+  const errors: CompileError[] = [];
+  const lines = blg.split(/\r?\n/);
+  // Errors "while reading main.aux" are about the document, not the .aux the
+  // user never edits: point them at the \bibliography line.
+  const bibLine = sourceLines.findIndex((l) => /\\bibliography(style)?\s*\{/.test(l.replace(/(^|[^\\])%.*$/, '$1'))) + 1;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(BIBTEX_ERROR);
+    if (!m) continue;
+    const message = m[1].trim();
+    let file = (m[3] ?? m[4]).trim();
+    let line = m[2] ? parseInt(m[2], 10) : 0;
+    if (file.toLowerCase().endsWith('.aux')) {
+      file = 'main.tex';
+      line = bibLine;
+    }
+    errors.push({
+      file,
+      line,
+      message,
+      friendlyExplanation: explainBibtexError(message, file),
+      raw: lines.slice(i, i + 4).join('\n'),
+    });
+  }
+  return errors;
+}
+
+// latexmk does not run BibTeX at all when a database is missing, so nothing
+// reports it except "Citation undefined". Check the source instead, resolving
+// names the way BIBINPUTS does: the project root and every subfolder.
+export function findMissingBibFiles(sourceLines: string[], projectDir: string): CompileError[] {
+  const available = new Set<string>();
+  const walk = (dir: string, depth: number) => {
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (depth < 4 && !e.name.startsWith('.') && e.name !== 'node_modules') walk(path.join(dir, e.name), depth + 1);
+      } else if (e.name.toLowerCase().endsWith('.bib')) {
+        available.add(e.name.toLowerCase());
+        available.add(path.relative(projectDir, path.join(dir, e.name)).replace(/\\/g, '/').toLowerCase());
+      }
+    }
+  };
+  walk(projectDir, 0);
+
+  const errors: CompileError[] = [];
+  sourceLines.forEach((line, idx) => {
+    const code = line.replace(/(^|[^\\])%.*$/, '$1');
+    for (const m of code.matchAll(/\\(bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g)) {
+      const names = m[1] === 'bibliography' ? m[2].split(',') : [m[2]];
+      for (const raw of names) {
+        const name = raw.trim();
+        if (!name) continue;
+        const withExt = name.toLowerCase().endsWith('.bib') ? name : `${name}.bib`;
+        if (available.has(withExt.toLowerCase()) || available.has(path.basename(withExt).toLowerCase())) continue;
+        const message = `I couldn't open database file ${withExt}`;
+        errors.push({
+          file: 'main.tex',
+          line: idx + 1,
+          message,
+          friendlyExplanation: explainBibtexError(message, withExt),
+          raw: line,
+        });
+      }
+    }
+  });
+  return errors;
 }
 
 // TeX repeats itself: the same fault appears in the on-disk log and again in
@@ -1072,8 +1313,238 @@ function enrichErrorsWithSourceContext(
       }
     }
 
-    return err;
+    return enrichFromSource(err, sourceLines);
   });
+}
+
+// ─── Source-aware rules ─────────────────────────────────────────────────────
+// Each rule reads the line the error points at and, where the right edit is
+// unambiguous, offers it as a replace_line fix. When it is not, the rule only
+// sharpens the explanation: a wrong one-click fix costs more than none.
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function replaceLineFix(lineIdx: number, find: string, replace: string, label: string, description: string): SuggestedFix {
+  return { type: 'replace_line', codeSnippet: replace, label, description, line: lineIdx + 1, find, replace };
+}
+
+// The undefined macro is the last control sequence on the first context line
+// TeX prints after the message ("l.3 Some \textbff", or "<argument> \emphh"
+// when the macro sat inside another command's argument).
+function undefinedMacroName(raw: string): string | undefined {
+  const lines = raw.split('\n').slice(1);
+  const context = lines.find((l) => /^(<argument>|<recently read>|l\.\d+)/.test(l));
+  return context?.trimEnd().match(/\\([A-Za-z@]+)$/)?.[1];
+}
+
+function commandsDefinedIn(sourceLines: string[]): string[] {
+  const names: string[] = [];
+  const def = /\\(?:(?:re|provide)?newcommand\*?\s*\{?\s*\\|DeclareMathOperator\*?\s*\{\s*\\|def\s*\\)([A-Za-z]+)/g;
+  for (const line of sourceLines) {
+    for (const m of line.matchAll(def)) names.push(m[1]);
+  }
+  return names;
+}
+
+// Reads a balanced {...} group starting at text[start] === '{'.
+function readGroup(text: string, start: number): { content: string; end: number } | undefined {
+  if (text[start] !== '{') return undefined;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return { content: text.slice(start + 1, i), end: i + 1 };
+  }
+  return undefined;
+}
+
+/** Number of columns a tabular/array preamble declares, e.g. "l|c|p{3cm}" -> 3. */
+export function countTableColumns(spec: string): number {
+  let s = spec;
+  // *{n}{cols} repeats cols n times
+  for (let guard = 0; guard < 10 && /\*\s*\{/.test(s); guard++) {
+    s = s.replace(/\*\s*\{(\d+)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/, (_, n, cols) => cols.repeat(parseInt(n, 10)));
+  }
+  // Arguments that do not make columns: @{..} !{..} >{..} <{..}; width
+  // arguments of p/m/b/w/W columns collapse to the column letter.
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/[@!<>]\s*\{[^{}]*\}/g, '').replace(/([pmbwW])\s*(\{[^{}]*\})+/g, '$1');
+  } while (s !== prev);
+  return (s.match(/[lcrpmbXSwW]/g) ?? []).length;
+}
+
+function enclosingTable(sourceLines: string[], lineIdx: number): { spec: string; line: number } | undefined {
+  for (let i = lineIdx; i >= 0 && i > lineIdx - 200; i--) {
+    const begin = sourceLines[i].match(/\\begin\{(tabular\*?|tabularx|tabulary|array|longtable)\}/);
+    if (!begin || begin.index === undefined) continue;
+    const text = sourceLines.slice(i, i + 3).join('\n');
+    let pos = begin.index + begin[0].length;
+    const skipOptional = () => {
+      while (/\s/.test(text[pos] ?? '')) pos++;
+      if (text[pos] === '[') pos = text.indexOf(']', pos) + 1;
+      while (/\s/.test(text[pos] ?? '')) pos++;
+    };
+    skipOptional();
+    if (/tabular\*|tabularx|tabulary/.test(begin[1])) {
+      const width = readGroup(text, pos);
+      if (!width) return undefined;
+      pos = width.end;
+      skipOptional();
+    }
+    const spec = readGroup(text, pos);
+    return spec ? { spec: spec.content, line: i + 1 } : undefined;
+  }
+  return undefined;
+}
+
+function enrichFromSource(err: CompileError, sourceLines: string[]): CompileError {
+  const lineIdx = err.line - 1;
+  const src = lineIdx >= 0 && lineIdx < sourceLines.length ? sourceLines[lineIdx] : undefined;
+
+  // A misspelled command: name it, and offer the closest real one.
+  if (/Undefined control sequence/.test(err.message) && !err.suggestedFix && !err.isCascading) {
+    const name = undefinedMacroName(err.raw);
+    if (name) {
+      const candidates = [...KNOWN_COMMANDS, ...commandsDefinedIn(sourceLines)];
+      const guess = closestMatch(name, candidates);
+      const usage = new RegExp(`\\\\${escapeRegExp(name)}(?![A-Za-z@])`, 'g');
+      const explanation = guess
+        ? `\\${name} is not defined. Did you mean \\${guess}?`
+        : `\\${name} is not defined by LaTeX or any loaded package. Check the spelling, or load the package that provides it.`;
+      if (guess && src && usage.test(src)) {
+        const fixed = src.replace(usage, `\\${guess}`);
+        return {
+          ...err,
+          friendlyExplanation: explanation,
+          suggestedFix: replaceLineFix(lineIdx, src, fixed, `Replace \\${name} with \\${guess}`, `Changes \\${name} to \\${guess} on line ${err.line}.`),
+        };
+      }
+      return { ...err, friendlyExplanation: explanation };
+    }
+  }
+
+  // A package that is not installed: TeX reports it at \begin{document} or
+  // later, with no line of its own. Point at the \usepackage that asked for it.
+  const missingSty = err.message.match(/File [`']([^'`]+)\.(sty|cls)' not found/);
+  if (missingSty) {
+    const loader = new RegExp(
+      missingSty[2] === 'cls'
+        ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${escapeRegExp(missingSty[1])}\\s*\\}`
+        : `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${escapeRegExp(missingSty[1])}\\s*(?:,[^}]*)?\\}`
+    );
+    const idx = sourceLines.findIndex((l) => loader.test(l));
+    if (idx >= 0) return { ...err, file: 'main.tex', line: idx + 1 };
+  }
+
+  // An argument that is never closed is only noticed at the end of the file,
+  // so TeX reports no useful line. Find the last use of the command whose
+  // braces do not balance by the end of the document.
+  const unclosed = err.message.match(/File ended while scanning use of \\([A-Za-z@]+)/);
+  if (unclosed) {
+    const opener = `\\${unclosed[1]}{`;
+    for (let i = sourceLines.length - 1; i >= 0; i--) {
+      const at = sourceLines[i].lastIndexOf(opener);
+      if (at < 0) continue;
+      const rest = [sourceLines[i].slice(at + opener.length - 1), ...sourceLines.slice(i + 1)].join('\n');
+      if (!readGroup(rest, 0)) {
+        return {
+          ...err,
+          line: i + 1,
+          friendlyExplanation: `The argument of \\${unclosed[1]} on line ${i + 1} is never closed. Add the missing } where the argument should end.`,
+        };
+      }
+      break;
+    }
+  }
+
+  if (!src) return err;
+
+  // & in running text
+  if (/Misplaced alignment tab character &/.test(err.message) && /(^|[^\\])&/.test(src)) {
+    const fixed = src.replace(/(^|[^\\])&/g, '$1\\&');
+    return {
+      ...err,
+      friendlyExplanation: `Line ${err.line} has an & outside a table or alignment. In text, an ampersand is written \\&.`,
+      suggestedFix: replaceLineFix(lineIdx, src, fixed, 'Escape & as \\&', `Replaces & with \\& on line ${err.line}.`),
+    };
+  }
+
+  // More cells than columns
+  if (/Extra alignment tab has been changed to \\cr/.test(err.message)) {
+    const table = enclosingTable(sourceLines, lineIdx);
+    if (table) {
+      const columns = countTableColumns(table.spec);
+      const row = src.split(/\\\\/)[0];
+      const cells = (row.match(/(^|[^\\])&/g) ?? []).length + 1;
+      if (cells > columns) {
+        return {
+          ...err,
+          friendlyExplanation:
+            `The row on line ${err.line} has ${cells} cells, but the table on line ${table.line} declares ${columns} columns ({${table.spec}}). ` +
+            'Remove the extra &, or add a column to the specification.',
+        };
+      }
+    }
+  }
+
+  // \begin{a} ... \end{b}
+  const mismatch = err.message.match(/\\begin\{([^}]+)\} on input line (\d+) ended by \\end\{([^}]+)\}/);
+  if (mismatch) {
+    const [, opened, openedLine, closer] = mismatch;
+    const closeTag = `\\end{${closer}}`;
+    if (src.includes(closeTag)) {
+      const fixed =
+        closer === 'document'
+          ? src.replace(closeTag, `\\end{${opened}}\n${closeTag}`)
+          : src.replace(closeTag, `\\end{${opened}}`);
+      return {
+        ...err,
+        suggestedFix: replaceLineFix(
+          lineIdx,
+          src,
+          fixed,
+          closer === 'document' ? `Close ${opened} before \\end{document}` : `Change to \\end{${opened}}`,
+          closer === 'document'
+            ? `Inserts \\end{${opened}} before \\end{document} to close the environment opened on line ${openedLine}.`
+            : `Closes the ${opened} environment opened on line ${openedLine} with a matching \\end{${opened}}.`
+        ),
+      };
+    }
+  }
+
+  // width=0.5 with no unit
+  if (/Illegal unit of measure/.test(err.message)) {
+    const unitless = /\b(width|height|totalheight|textwidth)\s*=\s*(\d*\.?\d+)\s*(?=[,\]}])/;
+    const m = src.match(unitless);
+    if (m) {
+      const reference = m[1] === 'width' || m[1] === 'textwidth' ? '\\linewidth' : '\\textheight';
+      const fixed = src.replace(unitless, `${m[1]}=${m[2]}${reference}`);
+      return {
+        ...err,
+        friendlyExplanation: `${m[1]}=${m[2]} on line ${err.line} has no unit. A bare number is not a length; ${m[2]}${reference} means ${m[2]} times the ${m[1] === 'width' ? 'line width' : 'text height'}.`,
+        suggestedFix: replaceLineFix(lineIdx, src, fixed, `Use ${m[2]}${reference}`, `Changes ${m[1]}=${m[2]} to ${m[1]}=${m[2]}${reference} on line ${err.line}.`),
+      };
+    }
+  }
+
+  // Misspelled colour
+  const color = err.message.match(/Undefined color `([^']+)'/);
+  if (color) {
+    const defined = sourceLines.flatMap((l) => [...l.matchAll(/\\(?:define|provide)color\s*\{([^}]+)\}/g)].map((m) => m[1]));
+    const guess = closestMatch(color[1], [...XCOLOR_BASE_COLORS, ...defined]);
+    const usage = `{${color[1]}}`;
+    if (guess && src.includes(usage)) {
+      const fixed = src.split(usage).join(`{${guess}}`);
+      return {
+        ...err,
+        friendlyExplanation: `The colour "${color[1]}" is not defined. Did you mean "${guess}"?`,
+        suggestedFix: replaceLineFix(lineIdx, src, fixed, `Use colour ${guess}`, `Changes "${color[1]}" to "${guess}" on line ${err.line}.`),
+      };
+    }
+  }
+
+  return err;
 }
 
 // The whole point of compiling locally is not hitting a compute wall, so the
@@ -1406,7 +1877,16 @@ export async function compileDocument(
   const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
   const detectedMissingPackages = scanMissingPackages(mainSource);
 
-  const { errors, warnings } = parseLatexLog(fullLog, sourceLines, projectDir);
+  const parsed = parseLatexLog(fullLog, sourceLines, projectDir);
+  const warnings = parsed.warnings;
+  // A .blg survives in .build after the document stops using BibTeX; only
+  // trust it while the aux file still declares a bibliography.
+  const auxText = readSafe(path.join(buildDir, `${baseName}.aux`));
+  const bibErrors = [
+    ...findMissingBibFiles(sourceLines, projectDir),
+    ...(/\\bibdata\{/.test(auxText) ? parseBibtexLog(readSafe(path.join(buildDir, `${baseName}.blg`)), sourceLines) : []),
+  ].filter((e, i, all) => all.findIndex((o) => o.message === e.message) === i);
+  const errors = [...parsed.errors, ...bibErrors];
   const pdfGenerated = fs.existsSync(generatedPdf);
 
   // A PDF that exists is worth showing even when the log carries errors, which

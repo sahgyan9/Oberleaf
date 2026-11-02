@@ -107,7 +107,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           ) : compileDuration !== null ? (
             <div className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-3 h-3" />
-              <span>Built in {compileDuration.toFixed(2)}s</span>
+              <span>Built in {(compileDuration / 1000).toFixed(2)}s</span>
             </div>
           ) : (
             <div className="flex items-center space-x-1 text-stone-500 dark:text-stone-400">

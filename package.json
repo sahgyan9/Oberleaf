@@ -17,7 +17,10 @@
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"@(3001, 5173) | ForEach-Object { Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 } | ForEach-Object { Start-Process taskkill.exe -ArgumentList @('/F', '/T', '/PID', $_.OwningProcess) -NoNewWindow -Wait -ErrorAction SilentlyContinue } }\"",
     "logs": "powershell -NoProfile -Command \"if (Test-Path logs/project.log) { Get-Content -Path logs/project.log -Wait -Tail 50 } else { Write-Host 'No logs found yet. Start the app first.' }\"",
     "setup:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-windows.ps1",
-    "bench": "tsx scripts/benchmark.ts"
+    "bench": "tsx scripts/benchmark.ts",
+    "test": "vitest run",
+    "test:live": "vitest run --mode live tests/errors.test.ts",
+    "test:record": "tsx scripts/record-error-logs.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -53,6 +56,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.0",
     "typescript": "^5.5.3",
-    "vite": "^5.4.3"
+    "vite": "^5.4.3",
+    "vitest": "^2.1.9"
   }
 }

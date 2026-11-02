@@ -54,6 +54,29 @@ import {
   getInitialProjectId,
 } from './utils/storage';
 
+/**
+ * The project file a compiler-reported path refers to. TeX reports absolute
+ * paths, ./relative ones or bare names (BibTeX), so match the longest project
+ * path the reported one ends with.
+ */
+function findProjectFile(entries: FileEntry[], reported: string): string | undefined {
+  const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+  const target = norm(reported);
+  let best: string | undefined;
+  const walk = (list: FileEntry[]) => {
+    for (const e of list) {
+      if (e.type === 'directory') {
+        if (e.children) walk(e.children);
+        continue;
+      }
+      const rel = norm(e.relativePath);
+      if ((target === rel || target.endsWith(`/${rel}`)) && (!best || rel.length > best.length)) best = e.relativePath;
+    }
+  };
+  walk(entries);
+  return best;
+}
+
 const DEFAULT_STARTER_DOCUMENT = [
   '\\documentclass{article}',
   '\\usepackage{amsmath,amssymb}',
@@ -730,7 +753,10 @@ export const App: React.FC = () => {
             }
 
             if (result.file !== activeFilePath) {
-              handleSelectFile(result.file);
+              // Wait for the file's text to reach the editor, or the line is
+              // revealed in the file being left behind.
+              await handleSelectFile(result.file);
+              await new Promise((r) => requestAnimationFrame(r));
             }
 
             // Trigger Monaco editor scroll and glowing line pulse
@@ -2146,7 +2172,19 @@ export const App: React.FC = () => {
                 isFixBusy={isCompiling || fixReceipt?.status === 'working' || fixReceipt?.status === 'compiling'}
                 detectedMissingPackages={detectedMissingPackages}
                 onApplyBatchFix={handleApplyBatchFix}
-                onSelectErrorLine={(line) => {
+                onSelectErrorLine={(line, file) => {
+                  // An error in another project file (a .bib, an \input
+                  // chapter) opens that file, the way SyncTeX does.
+                  const target = file ? findProjectFile(files, file) : undefined;
+                  if (target && target !== activeFilePath) {
+                    if (viewMode === 'pdf') setViewMode('split');
+                    // Highlight only once the file's text is in the editor;
+                    // revealing the line earlier lands in the previous file.
+                    void handleSelectFile(target).then(() =>
+                      requestAnimationFrame(() => setHighlightLine({ line, timestamp: Date.now() }))
+                    );
+                    return;
+                  }
                   if (monacoEditorRef.current) {
                     monacoEditorRef.current.revealLineInCenter(line);
                     monacoEditorRef.current.setPosition({ lineNumber: line, column: 1 });
