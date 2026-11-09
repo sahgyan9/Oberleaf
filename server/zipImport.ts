@@ -18,7 +18,10 @@ const MAX_TOTAL_BYTES = 500 * 1024 * 1024;
 // Metadata other tools add that never belongs in a LaTeX project.
 const IGNORED_SEGMENTS = new Set(['__MACOSX', '.git', '.DS_Store', 'Thumbs.db']);
 
-export class ZipImportError extends Error {}
+export class ZipImportError extends Error {
+  /** Set when the zip has several documents and the user must pick the one to compile */
+  candidates?: string[];
+}
 
 function findEndOfCentralDirectory(buf: Buffer): number {
   // The record is 22 bytes plus a comment of at most 65535 bytes.
@@ -132,28 +135,31 @@ function declaresDocumentClass(data: Buffer): boolean {
  * so pick the top-level .tex file that declares \documentclass and, if it is
  * not already main.tex, rename it. Returns the original name when renamed.
  */
-export function chooseMainFile(entries: ZipEntry[]): { entries: ZipEntry[]; renamedFrom?: string } {
+export function chooseMainFile(entries: ZipEntry[], preferred?: string): { entries: ZipEntry[]; renamedFrom?: string } {
   const topLevelTex = entries.filter((e) => !e.path.includes('/') && e.path.toLowerCase().endsWith('.tex'));
   const roots = topLevelTex.filter((e) => declaresDocumentClass(e.data));
   const main = topLevelTex.find((e) => e.path === 'main.tex');
 
-  if (main && roots.includes(main)) return { entries };
   if (roots.length === 0) {
     throw new ZipImportError('The zip has no top-level .tex file with \\documentclass, so there is no document to compile.');
   }
-  if (roots.length > 1) {
-    throw new ZipImportError(
-      `The zip has several documents (${roots.map((r) => r.path).join(', ')}). ` +
-        'Rename the one you compile to main.tex, or remove the others, and import again.'
-    );
+  // Journal and conference kits ship several sample documents (IEEEtran's
+  // bare_conf.tex and bare_jrnl.tex, elsarticle's -num and -harv variants),
+  // and Overleaf's "main document" setting is not in its zip. Ask.
+  const picked = preferred ? roots.find((r) => r.path === preferred) : roots.length === 1 ? roots[0] : main && roots.includes(main) ? main : undefined;
+  if (!picked) {
+    const err = new ZipImportError(`The zip has several documents (${roots.map((r) => r.path).join(', ')}). Choose the one to compile.`);
+    err.candidates = roots.map((r) => r.path).sort();
+    throw err;
   }
+  if (picked === main) return { entries };
   if (main) {
     throw new ZipImportError(
-      `The document is ${roots[0].path}, but the zip also has a main.tex that is not a document. ` +
-        `Rename ${roots[0].path} to main.tex in the zip and import again.`
+      `The document is ${picked.path}, but the zip also has a main.tex that is not that document. ` +
+        `Rename ${picked.path} to main.tex in the zip and import again.`
     );
   }
-  const root = roots[0];
+  const root = picked;
   return {
     entries: entries.map((e) => (e === root ? { ...e, path: 'main.tex' } : e)),
     renamedFrom: root.path,

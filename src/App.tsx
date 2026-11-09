@@ -1473,7 +1473,7 @@ export const App: React.FC = () => {
   }, []);
 
   // Multi-File Upload Pipeline
-  const handleUploadFiles = (selectedFiles: File[]) => {
+  const handleUploadFiles = (selectedFiles: File[], targetDirFor?: (file: File) => string | undefined) => {
     if (selectedFiles.length === 0) return;
 
     const newItems: UploadFileItem[] = selectedFiles.map((file, idx) => ({
@@ -1502,6 +1502,7 @@ export const App: React.FC = () => {
             body: JSON.stringify({
               fileName: item.name,
               base64Data: reader.result,
+              targetDir: targetDirFor?.(item.file),
             }),
           });
 
@@ -2221,7 +2222,21 @@ export const App: React.FC = () => {
                 detectedMissingPackages={detectedMissingPackages}
                 onApplyBatchFix={handleApplyBatchFix}
                 missingProjectFiles={missingProjectFiles}
-                onUploadFiles={handleUploadFiles}
+                onUploadFiles={(files) =>
+                  // Put each file where the document refers to it. Images
+                  // otherwise land in figures/, and pdfLaTeX's EPS converter
+                  // does not search subfolders, so \includegraphics{fig.eps}
+                  // with fig.eps in figures/ fails to convert.
+                  handleUploadFiles(files, (file) => {
+                    const lower = file.name.toLowerCase();
+                    const ref = missingProjectFiles.find((m) => {
+                      const base = m.file.split('/').pop()!.toLowerCase();
+                      return base === lower || lower.startsWith(base + '.');
+                    });
+                    if (!ref) return undefined;
+                    return ref.file.includes('/') ? ref.file.slice(0, ref.file.lastIndexOf('/')) : '.';
+                  })
+                }
                 onImportZip={() => setIsNewProjectModalOpen(true)}
                 onSelectErrorLine={(line, file) => {
                   // An error in another project file (a .bib, an \input
@@ -2366,7 +2381,7 @@ export const App: React.FC = () => {
             addToast(`Could not create project: ${e.message}`, 'error');
           }
         }}
-        onImport={async (name, file) => {
+        onImport={async (name, file, mainFile) => {
           // The JSON body limit is 50 MB, and base64 adds a third.
           if (file.size > 36 * 1024 * 1024) {
             addToast(`${file.name} is ${(file.size / (1024 * 1024)).toFixed(0)} MB; import accepts zips up to 36 MB.`, 'error');
@@ -2382,9 +2397,12 @@ export const App: React.FC = () => {
             const res = await fetch('/api/projects/import', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name, base64Data }),
+              body: JSON.stringify({ name, base64Data, mainFile }),
             });
             const data = await res.json();
+            if (res.status === 409 && data.code === 'CHOOSE_MAIN_FILE' && Array.isArray(data.candidates)) {
+              return { candidates: data.candidates as string[] };
+            }
             if (!res.ok) {
               addToast(`Could not import ${file.name}: ${data.error || res.statusText}`, 'error');
               return false;

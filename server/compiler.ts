@@ -747,7 +747,13 @@ function unwrapFileLineErrors(lines: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
-    if (line.length >= 79 && !FILE_LINE_ERROR.test(line)) {
+    // A path never starts with a space. TeX's memory statistics line
+    // (" 49i,0n,52p,... stack positions out of ...") is just over 79 columns
+    // and sits right above "./sn-jnl.cls:774: ==> Fatal error", and joining
+    // the two made the statistics the error's file name. (The next line
+    // matching on its own proves nothing: the second half of a wrapped
+    // absolute path, "ae-0b57.../main.tex:3: ...", matches too.)
+    if (line.length >= 79 && !/^\s/.test(line) && !FILE_LINE_ERROR.test(line)) {
       let joined = line;
       for (let k = 1; k <= 3 && i + k < lines.length; k++) {
         joined += lines[i + k];
@@ -1022,8 +1028,12 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
       return {
         ...err,
         isCascading: true,
-        cascadingFromLine: rootError.line,
-        friendlyExplanation: `Secondary error cascading from Line ${rootError.line}. Resolving the root issue on Line ${rootError.line} will fix this.`,
+        cascadingFromLine: rootError.line > 0 ? rootError.line : undefined,
+        // A root with no line of its own must not be cited as "Line 0".
+        friendlyExplanation:
+          rootError.line > 0
+            ? `Secondary error cascading from Line ${rootError.line}. Resolving the root issue on Line ${rootError.line} will fix this.`
+            : 'Secondary error caused by the root issue above. Resolving that one will fix this.',
       };
     }
 
@@ -1126,7 +1136,7 @@ function enrichErrorsWithSourceContext(
   const maketitleLineIdx = sourceLines.findIndex((l) => /\\maketitle\b/.test(l));
   let authorFixAssigned = false;
 
-  return errors.map((err) => {
+  const enriched = errors.map((err) => {
     const lineIdx = (err.line ?? 0) - 1; // convert to 0-based
 
     // ── Pattern 0: Unicode character pdfLaTeX has no definition for ────────
@@ -1303,6 +1313,62 @@ function enrichErrorsWithSourceContext(
     // Symptoms: "File '<name>' not found" or "Package pdftex.def Error: File '<name>' not found"
     // If the file actually exists inside figures/, images/, img/, assets/, etc.,
     // suggest updating the path in \includegraphics.
+    // ── Pattern 3a: an .eps figure pdfLaTeX could not convert ────────────────
+    // pdfLaTeX converts fig.eps by running epstopdf on the name as written in
+    // \includegraphics, from the project root. TeX itself finds figures/fig.eps
+    // through the subfolder search path, but the converter does not search, so
+    // an .eps in a subfolder fails as "fig-eps-converted-to.pdf not found".
+    const converted = err.message.match(/File [`']?([^`'\s:]+)-(eps|ps)-converted-to\.pdf[`']?\s+not found/i);
+    if (converted && projectDir) {
+      const base = converted[1];
+      const sourceName = `${path.posix.basename(base)}.${converted[2]}`;
+      const atReference = fs.existsSync(path.join(projectDir, `${base}.${converted[2]}`));
+      let subdir: string | undefined;
+      if (!atReference) {
+        try {
+          subdir = fs
+            .readdirSync(projectDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+            .map((e) => e.name)
+            .find((d) => fs.existsSync(path.join(projectDir, d, sourceName)));
+        } catch {
+          subdir = undefined;
+        }
+      }
+      const refIdx = (() => {
+        const hint = lineIdx >= 0 && lineIdx < sourceLines.length && sourceLines[lineIdx].includes(base) ? lineIdx : -1;
+        return hint >= 0 ? hint : findCodeLine(sourceLines, new RegExp(`\\\\includegraphics[^{]*\\{\\s*${escapeRegExp(base)}(\\.${converted[2]})?\\s*\\}`));
+      })();
+      if (subdir && refIdx >= 0) {
+        const srcLine = sourceLines[refIdx];
+        const fixedLine = srcLine.replace(new RegExp(`\\{\\s*${escapeRegExp(base)}((\\.${converted[2]})?\\s*\\})`), `{${subdir}/${base}$1`);
+        return {
+          ...err,
+          line: refIdx + 1,
+          friendlyExplanation:
+            `${sourceName} is in ${subdir}/, and pdfLaTeX could not convert it to PDF from there: the converter (epstopdf) ` +
+            `only looks at the path written in \\includegraphics. Write the folder into the path, or move the file next to main.tex.`,
+          suggestedFix: {
+            type: 'replace_line' as const,
+            codeSnippet: fixedLine,
+            label: `Use ${subdir}/${base} in the path`,
+            description: `Changes the \\includegraphics path on line ${refIdx + 1} so the EPS converter finds the file.`,
+            line: refIdx + 1,
+            find: srcLine,
+            replace: fixedLine,
+          },
+        };
+      }
+      return {
+        ...err,
+        line: refIdx >= 0 ? refIdx + 1 : err.line,
+        friendlyExplanation: atReference
+          ? `pdfLaTeX could not convert ${sourceName} to PDF. The EPS converter needs Ghostscript; TeX Doctor checks for it. ` +
+            `The file may also be damaged: open it in another program, or export the figure as PDF or PNG instead.`
+          : `${sourceName} is not in the project, so pdfLaTeX had nothing to convert. Upload it next to main.tex.`,
+      };
+    }
+
     const fileNotFoundMatch = err.message.match(
       /File [`']?([^`'\s:]+\.(?:png|jpe?g|pdf|eps))[`']?\s+not found/i
     );
@@ -1357,6 +1423,58 @@ function enrichErrorsWithSourceContext(
     }
 
     return enrichFromSource(err, sourceLines);
+  });
+  // Both maps are 1:1, so enriched[i] and rawErrors[i] are the same error;
+  // the raw file names still say which class was open.
+  return attributeIndirectlyLoadedFiles(enriched, sourceLines, rawErrors);
+}
+
+/**
+ * A missing package that main.tex never loads itself was requested by the
+ * document class or another package (Springer Nature's sn-jnl.cls loads
+ * cuted). TeX gives that error no line, so it showed as "Line 0" and its
+ * cascades as "cascading from Line 0". The file TeX was reading when it
+ * stopped names the requester: the following "Emergency stop" or fatal error
+ * is reported against it.
+ */
+function attributeIndirectlyLoadedFiles(errors: CompileError[], sourceLines: string[], rawErrors: CompileError[]): CompileError[] {
+  return errors.map((err, idx) => {
+    if (err.line > 0) return err;
+    const missing = err.message.match(/File [`']([^'`]+\.(?:sty|cls))' not found/);
+    if (!missing) return err;
+
+    // Raw file names: the earlier pass already moved errors inside an
+    // installed class (revtex4-2.cls) onto main.tex.
+    const requesterFile = rawErrors
+      .slice(idx + 1)
+      .map((e) => path.win32.basename(e.file))
+      .find((f) => /\.(cls|sty)$/i.test(f));
+    const requester = requesterFile ? requesterFile.replace(/\.(cls|sty)$/i, '') : undefined;
+    const isClass = requesterFile?.toLowerCase().endsWith('.cls');
+
+    const loaderOf = (name: string, cls: boolean) =>
+      new RegExp(
+        cls
+          ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${escapeRegExp(name)}\\s*\\}`
+          : `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${escapeRegExp(name)}\\s*(?:,[^}]*)?\\}`
+      );
+    let idxLine = requester ? findCodeLine(sourceLines, loaderOf(requester, !!isClass)) : -1;
+    // Unknown requester: the class is the usual one, and its line is a better
+    // place to land than the top of the file.
+    if (idxLine < 0) idxLine = findCodeLine(sourceLines, /\\documentclass\s*(\[[^\]]*\])?\s*\{/);
+    if (idxLine < 0) return err;
+
+    const via = requesterFile
+      ? `${isClass ? 'The document class' : 'The package'} ${requester} (${requesterFile}) loads ${missing[1]}; this document does not load it directly, so the line shown is where ${requester} is loaded. `
+      : `This document does not load ${missing[1]} directly; a class or package it uses does. `;
+    return {
+      ...err,
+      file: 'main.tex',
+      line: idxLine + 1,
+      friendlyExplanation:
+        via +
+        `${missing[1]} is not installed. Install it with the button below (your TeX package manager), or, if it came with a template, copy it into this project.`,
+    };
   });
 }
 
@@ -1610,6 +1728,24 @@ const DEFAULT_COMPILE_TIMEOUT_MS = (() => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 600000;
 })();
 
+// MiKTeX installs a missing package the moment the engine asks for it, but
+// only when its AutoInstall setting is "always"; a fresh install defaults to
+// "ask", and a compile running in the background cannot answer a prompt. The
+// result was a document from Overleaf failing on every CTAN package its class
+// loads (sn-jnl.cls needs cuted), one Install click and recompile per package.
+// -enable-installer turns installation on for this run only. TeX Live has no
+// on-the-fly installer and would reject the flag, hence the probe.
+let miktexCache: boolean | undefined;
+export async function isMiktex(): Promise<boolean> {
+  if (miktexCache !== undefined) return miktexCache;
+  const probe = await executeCommand('pdflatex', ['--version'], process.cwd(), 10000);
+  const isMik = !probe.error && /MiKTeX/i.test(probe.stdout + probe.stderr);
+  // Only a positive answer is cached, so installing MiKTeX while the server
+  // runs is picked up by the next compile.
+  if (isMik) miktexCache = true;
+  return isMik;
+}
+
 // Cache whether latexmk+Perl are available so we pay the probe cost only once
 // per server process. undefined = not yet checked; true/false = known.
 let latexmkAvailableCache: boolean | undefined = undefined;
@@ -1860,10 +1996,14 @@ export async function compileDocument(
   // latexmk is preferred: it decides how many passes are needed and runs
   // bibtex/biber on its own. The availability check is cached after the first
   // compile so we don't pay the probe overhead on every subsequent keypress.
+  const miktex = await isMiktex();
+  const installerFlag = miktex ? ' -enable-installer' : '';
   const latexmkArgs = [
     '-pdf',
     '-g',
-    `-pdflatex=${engine}`,
+    `-pdflatex=${engine}${installerFlag}`,
+    // latexmk runs BibTeX on its own; a template's .bst can need a package too.
+    ...(miktex ? ['-e', '$bibtex = q/bibtex -enable-installer %O %S/'] : []),
     '-interaction=nonstopmode',
     '-synctex=1',
     '-file-line-error',
@@ -1886,6 +2026,7 @@ export async function compileDocument(
   // -include-directory are MiKTeX extensions that make this path fail
   // outright on TeX Live; TEXINPUTS already covers file resolution.
   const directArgs = [
+    ...(miktex ? ['-enable-installer'] : []),
     '-interaction=nonstopmode',
     '-file-line-error',
     '-synctex=1',
@@ -1906,7 +2047,7 @@ export async function compileDocument(
     // then reruns until the labels settle.
     const needsBibtex = fs.existsSync(auxFile) && /^\\citation\{/m.test(readSafe(auxFile));
     if (needsBibtex) {
-      await executeCommand('bibtex', [baseName], buildDir, undefined, compileEnv);
+      await executeCommand('bibtex', [...(miktex ? ['-enable-installer'] : []), baseName], buildDir, undefined, compileEnv);
       res = await executeCommand(engine, directArgs, projectDir, undefined, compileEnv);
     }
 

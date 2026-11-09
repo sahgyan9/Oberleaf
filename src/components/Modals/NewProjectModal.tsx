@@ -5,8 +5,11 @@ interface NewProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, template: string) => void;
-  /** Resolves true when the import succeeded and the modal can close. */
-  onImport: (name: string, file: File) => Promise<boolean>;
+  /**
+   * Resolves true when the import succeeded and the modal can close, or with
+   * the documents to choose from when the zip has several.
+   */
+  onImport: (name: string, file: File, mainFile?: string) => Promise<boolean | { candidates: string[] }>;
 }
 
 const projectNameFromZip = (fileName: string) =>
@@ -25,25 +28,38 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const [template, setTemplate] = useState('cv');
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [mainCandidates, setMainCandidates] = useState<string[] | null>(null);
+  const [chosenMain, setChosenMain] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
+  const clearZip = () => {
+    setZipFile(null);
+    setMainCandidates(null);
+    setChosenMain('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const reset = () => {
     setName('');
-    setZipFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    clearZip();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || isImporting) return;
     if (zipFile) {
+      if (mainCandidates && !chosenMain) return;
       setIsImporting(true);
       try {
-        if (await onImport(name.trim(), zipFile)) {
+        const result = await onImport(name.trim(), zipFile, chosenMain || undefined);
+        if (result === true) {
           reset();
           onClose();
+        } else if (result && typeof result === 'object') {
+          setMainCandidates(result.candidates);
+          setChosenMain('');
         }
       } finally {
         setIsImporting(false);
@@ -58,6 +74,8 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const handleZipChosen = (file: File | undefined) => {
     if (!file) return;
     setZipFile(file);
+    setMainCandidates(null);
+    setChosenMain('');
     if (!name.trim()) setName(projectNameFromZip(file.name));
   };
 
@@ -173,17 +191,40 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setZipFile(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
+                  onClick={clearZip}
                   className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded btn-tactile"
                   aria-label="Remove zip"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
+            ) : null}
+            {zipFile && mainCandidates && (
+              <fieldset className="mt-2 p-3 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder">
+                <legend className="px-1 text-xs font-medium text-stone-700 dark:text-stone-300">
+                  This zip has several documents. Choose the one to compile:
+                </legend>
+                <div className="space-y-1.5">
+                  {mainCandidates.map((c) => (
+                    <label key={c} className="flex items-center gap-2 text-xs text-stone-900 dark:text-stone-100 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="main-document"
+                        value={c}
+                        checked={chosenMain === c}
+                        onChange={() => setChosenMain(c)}
+                        className="accent-scholarly"
+                      />
+                      <span className="font-mono">{c}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-stone-500 dark:text-stone-400">
+                  It becomes main.tex. The other documents are imported unchanged.
+                </p>
+              </fieldset>
+            )}
+            {!zipFile && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -212,7 +253,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isImporting}
+              disabled={isImporting || (!!zipFile && !!mainCandidates && !chosenMain)}
               className="px-4 py-1.5 rounded-md bg-scholarly dark:bg-scholarly-dark hover:bg-scholarly-hover dark:hover:bg-scholarly-darkHover text-white text-xs font-medium shadow-xs transition btn-tactile disabled:opacity-60"
             >
               {zipFile ? (isImporting ? 'Importing...' : 'Import Project') : 'Create Project'}

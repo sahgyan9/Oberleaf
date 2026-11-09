@@ -1412,7 +1412,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                           </span>
                           {err.isCascading ? (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-normal bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 whitespace-nowrap">
-                              Cascades from Line {err.cascadingFromLine || 1}
+                              {err.cascadingFromLine ? `Cascades from Line ${err.cascadingFromLine}` : 'Secondary'}
                             </span>
                           ) : (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-crimson-subtle dark:bg-crimson-darkSubtle text-crimson dark:text-crimson-dark border border-crimson/20 whitespace-nowrap">

@@ -2,8 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import {
   runDependencyCheck,
   runDoctorAction,
@@ -34,6 +33,7 @@ import {
   importProjectFromZip,
 } from './projects.js';
 import { ZipImportError } from './zipImport.js';
+import { installPackageForSty } from './packageInstall.js';
 import {
   createProjectCommit,
   createExplicitCommit,
@@ -263,13 +263,17 @@ app.post('/api/projects', (req, res) => {
 // Import a whole project from a .zip (Overleaf: Menu > Download > Source).
 app.post('/api/projects/import', (req, res) => {
   try {
-    const { name, base64Data } = req.body;
+    const { name, base64Data, mainFile } = req.body;
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Project name is required' });
     if (!base64Data || typeof base64Data !== 'string') return res.status(400).json({ error: 'base64Data is required' });
     const zip = Buffer.from(base64Data.includes(',') ? base64Data.split(',')[1] : base64Data, 'base64');
-    res.json(importProjectFromZip(name.trim(), zip));
+    res.json(importProjectFromZip(name.trim(), zip, typeof mainFile === 'string' ? mainFile : undefined));
   } catch (error: any) {
-    if (error instanceof ZipImportError) return res.status(400).json({ error: error.message });
+    if (error instanceof ZipImportError) {
+      return error.candidates
+        ? res.status(409).json({ error: error.message, code: 'CHOOSE_MAIN_FILE', candidates: error.candidates })
+        : res.status(400).json({ error: error.message });
+    }
     sendApiError(res, error);
   }
 });
@@ -786,8 +790,6 @@ app.post('/api/projects/:id/clean', async (req, res) => {
   }
 });
 
-const execAsync = promisify(exec);
-
 // 7.5. Package Installer Endpoint (MiKTeX mpm, TeX Live tlmgr, or CTAN mirror fallback)
 app.post('/api/projects/:id/packages/install', async (req, res) => {
   try {
@@ -802,61 +804,11 @@ app.post('/api/projects/:id/packages/install', async (req, res) => {
       return res.status(400).json({ error: 'Invalid packageName' });
     }
 
-    // The compile log names the missing .sty file, but package managers index
-    // by distribution package. Most match; these common ones do not.
-    const STY_TO_PACKAGE: Record<string, string> = {
-      tikz: 'pgf',
-      graphicx: 'graphics',
-      amssymb: 'amsfonts',
-      subcaption: 'caption',
-      algorithmic: 'algorithms',
-      algorithm: 'algorithms',
-    };
-    const distPkg = STY_TO_PACKAGE[cleanPkg] ?? cleanPkg;
-
-    const managers: Array<{ method: string; label: string; cmd: string }> = [
-      // MiKTeX 22+; `mpm` is deprecated upstream and kept only as a fallback.
-      { method: 'miktex', label: 'MiKTeX', cmd: `miktex packages install ${distPkg}` },
-      { method: 'mpm', label: 'MiKTeX Package Manager', cmd: `mpm --install=${distPkg}` },
-      { method: 'tlmgr', label: 'TeX Live (tlmgr)', cmd: `tlmgr install ${distPkg}` },
-    ];
-
-    for (const manager of managers) {
-      try {
-        const { stdout } = await execAsync(manager.cmd, { timeout: 300_000, windowsHide: true });
-        return res.json({
-          success: true,
-          method: manager.method,
-          message: `Installed '${distPkg}' with ${manager.label}.`,
-          stdout,
-        });
-      } catch {
-        // Not installed, or the package is unknown to this manager: try the next
-      }
-    }
-
-    // Attempt 3: Direct download from CTAN mirror into project root
-    try {
-      const targetStyPath = path.join(projectDir, `${cleanPkg}.sty`);
-      const ctanUrl = `https://mirrors.ctan.org/macros/latex/contrib/${cleanPkg}/${cleanPkg}.sty`;
-      const ctanRes = await fetch(ctanUrl);
-      if (ctanRes.ok) {
-        const styText = await ctanRes.text();
-        fs.writeFileSync(targetStyPath, styText, 'utf-8');
-        return res.json({
-          success: true,
-          method: 'ctan',
-          message: `Downloaded '${cleanPkg}.sty' from CTAN directly into project directory.`,
-          file: `${cleanPkg}.sty`,
-        });
-      }
-    } catch {
-      // ignore
-    }
-
-    return res.status(500).json({
-      error: `Could not install package '${cleanPkg}'. Please verify your TeX package manager or install it manually.`,
-    });
+    // Resolves the file to its distribution package and verifies the result;
+    // see server/packageInstall.ts for why exit codes are not trusted.
+    const outcome = await installPackageForSty(cleanPkg, projectDir);
+    if (!outcome.success) return res.status(422).json({ error: outcome.message });
+    return res.json(outcome);
   } catch (error: any) {
     sendApiError(res, error);
   }

@@ -603,8 +603,8 @@ export interface ImportedProject extends ProjectSummary {
  * journal template keeps beside it -- the .cls, .bst, .bib and figures -- and
  * the document then fails on its first line. Import brings all of them.
  */
-export function importProjectFromZip(name: string, zip: Buffer): ImportedProject {
-  const { entries, renamedFrom } = chooseMainFile(unwrapSingleFolder(readZip(zip)));
+export function importProjectFromZip(name: string, zip: Buffer, mainFile?: string): ImportedProject {
+  const { entries, renamedFrom } = chooseMainFile(unwrapSingleFolder(readZip(zip)), mainFile);
   const { slug, dir: projectDir } = allocateProjectDir(name, 'imported-project');
   try {
     for (const entry of entries) {

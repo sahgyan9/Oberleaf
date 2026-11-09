@@ -191,8 +191,28 @@ describe('choosing the document to compile', () => {
     expect(() => chooseMainFile([entry('notes.tex', '% \\documentclass{article}\n')])).toThrow(/no top-level \.tex file/);
   });
 
-  it('asks the user to pick when there are several documents', () => {
-    expect(() => chooseMainFile([entry('a.tex', ARTICLE), entry('b.tex', ARTICLE)])).toThrow(/several documents \(a\.tex, b\.tex\)/);
+  it('asks the user to pick when there are several documents, listing them', () => {
+    const kit = [entry('bare_jrnl.tex', ARTICLE), entry('bare_conf.tex', ARTICLE), entry('IEEEtran.cls', '')];
+    let thrown: ZipImportError | undefined;
+    try {
+      chooseMainFile(kit);
+    } catch (e) {
+      thrown = e as ZipImportError;
+    }
+    expect(thrown?.message).toMatch(/several documents/);
+    expect(thrown?.candidates).toEqual(['bare_conf.tex', 'bare_jrnl.tex']);
+  });
+
+  it('uses the document the user picked and leaves the others as they are', () => {
+    const kit = [entry('bare_jrnl.tex', ARTICLE), entry('bare_conf.tex', ARTICLE)];
+    const { entries, renamedFrom } = chooseMainFile(kit, 'bare_conf.tex');
+    expect(renamedFrom).toBe('bare_conf.tex');
+    expect(entries.map((e) => e.path)).toEqual(['bare_jrnl.tex', 'main.tex']);
+  });
+
+  it('prefers main.tex among several documents without asking', () => {
+    const { renamedFrom } = chooseMainFile([entry('main.tex', ARTICLE), entry('sample.tex', ARTICLE)]);
+    expect(renamedFrom).toBeUndefined();
   });
 
   it('unwraps a zip whose files all sit in one folder', () => {
@@ -313,5 +333,90 @@ describe('findMissingProjectFiles', () => {
     const lines = [String.raw`\input{glyphtounicode}`, String.raw`\input{sections/method}`];
     const missing = await findMissingProjectFiles(lines, dir, []);
     expect(missing).toEqual([{ file: 'sections/method.tex', kind: 'input', line: 2 }]);
+  });
+});
+
+// ─── A package the document class loads (sn-jnl.cls loads cuted) ───────────
+
+const CLASS_SOURCE = [
+  '%Version 3.1',
+  String.raw`%%\documentclass[referee]{jnlcls}`,
+  String.raw`\documentclass[pdflatex]{jnlcls}`,
+  String.raw`\begin{document}`,
+  'Hello.',
+  String.raw`\end{document}`,
+];
+
+// The shape of the log MiKTeX wrote for this case: the class is open when
+// the package is missing, and the statistics line sits right above the
+// fatal error, which names the class by its relative path.
+const CLASS_LOADS_MISSING_LOG = [
+  '(./main.tex',
+  'LaTeX2e <2025-11-01>',
+  '(./jnlcls.cls',
+  'Document Class: jnlcls',
+  '',
+  "! LaTeX Error: File `cuted.sty' not found.",
+  '',
+  'Type X to quit or <RETURN> to proceed,',
+  'or enter new name. (Default extension: sty)',
+  '',
+  'Enter file name: ',
+  'jnlcls.cls:5: Emergency stop.',
+  '<read *> ',
+  '         ',
+  'l.5 ',
+  '*** (cannot \read from terminal in nonstop modes)',
+  '',
+  'Here is how much of TeX\'s memory you used:',
+  ' 49i,0n,52p,320b,36s stack positions out of 10000i,1000n,20000p,200000b,200000s',
+  'jnlcls.cls:5:  ==> Fatal error occurred, no output PDF file produced!',
+].join('\n');
+
+describe('a missing package loaded by the document class', () => {
+  it('points at the live \documentclass and names the class as the requester', () => {
+    const { errors } = parseLatexLog(CLASS_LOADS_MISSING_LOG, CLASS_SOURCE);
+    const root = errors.find((e) => /cuted\.sty' not found/.test(e.message))!;
+    expect(root.line).toBe(3);
+    expect(root.friendlyExplanation).toMatch(/The document class jnlcls \(jnlcls\.cls\) loads cuted\.sty/);
+    expect(root.suggestedFix?.type).toBe('install_package');
+  });
+
+  it('marks what follows as cascades from that line, never "Line 0"', () => {
+    const { errors } = parseLatexLog(CLASS_LOADS_MISSING_LOG, CLASS_SOURCE);
+    const cascades = errors.filter((e) => e.isCascading);
+    expect(cascades.length).toBe(2);
+    for (const c of cascades) {
+      expect(c.cascadingFromLine).toBe(3);
+      expect(c.friendlyExplanation).not.toMatch(/Line 0/);
+    }
+  });
+
+  it('does not take TeX\'s memory statistics line as part of a file name', () => {
+    // The class sits in the project, as it does after an Overleaf import, so
+    // its errors stay on it rather than moving to main.tex.
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oberleaf-cls-'));
+    try {
+      fs.writeFileSync(path.join(projectDir, 'jnlcls.cls'), '');
+      const { errors } = parseLatexLog(CLASS_LOADS_MISSING_LOG, CLASS_SOURCE, projectDir);
+      const fatal = errors.find((e) => /Fatal error/.test(e.message))!;
+      expect(fatal.file).toBe('jnlcls.cls');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('still joins an absolute path that TeX wrapped at column 79', () => {
+    const full = 'C:/Users/x/' + 'a'.repeat(90) + '/main.tex:3: Emergency stop.';
+    const log = [full.slice(0, 79), full.slice(79), '<read *>'].join('\n');
+    const { errors } = parseLatexLog(log, CLASS_SOURCE);
+    expect(errors[0].file).toBe(full.slice(0, full.indexOf(':3:')));
+  });
+
+  it('words a cascade without a line number when the root has none', () => {
+    const { errors } = parseLatexLog(CLASS_LOADS_MISSING_LOG, []);
+    const cascade = errors.find((e) => e.isCascading)!;
+    expect(cascade.cascadingFromLine).toBeUndefined();
+    expect(cascade.friendlyExplanation).toMatch(/caused by the root issue above/);
   });
 });
