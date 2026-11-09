@@ -4,8 +4,9 @@ import { TopBar, ViewMode, ProjectInfo } from './components/TopBar/TopBar';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
-import { Editor } from './components/Editor/Editor';
-import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt } from './components/PDFViewer/PDFViewer';
+import { Editor, PDFViewer } from './components/Lazy/LazyPanels';
+import type { CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt } from './components/PDFViewer/PDFViewer';
+import { bootStep } from './boot';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
 import { ImageQuickPicker, ImageQuickPickerHandle } from './components/Modals/ImageQuickPicker';
@@ -347,6 +348,7 @@ export const App: React.FC = () => {
         throw new Error(`Server returned status ${res.status}`);
       }
       const data: ProjectInfo[] = await res.json();
+      bootStep('projects', 'done');
       if (Array.isArray(data) && data.length > 0) {
         setProjects(data);
         writeSetting('cached-projects', JSON.stringify(data));
@@ -384,6 +386,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       console.warn('[Oberleaf] Network error loading /api/projects:', err);
+      bootStep('projects', 'error', 'Could not reach the Oberleaf server.');
       // Try local storage cache
       try {
         const cached = readSetting('cached-projects');

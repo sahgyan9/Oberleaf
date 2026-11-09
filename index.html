@@ -7,9 +7,15 @@
     <title>Oberleaf</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded without blocking first paint: a render-blocking stylesheet from
+         the network held back the startup screen (about 300 ms on a cold cache,
+         much longer on a slow or captive network). display=swap already
+         tolerates the fonts arriving after the first frame. -->
     <link
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     <!-- Dark-mode guard: runs synchronously before any rendering to prevent FOUC.
          Reads the user's saved preference from localStorage; defaults to dark if
@@ -31,8 +37,155 @@
         }
       })();
     </script>
+    <!-- Startup screen. Plain HTML/CSS so it paints before the JavaScript
+         bundle arrives; src/boot.ts reports real progress into it. Colours are
+         the app's own light/dark surface tokens (brand_assets/BRAND_GUIDELINES.md). -->
+    <style>
+      #boot {
+        position: fixed; inset: 0; z-index: 2147483000;
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+        background: #FBFBFA; color: #1C1917;
+        font: 14px/1.4 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        transition: opacity 160ms ease-out;
+      }
+      html.dark #boot { background: #141416; color: #F5F5F4; }
+      #boot.boot-hide { opacity: 0; pointer-events: none; }
+      .boot-card {
+        width: 100%; max-width: 340px; box-sizing: border-box; padding: 24px 24px 0;
+        background: #FFFFFF; border: 1px solid #E7E5DF; border-radius: 10px; overflow: hidden;
+      }
+      html.dark .boot-card { background: #1C1C1F; border-color: #2E2E35; }
+      .boot-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+      .boot-brand span { font: 600 20px/1 Newsreader, Georgia, 'Times New Roman', serif; letter-spacing: -0.01em; }
+      .boot-steps { list-style: none; margin: 0; padding: 0; }
+      .boot-steps li { display: flex; align-items: center; gap: 10px; padding: 5px 0; color: #57534E; }
+      html.dark .boot-steps li { color: #A8A29E; }
+      .boot-steps li[data-state="active"], .boot-steps li[data-state="error"] { color: inherit; }
+      .boot-mark { flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #D6D3CD; color: #1B5E20; }
+      html.dark .boot-mark { border-color: #3F3F46; color: #2EA043; }
+      li[data-state="active"] .boot-mark { border-color: #E7E5DF; border-top-color: #1B5E20; animation: boot-spin 0.9s linear infinite; }
+      html.dark li[data-state="active"] .boot-mark { border-color: #2E2E35; border-top-color: #2EA043; }
+      li[data-state="done"] .boot-mark, li[data-state="error"] .boot-mark { border: 0; }
+      .boot-mark svg { display: block; width: 14px; height: 14px; }
+      .boot-msg { margin: 12px 0 0; font-size: 13px; color: #57534E; }
+      html.dark .boot-msg { color: #A8A29E; }
+      .boot-msg code { font: 12px 'JetBrains Mono', Consolas, monospace; }
+      .boot-actions { display: flex; gap: 8px; margin-top: 14px; }
+      .boot-actions button {
+        font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+        border: 1px solid #E7E5DF; background: #FFFFFF; color: inherit;
+      }
+      .boot-actions button.boot-primary { background: #1B5E20; border-color: #1B5E20; color: #FFFFFF; }
+      html.dark .boot-actions button { background: #26262B; border-color: #2E2E35; }
+      html.dark .boot-actions button.boot-primary { background: #2EA043; border-color: #2EA043; color: #141416; }
+      .boot-bar { height: 3px; margin: 20px -24px 0; background: #F4F3EF; }
+      html.dark .boot-bar { background: #26262B; }
+      .boot-bar div { height: 100%; width: 0; background: #1B5E20; transition: width 200ms ease-out; }
+      html.dark .boot-bar div { background: #2EA043; }
+      #boot [hidden] { display: none !important; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        #boot, .boot-bar div { transition: none; }
+        li[data-state="active"] .boot-mark { animation: none; }
+      }
+    </style>
   </head>
   <body class="bg-surface-light dark:bg-surface-dark text-[#1C1917] dark:text-[#F5F5F4] min-h-screen antialiased selection:bg-[#1B5E20]/20 dark:selection:bg-[#2EA043]/30">
+    <div id="boot" role="status" aria-live="polite">
+      <div class="boot-card">
+        <div class="boot-brand">
+          <img src="/assets/icon.svg" width="36" height="36" alt="" />
+          <span>Oberleaf</span>
+        </div>
+        <ol class="boot-steps" id="boot-steps"></ol>
+        <p class="boot-msg" id="boot-msg" hidden></p>
+        <div class="boot-actions" id="boot-actions" hidden>
+          <button type="button" class="boot-primary" id="boot-retry">Retry</button>
+          <button type="button" id="boot-continue">Continue anyway</button>
+        </div>
+        <div class="boot-bar"><div id="boot-bar"></div></div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var root = document.getElementById('boot');
+        var list = document.getElementById('boot-steps');
+        var msg = document.getElementById('boot-msg');
+        var actions = document.getElementById('boot-actions');
+        var bar = document.getElementById('boot-bar');
+        var CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="currentColor"/><path d="M4 7.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        var ALERT = '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="#B42318"/><path d="M7 3.6v4.2M7 10.2v.1" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>';
+        var steps = [
+          { id: 'app', label: 'Loading the app' },
+          { id: 'projects', label: 'Loading projects' }
+        ];
+        // A project link opens straight into the editor; wait for that too.
+        if (location.hash.indexOf('#/project/') === 0) steps.push({ id: 'project', label: 'Opening the editor' });
+        var state = { app: 'active' };
+        var finished = false;
+
+        steps.forEach(function (s) {
+          var li = document.createElement('li');
+          li.id = 'boot-step-' + s.id;
+          li.innerHTML = '<span class="boot-mark"></span><span></span>';
+          li.lastChild.textContent = s.label;
+          list.appendChild(li);
+        });
+
+        function render() {
+          var done = 0;
+          steps.forEach(function (s) {
+            var st = state[s.id] || 'pending';
+            var li = document.getElementById('boot-step-' + s.id);
+            li.setAttribute('data-state', st);
+            li.firstChild.innerHTML = st === 'done' ? CHECK : st === 'error' ? ALERT : '';
+            if (st === 'done') done++;
+          });
+          bar.style.width = Math.round((done / steps.length) * 100) + '%';
+          return done === steps.length;
+        }
+
+        function finish() {
+          if (finished) return;
+          finished = true;
+          clearTimeout(slowTimer);
+          root.className = 'boot-hide';
+          setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 200);
+        }
+
+        function explain(text) {
+          msg.textContent = text + ' The server log is ';
+          var code = document.createElement('code');
+          code.textContent = 'logs/project.log';
+          msg.appendChild(code);
+          msg.appendChild(document.createTextNode(' in the Oberleaf folder.'));
+          msg.hidden = false;
+          actions.hidden = false;
+        }
+
+        document.getElementById('boot-retry').onclick = function () { location.reload(); };
+        document.getElementById('boot-continue').onclick = finish;
+
+        // Not a progress timer: it only says a step has stalled and offers a
+        // way out, instead of leaving a spinner running forever.
+        var slowTimer = setTimeout(function () {
+          // A step that already failed keeps its own explanation.
+          if (!finished && msg.hidden) explain('This is taking longer than usual.');
+        }, 20000);
+
+        window.__oberleafBoot = {
+          step: function (id, st, text) {
+            if (finished || !steps.some(function (s) { return s.id === id; })) return;
+            state[id] = st;
+            var allDone = render();
+            if (st === 'error') explain(text || 'A startup step failed.');
+            if (allDone) finish();
+          },
+          finish: finish
+        };
+        render();
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

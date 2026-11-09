@@ -1,6 +1,9 @@
 import * as Y from 'yjs';
 import { WebrtcProvider } from 'y-webrtc';
-import { MonacoBinding } from 'y-monaco';
+// Type only: y-monaco imports the whole of monaco-editor, so it is loaded on
+// demand below. A static import here would put Monaco in the main bundle, since
+// App.tsx imports this module for broadcastRemoteCompile/leaveCollabSession.
+import type { MonacoBinding } from 'y-monaco';
 
 export interface CollabSessionConfig {
   room: string;
@@ -133,14 +136,21 @@ export function setupMonacoCollab(
     ytext.insert(0, model.getValue());
   }
 
-  activeBinding = new MonacoBinding(
-    ytext,
-    model,
-    new Set([editor]),
-    provider.awareness
-  );
+  let disposed = false;
+  import('y-monaco')
+    .then(({ MonacoBinding: Binding }) => {
+      if (disposed || editor.getModel() !== model) return;
+      if (activeBinding) {
+        try {
+          activeBinding.destroy();
+        } catch {}
+      }
+      activeBinding = new Binding(ytext, model, new Set([editor]), provider.awareness);
+    })
+    .catch((err) => console.warn('[Oberleaf] Could not load the collaboration binding:', err));
 
   return () => {
+    disposed = true;
     if (activeBinding) {
       try {
         activeBinding.destroy();

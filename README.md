@@ -129,9 +129,11 @@ TeX Diagnostics checks the installation on first launch.
 
 3. Start the app:
    ```bash
-   npm start
+   npm run app
    ```
-   The editor opens at `http://localhost:5173`; the local compile server runs on port `3001`.
+   This builds the page once and serves it with the API from one process at `http://127.0.0.1:3001`. The Windows launcher does the same and rebuilds only when the sources are newer than the last build.
+
+   For development, `npm start` runs the Vite dev server with hot reload at `http://localhost:5173` and the API on port `3001`.
 
 ---
 

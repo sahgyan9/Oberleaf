@@ -63,6 +63,8 @@ import {
   stopCloudflareTunnel,
 } from './tunnel.js';
 import { getSessionToken, isLocalRequest, hasValidToken } from './auth.js';
+import { mountBuiltClient, isServingBuild } from './staticApp.js';
+import { relaunchSelf } from './restart.js';
 
 const app = express();
 // Overridable so a second instance can be run alongside a live one (tests,
@@ -75,6 +77,9 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
+  // This server's own page (--serve-build) when OBERLEAF_PORT moves it off 3001.
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
 ];
 
 function isAllowedOrigin(origin?: string): boolean {
@@ -1341,8 +1346,11 @@ app.get('/api/system/check-update', async (req, res) => {
 
 app.post('/api/system/apply-update', async (_req, res) => {
   try {
-    const result = await applySoftwareUpdate();
+    const result = await applySoftwareUpdate(undefined, isServingBuild());
     if (result.success) {
+      // Restart only once the response has reached the page, which then
+      // waits for /health before reloading.
+      if (result.restart) res.on('finish', () => setTimeout(relaunchSelf, 100));
       return res.json(result);
     } else {
       return res.status(500).json(result);
@@ -1355,7 +1363,8 @@ app.post('/api/system/apply-update', async (_req, res) => {
 // 14. Real-Time Collaboration & Tunnel Endpoints
 app.get('/api/collab/network', (_req, res) => {
   try {
-    const status = getCollabNetworkStatus(5173);
+    // The page is served by Vite on 5173 in development, by this server otherwise.
+    const status = getCollabNetworkStatus(isServingBuild() ? PORT : 5173);
     // Local-only route (see LOCAL_ONLY_PREFIXES), so the token is only ever
     // handed to the owner's own browser, which embeds it in the invite link.
     res.json({ ...status, shareToken: getSessionToken() });
@@ -1366,7 +1375,7 @@ app.get('/api/collab/network', (_req, res) => {
 
 app.post('/api/collab/tunnel/start', async (_req, res) => {
   try {
-    const url = await startCloudflareTunnel('http://127.0.0.1:5173');
+    const url = await startCloudflareTunnel(`http://127.0.0.1:${isServingBuild() ? PORT : 5173}`);
     res.json({ success: true, url });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1470,6 +1479,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(status).json({ error: message });
 });
 
+// Serve the built client when launched with --serve-build (see staticApp.ts).
+mountBuiltClient(app);
+
 // Ensure clean starter CV template if workspace has 0 projects
 ensureStarterCVProject();
 
@@ -1477,9 +1489,18 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Oberleaf] Server daemon running at http://127.0.0.1:${PORT}`);
   // Pre-warm the latexmk/perl availability check in background so first compile is instant
   isLatexmkAvailable().catch(() => {});
+  // Start the Doctor scan now; the page's first /api/doctor reuses it.
+  runDependencyCheck().catch(() => {});
 });
 
+// After relaunchSelf() the previous process may still hold the port for a
+// moment; retry for up to 15 s instead of exiting.
+let restartListenRetries = 0;
 server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE' && process.env.OBERLEAF_RESTARTING === '1' && restartListenRetries++ < 60) {
+    setTimeout(() => server.listen(PORT, '0.0.0.0'), 250);
+    return;
+  }
   if (err.code === 'EADDRINUSE') {
     console.error(
       `[Oberleaf] Port ${PORT} is already in use.\n` +

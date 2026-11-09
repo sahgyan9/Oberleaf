@@ -23,6 +23,22 @@ interface UpdateModalProps {
   isChecking: boolean;
 }
 
+// Gives the old process time to exit, then polls until the new one answers
+// (or 60 s pass; the reload then shows the startup screen's own error state).
+async function waitForServerRestart(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 1500));
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch('/health', { cache: 'no-store' });
+      if (res.ok) return;
+    } catch {
+      // Not up yet.
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
 export const UpdateModal: React.FC<UpdateModalProps> = ({
   isOpen,
   onClose,
@@ -43,6 +59,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       const res = await fetch('/api/system/apply-update', { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.restart) {
+          // The server restarts itself to load the update; reload once it answers again.
+          setUpdateSuccess(`${data.message} Restarting Oberleaf...`);
+          await waitForServerRestart();
+          window.location.reload();
+          return;
+        }
         setUpdateSuccess(`${data.message} Reloading Oberleaf...`);
         setTimeout(() => {
           window.location.reload();

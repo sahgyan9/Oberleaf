@@ -577,7 +577,31 @@ async function fontMapsCached(distribution: TexDistribution, pdflatexVersion: st
 }
 
 /** `force` repeats checks that are otherwise cached, such as the font test compile. */
-export async function runDependencyCheck(force = false): Promise<DoctorReport> {
+// The page asks for the report on every load, and a full scan spawns a dozen
+// TeX processes (1.3-2.9 s measured). The server starts a scan at boot, and a
+// report younger than this is reused, so the first page load gets it for free
+// and React StrictMode's double mount in development shares one scan. Anything
+// older is rescanned, so a reload after installing TeX still sees the change.
+const REPORT_REUSE_MS = 60_000;
+let lastReport: { at: number; report: Promise<DoctorReport> } | null = null;
+
+/**
+ * The Doctor report. `force` (the Re-scan button, repairs) always rescans and
+ * also repeats checks that are cached for longer, such as the font test compile.
+ */
+export function runDependencyCheck(force = false): Promise<DoctorReport> {
+  if (!force && lastReport && Date.now() - lastReport.at < REPORT_REUSE_MS) {
+    return lastReport.report;
+  }
+  const entry = { at: Date.now(), report: scanDependencies(force) };
+  lastReport = entry;
+  entry.report.catch(() => {
+    if (lastReport === entry) lastReport = null;
+  });
+  return entry.report;
+}
+
+async function scanDependencies(force: boolean): Promise<DoctorReport> {
   // Binaries first: the distribution they reveal decides which configuration
   // checks apply and which commands the repairs use.
   const [node, pdflatex, xelatex, biber] = await Promise.all([

@@ -1,4 +1,5 @@
 import { exec } from 'child_process';
+import path from 'path';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
@@ -134,8 +135,9 @@ export async function checkSoftwareUpdate(force = false, cwd = process.cwd()): P
  * reset away.
  */
 export async function applySoftwareUpdate(
-  cwd = process.cwd()
-): Promise<{ success: boolean; message: string; error?: string }> {
+  cwd = process.cwd(),
+  rebuildClient = false
+): Promise<{ success: boolean; message: string; error?: string; restart?: boolean }> {
   try {
     await execAsync(FETCH_MAIN, { cwd, timeout: 30000 });
 
@@ -187,10 +189,26 @@ export async function applySoftwareUpdate(
     cachedStatus = null;
     lastCheckTime = 0;
 
-    return {
-      success: true,
-      message: `Updated ${behindBy} commit${behindBy === 1 ? '' : 's'} to ${(await execAsync('git rev-parse --short HEAD', { cwd })).stdout.trim()}.`,
-    };
+    const updatedMessage = `Updated ${behindBy} commit${behindBy === 1 ? '' : 's'} to ${(await execAsync('git rev-parse --short HEAD', { cwd })).stdout.trim()}.`;
+
+    // When the server serves the built page (--serve-build) nothing watches
+    // the files, so the page is rebuilt here and the caller restarts the
+    // server to load the new server code.
+    if (rebuildClient) {
+      const viteJs = path.join(cwd, 'node_modules', 'vite', 'bin', 'vite.js');
+      try {
+        await execAsync(`"${process.execPath}" "${viteJs}" build`, { cwd, timeout: 180000 });
+      } catch (err: any) {
+        return {
+          success: false,
+          message: `${updatedMessage} Rebuilding the app failed; restart Oberleaf and it will retry.`,
+          error: (err?.stderr || err?.message || '').toString().trim().slice(-2000),
+        };
+      }
+      return { success: true, message: updatedMessage, restart: true };
+    }
+
+    return { success: true, message: updatedMessage };
   } catch (err: any) {
     return {
       success: false,
