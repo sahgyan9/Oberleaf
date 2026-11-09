@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { chooseMainFile, readZip, unwrapSingleFolder, ZipImportError } from './zipImport.js';
 
 // ----------------------------------------------------
 // Path containment helpers (canonical definitions)
@@ -563,33 +564,86 @@ export function createProjectZip(rawProjectId: string): string {
   return zipPath;
 }
 
-export function createProject(name: string, templateKey: string = 'cv'): ProjectSummary {
+// A new, empty project directory whose name is a slug of `name`, suffixed
+// until it does not collide with an existing project.
+function allocateProjectDir(name: string, fallback: string): { slug: string; dir: string } {
   const root = getProjectsRoot();
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'my-cv';
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || fallback;
   let finalSlug = slug;
   let counter = 1;
-
   while (fs.existsSync(path.join(root, finalSlug))) {
     finalSlug = `${slug}-${counter++}`;
   }
+  const dir = path.join(root, finalSlug);
+  fs.mkdirSync(dir, { recursive: true });
+  return { slug: finalSlug, dir };
+}
 
-  const projectDir = path.join(root, finalSlug);
-  fs.mkdirSync(projectDir, { recursive: true });
+function writeProjectMeta(projectDir: string, name: string, template: string, nowIso: string): void {
+  const meta = {
+    name,
+    owner: 'You',
+    relativeTime: 'Just now by You',
+    updatedAt: nowIso,
+    template,
+    isArchived: false,
+  };
+  fs.writeFileSync(path.join(projectDir, '.meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+}
+
+export interface ImportedProject extends ProjectSummary {
+  fileCount: number;
+  /** The original name of the root document when it was renamed to main.tex. */
+  mainRenamedFrom?: string;
+}
+
+/**
+ * Creates a project from a .zip of a whole LaTeX project (Overleaf's
+ * Menu > Download > Source). Copying only main.tex across loses the files a
+ * journal template keeps beside it -- the .cls, .bst, .bib and figures -- and
+ * the document then fails on its first line. Import brings all of them.
+ */
+export function importProjectFromZip(name: string, zip: Buffer): ImportedProject {
+  const { entries, renamedFrom } = chooseMainFile(unwrapSingleFolder(readZip(zip)));
+  const { slug, dir: projectDir } = allocateProjectDir(name, 'imported-project');
+  try {
+    for (const entry of entries) {
+      const target = path.resolve(projectDir, entry.path);
+      // readZip already rejected "..", absolute and drive paths; this is the
+      // last line of defence before a write.
+      if (!isInside(projectDir, target) || target === path.resolve(projectDir)) {
+        throw new ZipImportError(`Refusing to write ${entry.path} outside the project.`);
+      }
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, entry.data);
+    }
+    fs.mkdirSync(path.join(projectDir, 'figures'), { recursive: true });
+    const nowIso = new Date().toISOString();
+    writeProjectMeta(projectDir, name, 'import', nowIso);
+    return {
+      id: slug,
+      name,
+      template: 'import',
+      updatedAt: nowIso,
+      path: projectDir,
+      fileCount: entries.length,
+      mainRenamedFrom: renamedFrom,
+    };
+  } catch (err) {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+    throw err;
+  }
+}
+
+export function createProject(name: string, templateKey: string = 'cv'): ProjectSummary {
+  const { slug: finalSlug, dir: projectDir } = allocateProjectDir(name, 'my-cv');
   fs.mkdirSync(path.join(projectDir, 'figures'), { recursive: true });
 
   const template = TEMPLATES[templateKey] || TEMPLATES.cv || TEMPLATES.blank;
   fs.writeFileSync(path.join(projectDir, 'main.tex'), template.mainTex, 'utf-8');
 
   const nowIso = new Date().toISOString();
-  const meta = {
-    name,
-    owner: 'You',
-    relativeTime: 'Just now by You',
-    updatedAt: nowIso,
-    template: templateKey,
-    isArchived: false,
-  };
-  fs.writeFileSync(path.join(projectDir, '.meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+  writeProjectMeta(projectDir, name, templateKey, nowIso);
 
   return {
     id: finalSlug,

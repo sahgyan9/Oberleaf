@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 import { ENVIRONMENT_SOURCES, KNOWN_COMMANDS, XCOLOR_BASE_COLORS, closestMatch } from './texKnowledge.js';
+import { findMissingProjectFiles, type MissingProjectFile } from './projectFiles.js';
 
 export interface SuggestedFix {
   type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line' | 'set_engine' | 'open_doctor';
@@ -48,6 +49,8 @@ export interface CompileResult {
   documentTitle?: string;
   pdfDownloadFilename?: string;
   detectedMissingPackages?: DetectedMissingPackage[];
+  /** Files the document needs that are in neither the project nor the TeX installation */
+  missingProjectFiles?: MissingProjectFile[];
   /** The engine that actually ran, after any % !TEX program override */
   engine?: SupportedEngine;
 }
@@ -80,11 +83,25 @@ function translateTeXError(rawText: string): string {
     if (isImage) {
       return `Figure could not be found.\nExpected: ${file}\nCheck that the image exists in the project and that the LaTeX path matches the File Tree.`;
     }
+    // Journal and conference templates (Springer Nature's sn-jnl, many society
+    // classes) ship their .cls next to the document instead of publishing it
+    // on CTAN. On Overleaf the file sits in the project, so a document copied
+    // over without it fails here, and "install it from CTAN" sends the user
+    // looking for a package that does not exist.
     const sty = file.match(/^(.+)\.(sty|cls)$/);
+    if (sty?.[2] === 'cls') {
+      return (
+        `The document class "${sty[1]}" (${file}) is not in this project or in your TeX installation. ` +
+        `Journal templates usually ship their own .cls file rather than publishing it on CTAN; on Overleaf it sits in the project next to the main .tex file. ` +
+        `Copy ${file} into this project, together with the template's .bst and .bib files, or import the whole Overleaf project as a .zip. ` +
+        `If the class is a standard one, check the spelling or install it with your TeX package manager.`
+      );
+    }
     if (sty) {
       return (
-        `The ${sty[2] === 'cls' ? 'document class' : 'package'} "${sty[1]}" (${file}) is not installed. ` +
-        `Check the spelling first. If the name is right, install it from CTAN with your TeX package manager.`
+        `The package "${sty[1]}" (${file}) is not in this project or in your TeX installation. ` +
+        `Check the spelling first. If the name is right, install it from CTAN with your TeX package manager; ` +
+        `if it came with a template, copy ${file} into this project.`
       );
     }
     return `Missing file: "${file}". Check that it exists in the project and that the name in the source matches, including the extension.`;
@@ -843,9 +860,20 @@ const BIBTEX_ERROR = /^(.+?)---(?:line (\d+) of file (.+)|while reading file (.+
 
 function explainBibtexError(message: string, file: string): string {
   const db = message.match(/couldn't open database file (.+)$/);
-  if (db) return `BibTeX cannot find ${db[1].trim()}. Check that the file is in the project and that \\bibliography{...} names it without the .bib extension.`;
+  if (db) {
+    return (
+      `BibTeX cannot find ${db[1].trim()}. Check that the file is in the project and that \\bibliography{...} names it without the .bib extension. ` +
+      `A document copied from Overleaf needs its .bib file copied too, or import the whole project as a .zip.`
+    );
+  }
   const style = message.match(/couldn't open style file (.+)$/);
-  if (style) return `The bibliography style ${style[1].trim()} does not exist. Check \\bibliographystyle{...}; common styles are plain, alpha, abbrv, ieeetr and unsrt.`;
+  if (style) {
+    return (
+      `The bibliography style ${style[1].trim()} is not in this project or in your TeX installation. ` +
+      `If it came with a journal template, copy it into the project next to the .tex file. ` +
+      `Otherwise check \\bibliographystyle{...}; common styles are plain, alpha, abbrv, ieeetr and unsrt.`
+    );
+  }
   if (/found no \\citation commands/.test(message)) {
     return 'The document has a bibliography but cites nothing, so BibTeX has no entries to print. Add \\cite{key} where you cite a source, or \\nocite{*} to list every entry in the .bib file.';
   }
@@ -865,7 +893,7 @@ export function parseBibtexLog(blg: string, sourceLines: string[] = []): Compile
   const lines = blg.split(/\r?\n/);
   // Errors "while reading main.aux" are about the document, not the .aux the
   // user never edits: point them at the \bibliography line.
-  const bibLine = sourceLines.findIndex((l) => /\\bibliography(style)?\s*\{/.test(l.replace(/(^|[^\\])%.*$/, '$1'))) + 1;
+  const bibLine = findCodeLine(sourceLines, /\\bibliography(style)?\s*\{/) + 1;
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(BIBTEX_ERROR);
     if (!m) continue;
@@ -912,7 +940,7 @@ export function findMissingBibFiles(sourceLines: string[], projectDir: string): 
 
   const errors: CompileError[] = [];
   sourceLines.forEach((line, idx) => {
-    const code = line.replace(/(^|[^\\])%.*$/, '$1');
+    const code = stripTexComment(line);
     for (const m of code.matchAll(/\\(bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g)) {
       const names = m[1] === 'bibliography' ? m[2].split(',') : [m[2]];
       for (const raw of names) {
@@ -1075,7 +1103,7 @@ function enrichErrorsWithSourceContext(
         ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${name}\\s*\\}`
         : `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${name}\\s*(?:,[^}]*)?\\}`
     );
-    const idx = sourceLines.findIndex((l) => loader.test(l));
+    const idx = findCodeLine(sourceLines, loader);
     return idx >= 0 ? { ...err, file: 'main.tex', line: idx + 1 } : err;
   });
 
@@ -1339,6 +1367,16 @@ function enrichErrorsWithSourceContext(
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// The line with everything from an unescaped % onward removed.
+export const stripTexComment = (line: string) => line.replace(/(^|[^\\])%.*$/, '$1');
+
+// First line whose code (not its comment) matches. Templates list every
+// alternative \documentclass as a commented-out line above the live one, and
+// matching the raw text pointed "Jump" at a comment.
+function findCodeLine(sourceLines: string[], pattern: RegExp): number {
+  return sourceLines.findIndex((l) => pattern.test(stripTexComment(l)));
+}
+
 function replaceLineFix(lineIdx: number, find: string, replace: string, label: string, description: string): SuggestedFix {
   return { type: 'replace_line', codeSnippet: replace, label, description, line: lineIdx + 1, find, replace };
 }
@@ -1448,7 +1486,7 @@ function enrichFromSource(err: CompileError, sourceLines: string[]): CompileErro
         ? `\\\\documentclass\\s*(?:\\[[^\\]]*\\])?\\s*\\{\\s*${escapeRegExp(missingSty[1])}\\s*\\}`
         : `\\\\(?:usepackage|RequirePackage)\\s*(?:\\[[^\\]]*\\])?\\s*\\{(?:[^}]*[\\s,])?${escapeRegExp(missingSty[1])}\\s*(?:,[^}]*)?\\}`
     );
-    const idx = sourceLines.findIndex((l) => loader.test(l));
+    const idx = findCodeLine(sourceLines, loader);
     if (idx >= 0) return { ...err, file: 'main.tex', line: idx + 1 };
   }
 
@@ -1902,6 +1940,7 @@ export async function compileDocument(
     ...(/\\bibdata\{/.test(auxText) ? parseBibtexLog(readSafe(path.join(buildDir, `${baseName}.blg`)), sourceLines) : []),
   ].filter((e, i, all) => all.findIndex((o) => o.message === e.message) === i);
   const errors = [...parsed.errors, ...bibErrors];
+  const missingProjectFiles = await findMissingProjectFiles(sourceLines, projectDir, errors);
   const pdfGenerated = fs.existsSync(generatedPdf);
 
   // A PDF that exists is worth showing even when the log carries errors, which
@@ -1926,6 +1965,7 @@ export async function compileDocument(
     documentTitle,
     pdfDownloadFilename,
     detectedMissingPackages,
+    missingProjectFiles,
     engine,
   };
 }

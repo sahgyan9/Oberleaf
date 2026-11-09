@@ -24,6 +24,9 @@ import {
   Wrench,
   Copy,
   Info,
+  FileWarning,
+  Upload,
+  FolderInput,
 } from 'lucide-react';
 
 import { DetectedMissingPackage } from '../../utils/latexPackages';
@@ -50,6 +53,22 @@ export interface SuggestedFix {
   /** For replace_line: what to replace it with (empty = delete the line) */
   replace?: string;
 }
+
+/** A file the document refers to that is in neither the project nor the TeX installation (server/projectFiles.ts) */
+export interface MissingProjectFile {
+  file: string;
+  kind: 'class' | 'package' | 'bibliography' | 'bibstyle' | 'figure' | 'input';
+  line: number;
+}
+
+const MISSING_KIND_LABEL: Record<MissingProjectFile['kind'], string> = {
+  class: 'document class',
+  package: 'package',
+  bibliography: 'bibliography',
+  bibstyle: 'bibliography style',
+  figure: 'figure',
+  input: 'input file',
+};
 
 export interface CompileErrorItem {
   file: string;
@@ -126,6 +145,9 @@ interface PDFViewerProps {
   isFixBusy?: boolean;
   detectedMissingPackages?: DetectedMissingPackage[];
   onApplyBatchFix?: (pkgs: DetectedMissingPackage[]) => void;
+  missingProjectFiles?: MissingProjectFile[];
+  onUploadFiles?: (files: File[]) => void;
+  onImportZip?: () => void;
 }
 
 const RECEIPT_TONE: Record<FixReceipt['status'], string> = {
@@ -308,7 +330,11 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   isFixBusy = false,
   detectedMissingPackages,
   onApplyBatchFix,
+  missingProjectFiles,
+  onUploadFiles,
+  onImportZip,
 }, ref) => {
+  const missingFilesInputRef = useRef<HTMLInputElement>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeSyncToast, setActiveSyncToast] = useState<SyncTexTarget | null>(null);
   const [jumpSearchText, setJumpSearchText] = useState<string>('');
@@ -1231,6 +1257,88 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                   </span>
                 </div>
               </div>
+
+              {/* Files a pasted document needs from its original project. With one
+                  file the error card already says it; the list earns its place
+                  when TeX would otherwise reveal them one compile at a time. */}
+              {missingProjectFiles && missingProjectFiles.length > 1 && (
+                <div className="rounded-md bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-diagnostic/30 font-sans overflow-hidden">
+                  <div className="px-2.5 pt-2 pb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                    <FileWarning className="w-3 h-3 text-diagnostic dark:text-diagnostic-dark" />
+                    <span>Project files · {missingProjectFiles.length} missing</span>
+                  </div>
+                  <p className="px-2.5 text-[12px] font-medium text-stone-900 dark:text-stone-100">
+                    This document uses {missingProjectFiles.length} files that are not in the project
+                  </p>
+                  <p className="px-2.5 pt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
+                    A .tex file copied on its own leaves these behind. They are in the original project; on Overleaf,
+                    Menu, Download, Source gives all of them as a .zip.
+                  </p>
+                  <div className="mx-2.5 my-2 rounded border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel divide-y divide-surface-lightBorder dark:divide-surface-darkBorder">
+                    {missingProjectFiles.map((f) => (
+                      <button
+                        key={f.file}
+                        type="button"
+                        disabled={!f.line}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (f.line) onSelectErrorLine?.(f.line);
+                        }}
+                        title={f.line ? `Show line ${f.line}` : undefined}
+                        className="w-full flex items-center gap-2 px-2 py-1 text-left hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle disabled:cursor-default"
+                      >
+                        <span className="font-mono text-[11px] text-stone-900 dark:text-stone-100 [overflow-wrap:anywhere]">{f.file}</span>
+                        <span className="ml-auto flex-shrink-0 text-[10px] text-stone-500 dark:text-stone-400">
+                          {MISSING_KIND_LABEL[f.kind]}
+                          {f.line ? ` · line ${f.line}` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="px-2.5 py-1.5 border-t border-surface-lightBorder dark:border-surface-darkBorder flex flex-wrap items-center gap-2.5">
+                    {onUploadFiles && (
+                      <>
+                        <input
+                          ref={missingFilesInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const picked = Array.from(e.target.files ?? []);
+                            e.target.value = '';
+                            if (picked.length) onUploadFiles(picked);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            missingFilesInputRef.current?.click();
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium bg-scholarly hover:bg-scholarly-dark text-white dark:bg-scholarly-dark dark:hover:bg-scholarly shadow-xs transition btn-tactile"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Upload files</span>
+                        </button>
+                      </>
+                    )}
+                    {onImportZip && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImportZip();
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition btn-tactile"
+                      >
+                        <FolderInput className="w-3 h-3" />
+                        <span>Import .zip as new project</span>
+                      </button>
+                    )}
+                    <span className="text-[10px] text-stone-500 dark:text-stone-400">Recompile after uploading</span>
+                  </div>
+                </div>
+              )}
 
               {/* Proactive Batch Fix Banner: when multiple missing packages are detected */}
               {detectedMissingPackages && detectedMissingPackages.length > 1 && onApplyBatchFix && (

@@ -31,7 +31,9 @@ import {
   touchProject,
   isInside,
   sanitizeProjectId,
+  importProjectFromZip,
 } from './projects.js';
+import { ZipImportError } from './zipImport.js';
 import {
   createProjectCommit,
   createExplicitCommit,
@@ -254,6 +256,20 @@ app.post('/api/projects', (req, res) => {
     const project = createProject(name, template || 'cv');
     res.json(project);
   } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// Import a whole project from a .zip (Overleaf: Menu > Download > Source).
+app.post('/api/projects/import', (req, res) => {
+  try {
+    const { name, base64Data } = req.body;
+    if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Project name is required' });
+    if (!base64Data || typeof base64Data !== 'string') return res.status(400).json({ error: 'base64Data is required' });
+    const zip = Buffer.from(base64Data.includes(',') ? base64Data.split(',')[1] : base64Data, 'base64');
+    res.json(importProjectFromZip(name.trim(), zip));
+  } catch (error: any) {
+    if (error instanceof ZipImportError) return res.status(400).json({ error: error.message });
     sendApiError(res, error);
   }
 });

@@ -5,7 +5,7 @@ import { StatusBar } from './components/StatusBar/StatusBar';
 import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor } from './components/Editor/Editor';
-import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt } from './components/PDFViewer/PDFViewer';
+import { PDFViewer, CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt, MissingProjectFile } from './components/PDFViewer/PDFViewer';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
 import { ImageQuickPicker, ImageQuickPickerHandle } from './components/Modals/ImageQuickPicker';
@@ -191,6 +191,7 @@ export const App: React.FC = () => {
   const [fixReceipt, setFixReceipt] = useState<FixReceipt | null>(null);
   const fixSnapshotRef = useRef<{ before: string; after: string; targetMessage?: string } | null>(null);
   const [detectedMissingPackages, setDetectedMissingPackages] = useState<DetectedMissingPackage[]>([]);
+  const [missingProjectFiles, setMissingProjectFiles] = useState<MissingProjectFile[]>([]);
 
   // Live KaTeX Math State
   const [liveEquation, setLiveEquation] = useState<string | null>(null);
@@ -904,6 +905,7 @@ export const App: React.FC = () => {
     setCompileStatus('compiling');
     setCompileErrors([]);
     setDetectedMissingPackages([]);
+    setMissingProjectFiles([]);
 
     // Once the user has edited past a fix, its receipt describes a document
     // that no longer exists and its Undo would discard their work. Retire it.
@@ -936,6 +938,7 @@ export const App: React.FC = () => {
         // alongside the updated preview rather than hiding the output.
         const errors = result.errors || [];
         setCompileErrors(errors);
+        setMissingProjectFiles(errors.length > 0 ? result.missingProjectFiles || [] : []);
 
         if (errors.length > 0) {
           setDetectedMissingPackages(result.detectedMissingPackages || scanMissingPackages(getLiveContent()));
@@ -2217,6 +2220,9 @@ export const App: React.FC = () => {
                 isFixBusy={isCompiling || fixReceipt?.status === 'working' || fixReceipt?.status === 'compiling'}
                 detectedMissingPackages={detectedMissingPackages}
                 onApplyBatchFix={handleApplyBatchFix}
+                missingProjectFiles={missingProjectFiles}
+                onUploadFiles={handleUploadFiles}
+                onImportZip={() => setIsNewProjectModalOpen(true)}
                 onSelectErrorLine={(line, file) => {
                   // An error in another project file (a .bib, an \input
                   // chapter) opens that file, the way SyncTeX does.
@@ -2358,6 +2364,43 @@ export const App: React.FC = () => {
             }
           } catch (e: any) {
             addToast(`Could not create project: ${e.message}`, 'error');
+          }
+        }}
+        onImport={async (name, file) => {
+          // The JSON body limit is 50 MB, and base64 adds a third.
+          if (file.size > 36 * 1024 * 1024) {
+            addToast(`${file.name} is ${(file.size / (1024 * 1024)).toFixed(0)} MB; import accepts zips up to 36 MB.`, 'error');
+            return false;
+          }
+          try {
+            const base64Data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () => reject(new Error(`could not read ${file.name}`));
+              reader.readAsDataURL(file);
+            });
+            const res = await fetch('/api/projects/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, base64Data }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              addToast(`Could not import ${file.name}: ${data.error || res.statusText}`, 'error');
+              return false;
+            }
+            await loadProjects();
+            handleOpenProject(data.id);
+            addToast(
+              data.mainRenamedFrom
+                ? `Imported ${data.fileCount} files. ${data.mainRenamedFrom} is now main.tex, the file Oberleaf compiles.`
+                : `Imported ${data.fileCount} files.`,
+              'success'
+            );
+            return true;
+          } catch (e: any) {
+            addToast(`Could not import ${file.name}: ${e.message}`, 'error');
+            return false;
           }
         }}
       />
