@@ -16,6 +16,8 @@ import { registerLatexCompletions, ProjectContext } from '../../utils/latexCompl
 import { registerLatexLanguage } from '../../utils/latexLanguage';
 import { setupMonacoCollab, CollabSessionConfig } from '../../utils/yjsCollab';
 import { wrapOrToggleFormatting, BOLD_FORMAT, ITALIC_FORMAT } from '../../utils/editorFormatting';
+import { useEditorMode } from '../../utils/editorMode';
+import { VisualModeController } from './visualMode';
 
 interface EditorProps {
   content: string;
@@ -87,6 +89,14 @@ const EDITOR_OPTIONS = {
   },
 } as const;
 
+// What Visual mode changes, restored when switching back to Code.
+const CODE_MODE_OPTIONS = {
+  fontFamily: EDITOR_OPTIONS.fontFamily,
+  fontSize: EDITOR_OPTIONS.fontSize,
+  wrappingStrategy: 'simple',
+  disableMonospaceOptimizations: false,
+} as const;
+
 // While the picker is open it is the only completion UI for the image path.
 // Monaco falls back to word suggestions when a provider returns nothing, so
 // the built-in widget has to be switched off rather than just left empty.
@@ -147,6 +157,35 @@ export const Editor: React.FC<EditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropDecorationsRef = useRef<string[]>([]);
   const [dropHint, setDropHint] = useState<string | null>(null);
+  const editorMode = useEditorMode();
+  const editorModeRef = useRef(editorMode);
+  const visualModeRef = useRef<VisualModeController | null>(null);
+
+  // Visual mode only adds view decorations; the model, undo stack and Yjs binding stay as they are.
+  const ensureVisualMode = () => {
+    if (visualModeRef.current || !editorInstance.current || !monacoInstance.current) return;
+    visualModeRef.current = new VisualModeController(
+      editorInstance.current,
+      monacoInstance.current,
+      () => getProjectContextRef.current?.(),
+      CODE_MODE_OPTIONS as any
+    );
+    visualModeRef.current.setEnabled(editorModeRef.current === 'visual');
+  };
+
+  useEffect(() => {
+    editorModeRef.current = editorMode;
+    visualModeRef.current?.setEnabled(editorMode === 'visual');
+  }, [editorMode]);
+
+  useEffect(() => {
+    // Also runs again after React's development-mode remount check, which keeps the Monaco instance.
+    ensureVisualMode();
+    return () => {
+      visualModeRef.current?.dispose();
+      visualModeRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     onCompileRef.current = onCompile;
@@ -668,6 +707,10 @@ export const Editor: React.FC<EditorProps> = ({
     // Run preview checks once mounted
     updateMathPreview();
     updateImagePicker('cursor');
+
+    visualModeRef.current?.dispose();
+    visualModeRef.current = null;
+    ensureVisualMode();
   };
 
   const handleEditorChange: OnChange = (value) => {

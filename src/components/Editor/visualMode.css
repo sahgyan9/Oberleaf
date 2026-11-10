@@ -1,0 +1,211 @@
+/* Visual mode: view-only styling of LaTeX source in the Monaco editor. */
+
+.monaco-editor .vm-hidden {
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+
+.monaco-editor .vm-markup {
+  color: #a8a29e !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+}
+
+.monaco-editor .vm-heading {
+  color: #1c1917 !important;
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 600 !important;
+}
+
+.monaco-editor .vm-heading-1 { font-size: 27px; }
+.monaco-editor .vm-heading-2 { font-size: 23px; }
+.monaco-editor .vm-heading-3 { font-size: 20px; }
+.monaco-editor .vm-heading-4 { font-size: 18px; }
+.monaco-editor .vm-heading-5 { font-size: 16px; }
+
+.monaco-editor .vm-bold {
+  font-weight: 600 !important;
+}
+
+.monaco-editor .vm-italic {
+  font-style: italic !important;
+}
+
+.monaco-editor .vm-underline {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.monaco-editor .vm-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+}
+
+.monaco-editor .vm-math-source {
+  color: #2563eb !important;
+}
+
+.monaco-editor .vm-list-marker {
+  display: inline-block;
+  min-width: 1.6em;
+  padding-right: 0.35em;
+  color: #57534e;
+  font-family: 'Newsreader', Georgia, serif;
+}
+
+.monaco-editor .vm-list-delimiter {
+  color: #a8a29e !important;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8em;
+}
+
+.monaco-editor .vm-chip {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 5px;
+  border: 1px solid #e7e5df;
+  border-radius: 4px;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.78em;
+  line-height: 1.5;
+  vertical-align: 0.08em;
+  cursor: pointer;
+}
+
+.monaco-editor .vm-chip-cite {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.monaco-editor .vm-chip-ref {
+  color: #1b5e20;
+  background: #e8f5e9;
+  border-color: #c8e6c9;
+}
+
+.monaco-editor .vm-chip-label {
+  color: #78716c;
+  background: #f4f3ef;
+}
+
+.monaco-editor .vm-inline-math {
+  display: block;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 16px;
+  color: #1c1917;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.vm-inline-math .katex,
+.vm-inline-math-measure .katex {
+  font-size: 1.05em;
+}
+
+.vm-block {
+  font-size: 16px;
+  line-height: normal;
+  white-space: normal;
+  padding: 6px 12px;
+  color: #1c1917;
+  cursor: text;
+}
+
+.vm-block-displayMath .katex-display {
+  margin: 0;
+}
+
+.vm-figure-caption .katex {
+  font-size: 1.05em;
+}
+
+.vm-figure-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e7e5df;
+  border-radius: 6px;
+  background: #f4f3ef;
+  overflow: hidden;
+}
+
+.vm-figure-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.vm-figure-note {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 12px;
+  color: #78716c;
+}
+
+.vm-figure-caption {
+  padding-top: 6px;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: center;
+  color: #44403c;
+}
+
+/* Off-screen box used to measure rendered math and blocks before layout. */
+.vm-measure {
+  font-family: 'Newsreader', Georgia, serif;
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+/* Dark theme */
+.dark .monaco-editor .vm-markup,
+.dark .monaco-editor .vm-list-delimiter {
+  color: #78716c !important;
+}
+
+.dark .monaco-editor .vm-heading,
+.dark .monaco-editor .vm-inline-math,
+.dark .vm-block {
+  color: #f5f5f4 !important;
+}
+
+.dark .monaco-editor .vm-math-source {
+  color: #38bdf8 !important;
+}
+
+.dark .monaco-editor .vm-list-marker {
+  color: #a8a29e;
+}
+
+.dark .monaco-editor .vm-chip-cite {
+  color: #38bdf8;
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .monaco-editor .vm-chip-ref {
+  color: #2ea043;
+  background: #1b3522;
+  border-color: #24502f;
+}
+
+.dark .monaco-editor .vm-chip-label {
+  color: #a8a29e;
+  background: #26262b;
+  border-color: #2e2e35;
+}
+
+.dark .vm-figure-frame {
+  border-color: #2e2e35;
+  background: #26262b;
+}
+
+.dark .vm-figure-caption {
+  color: #d6d3d1;
+}
