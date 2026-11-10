@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import MonacoEditor, { OnMount, OnChange, BeforeMount } from '@monaco-editor/react';
+import '../../utils/monacoSetup';
+import { bootStep } from '../../boot';
 import { useTheme } from '../../context/ThemeContext';
 import { extractMathAtPosition } from '../../utils/mathDetector';
 import {
@@ -395,6 +397,7 @@ export const Editor: React.FC<EditorProps> = ({
   };
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
+    bootStep('project', 'done');
     editorInstance.current = editor;
     monacoInstance.current = monaco;
     if (editorRefOut) editorRefOut.current = editor;

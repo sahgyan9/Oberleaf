@@ -16,7 +16,7 @@ import {
   Github,
   Bookmark,
 } from 'lucide-react';
-import { DiffEditor } from '@monaco-editor/react';
+import { DiffEditor } from '../Lazy/LazyPanels';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface HistoryCommit {

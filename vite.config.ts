@@ -1,9 +1,32 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// Monaco's package entry registers ~80 built-in languages plus the CSS, HTML,
+// JSON and TypeScript language services and an LSP client. The editor only
+// uses its own `latex` language (src/utils/latexLanguage.ts), so the build
+// drops those imports: fewer chunks and workers to emit, a faster `vite build`
+// (which the launcher runs after every update) and a smaller editor chunk.
+// Dependency pre-bundling in dev does not run this plugin; dev keeps the full
+// package.
+const MONACO_ENTRY = /monaco-editor[\\/]esm[\\/]vs[\\/](index|editor[\\/]editor\.main)\.js$/;
+const MONACO_UNUSED = /languages\/(definitions|features)\/|monaco-lsp-client|^export \{ (index as lsp|__src_languages)/;
+
+function monacoLatexOnly(): Plugin {
+  return {
+    name: 'oberleaf:monaco-latex-only',
+    enforce: 'pre',
+    apply: 'build',
+    transform(code, id) {
+      if (!MONACO_ENTRY.test(id)) return null;
+      const kept = code.split('\n').filter((line) => !MONACO_UNUSED.test(line));
+      return { code: kept.join('\n'), map: null };
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), monacoLatexOnly()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

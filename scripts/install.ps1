@@ -340,6 +340,16 @@ function Start-InstallationPipeline {
             if ($LASTEXITCODE -ne 0) {
                 Write-Log "npm install reported errors - see $LogFile" "Yellow"
                 $Failures.Add("npm install")
+            } else {
+                # Build the page now so the first launch serves it at once
+                # instead of building behind the splash (launch.ps1 rebuilds
+                # by itself whenever the sources are newer than the build).
+                Set-ProgressStep 88 "Building the app..."
+                Write-Log "Building the Oberleaf app (vite build)..." "Cyan"
+                & $npm.Source run build:client 2>&1 | ForEach-Object { Write-Log $_ "Gray" }
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Log "The app build failed; the first launch will retry it." "Yellow"
+                }
             }
         } else {
             Write-Log "npm was not found on PATH. Restart Windows and run this setup again." "Yellow"
