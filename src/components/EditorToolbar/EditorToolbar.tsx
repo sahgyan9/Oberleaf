@@ -11,6 +11,7 @@ import {
   Target,
   Loader2,
 } from 'lucide-react';
+import { setEditorMode, useEditorMode } from '../../utils/editorMode';
 
 interface EditorToolbarProps {
   onInsertSnippet: (snippet: string) => void;
@@ -35,6 +36,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   isLiveMathEnabled = true,
   onToggleLiveMath,
 }) => {
+  const editorMode = useEditorMode();
   return (
     <div className="h-9 bg-surface-lightSubtle dark:bg-surface-darkSubtle border-b border-surface-lightBorder dark:border-surface-darkBorder px-2 sm:px-3 flex items-center justify-between min-w-0 overflow-x-auto select-none text-stone-600 dark:text-stone-300 transition-colors gap-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       {/* Left formatting buttons */}
@@ -145,6 +147,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
       {/* Right actions: SyncTeX Jump to PDF & Live Math toggle */}
       <div className="flex items-center space-x-1.5 flex-shrink-0 ml-auto pl-1">
+        <div
+          role="radiogroup"
+          aria-label="Editor mode"
+          className="flex items-center p-0.5 rounded border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-900 flex-shrink-0"
+        >
+          {(['code', 'visual'] as const).map((mode) => (
+            <button
+              key={mode}
+              role="radio"
+              aria-checked={editorMode === mode}
+              onClick={() => setEditorMode(mode)}
+              title={mode === 'code' ? 'Show the LaTeX source' : 'Show headings, formatting, math and figures rendered'}
+              className={`px-2 py-0.5 rounded-sm text-[11px] font-medium transition whitespace-nowrap ${
+                editorMode === mode
+                  ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+            >
+              {mode === 'code' ? 'Code' : 'Visual'}
+            </button>
+          ))}
+        </div>
+
         {onJumpToPdf && (
           <button
             aria-label="Jump to Cursor Location in PDF (SyncTeX: Ctrl+Alt+J)"
