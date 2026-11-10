@@ -17,6 +17,7 @@ import {
   Bookmark,
 } from 'lucide-react';
 import { DiffEditor } from '../Lazy/LazyPanels';
+import { defineEditorThemes, editorThemeName } from '../../utils/monacoThemes';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface HistoryCommit {
@@ -669,7 +670,10 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                 <DiffEditor
                   height="100%"
                   language="latex"
-                  theme={theme === 'dark' ? 'brandDark' : 'vs'}
+                  // Monaco's theme is page-wide: an undefined name here
+                  // turned the main editor light. See utils/monacoThemes.
+                  beforeMount={defineEditorThemes}
+                  theme={editorThemeName(theme)}
                   original={diffData.oldContent}
                   modified={diffData.newContent}
                   options={{

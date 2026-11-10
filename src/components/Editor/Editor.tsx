@@ -20,6 +20,7 @@ import { setupMonacoCollab, CollabSessionConfig } from '../../utils/yjsCollab';
 import { wrapOrToggleFormatting, BOLD_FORMAT, ITALIC_FORMAT } from '../../utils/editorFormatting';
 import { useEditorMode } from '../../utils/editorMode';
 import { VisualModeController } from './visualMode';
+import { defineEditorThemes, editorThemeName } from '../../utils/monacoThemes';
 
 interface EditorProps {
   content: string;
@@ -204,7 +205,7 @@ export const Editor: React.FC<EditorProps> = ({
   // Dynamically sync Monaco theme when user toggles light/dark mode
   useEffect(() => {
     if (monacoInstance.current) {
-      monacoInstance.current.editor.setTheme(theme === 'dark' ? 'scholarlyDark' : 'scholarlyLight');
+      monacoInstance.current.editor.setTheme(editorThemeName(theme));
     }
   }, [theme]);
 
@@ -382,57 +383,7 @@ export const Editor: React.FC<EditorProps> = ({
 
   // Pre-define themes before Monaco renders to eliminate white flash
   const handleBeforeMount: BeforeMount = (monaco) => {
-    // Define Scholarly Dark Theme
-    monaco.editor.defineTheme('scholarlyDark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'keyword', foreground: '2EA043', fontStyle: 'bold' },
-        { token: 'keyword.control', foreground: '38BDF8', fontStyle: 'bold' },
-        { token: 'tag', foreground: '2EA043' },
-        { token: 'type', foreground: '34C759', fontStyle: 'bold' },
-        { token: 'string.escape', foreground: 'F59E0B' },
-        { token: 'delimiter', foreground: 'A8A29E' },
-        { token: 'operator', foreground: '2EA043' },
-        { token: 'number', foreground: '38BDF8' },
-        { token: 'comment', foreground: '78716C', fontStyle: 'italic' },
-      ],
-      colors: {
-        'editor.background': '#1C1C1F',
-        'editor.foreground': '#F5F5F4',
-        'editorCursor.foreground': '#2EA043',
-        'editor.lineHighlightBackground': '#26262B80',
-        'editorLineNumber.foreground': '#78716C',
-        'editorLineNumber.activeForeground': '#F5F5F4',
-        'editorGutter.background': '#1C1C1F',
-      },
-    });
-
-    // Define Scholarly Light Paper Theme
-    monaco.editor.defineTheme('scholarlyLight', {
-      base: 'vs',
-      inherit: true,
-      rules: [
-        { token: 'keyword', foreground: '1B5E20', fontStyle: 'bold' },
-        { token: 'keyword.control', foreground: '2563EB', fontStyle: 'bold' },
-        { token: 'tag', foreground: '1B5E20' },
-        { token: 'type', foreground: '164E1B', fontStyle: 'bold' },
-        { token: 'string.escape', foreground: 'D97706' },
-        { token: 'delimiter', foreground: '57534E' },
-        { token: 'operator', foreground: '1B5E20' },
-        { token: 'number', foreground: '2563EB' },
-        { token: 'comment', foreground: 'A8A29E', fontStyle: 'italic' },
-      ],
-      colors: {
-        'editor.background': '#FBFBFA',
-        'editor.foreground': '#1C1917',
-        'editorCursor.foreground': '#1B5E20',
-        'editor.lineHighlightBackground': '#F4F3EF90',
-        'editorLineNumber.foreground': '#A8A29E',
-        'editorLineNumber.activeForeground': '#1C1917',
-        'editorGutter.background': '#FBFBFA',
-      },
-    });
+    defineEditorThemes(monaco);
   };
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
@@ -726,7 +677,7 @@ export const Editor: React.FC<EditorProps> = ({
         height="100%"
         defaultLanguage="latex"
         language="latex"
-        theme={theme === 'dark' ? 'scholarlyDark' : 'scholarlyLight'}
+        theme={editorThemeName(theme)}
         beforeMount={handleBeforeMount}
         value={content}
         onChange={handleEditorChange}
