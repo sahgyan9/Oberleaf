@@ -164,6 +164,18 @@
         }
 
         document.getElementById('boot-retry').onclick = function () { location.reload(); };
+
+        // The bundle (or a module it imports) failed to download: nothing will
+        // ever report the 'app' step, so say so now instead of after the slow
+        // timer. Typical cause: the server restarted mid-load, e.g. an update
+        // restarting Vite just as the page reloaded. Resource errors do not
+        // bubble, hence the capture listener; it also covers the tag Vite's
+        // build rewrites, which would drop an onerror attribute.
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          if (!t || t.tagName !== 'SCRIPT' || t.type !== 'module' || state.app !== 'active') return;
+          window.__oberleafBoot.step('app', 'error', 'The app files did not finish loading, usually because Oberleaf restarted while the page was loading. Retry loads them again.');
+        }, true);
         document.getElementById('boot-continue').onclick = finish;
 
         // Not a progress timer: it only says a step has stalled and offers a
