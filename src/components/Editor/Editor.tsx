@@ -53,6 +53,10 @@ export interface ImageDrop {
 
 // Module-level cache to restore cursor & scroll when editor unmounts/remounts across view modes
 let lastEditorViewState: any = null;
+// Timestamp of the last highlightLine target this editor revealed. App keeps
+// the last target in state, so without this a remount (leaving PDF-only view)
+// would jump back to an old SyncTeX target instead of restoring the view.
+let lastRevealedHighlight = 0;
 
 // Kept as one stable object: @monaco-editor/react re-applies `options` whenever
 // its identity changes, which would undo the suggest suppression below on every render.
@@ -340,6 +344,7 @@ export const Editor: React.FC<EditorProps> = ({
     const editor = editorInstance.current;
     const monaco = monacoInstance.current;
     const line = highlightLine.line;
+    lastRevealedHighlight = highlightLine.timestamp;
 
     editor.revealLineInCenter(line);
     editor.setPosition({ lineNumber: line, column: 1 });
@@ -456,8 +461,9 @@ export const Editor: React.FC<EditorProps> = ({
 
     // Immediate positioning: if a target line was requested (e.g. view mode switch to split mode)
     // reveal it immediately on mount. Otherwise restore the cached editor view state.
-    if (highlightLine?.line) {
+    if (highlightLine?.line && highlightLine.timestamp !== lastRevealedHighlight) {
       const line = highlightLine.line;
+      lastRevealedHighlight = highlightLine.timestamp;
       editor.revealLineInCenter(line);
       editor.setPosition({ lineNumber: line, column: 1 });
       decorationsRef.current = editor.deltaDecorations(

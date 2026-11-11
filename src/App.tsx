@@ -166,6 +166,13 @@ export const App: React.FC = () => {
 
   // View & UI State
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  // Current mode for async SyncTeX callbacks: a closure's viewMode is the one
+  // from before the switch that started the request.
+  const viewModeRef = useRef<ViewMode>(viewMode);
+  viewModeRef.current = viewMode;
+  // In split view, the pane the user last worked in. On leaving split, the
+  // other pane is moved to match it.
+  const lastActivePaneRef = useRef<'editor' | 'pdf'>('editor');
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState<boolean>(() => {
     return readSetting('filetree-collapsed') === 'true';
   });
@@ -664,9 +671,11 @@ export const App: React.FC = () => {
     }
   }, [addToast, collabSession, activeFilePath, projectId]);
 
-  // SyncTeX Forward (Cursor Position / Visible Line -> PDF Page & Coordinates)
+  // SyncTeX Forward (Cursor Position / Visible Line -> PDF Page & Coordinates).
+  // revealPdf: open the PDF if the current view hides it. A view switch passes
+  // false, since it has already chosen the view.
   const handleJumpToPdf = useCallback(
-    async (targetMode?: ViewMode) => {
+    async (revealPdf = true) => {
       if (!monacoEditorRef.current || isJumpingToPdf) return;
       const editor = monacoEditorRef.current;
       const position = editor.getPosition();
@@ -708,13 +717,8 @@ export const App: React.FC = () => {
               timestamp: Date.now(),
             });
 
-            // Reveal PDF panel if hidden or in code mode (unless target mode was explicitly specified)
-            if (targetMode) {
-              setViewMode(targetMode);
-            } else if (viewMode === 'code') {
-              setViewMode('split');
-            }
-            if (pdfCollapsed) {
+            if (revealPdf) {
+              if (viewModeRef.current === 'code') setViewMode('split');
               setPdfCollapsed(false);
             }
           }
@@ -725,7 +729,7 @@ export const App: React.FC = () => {
         setIsJumpingToPdf(false);
       }
     },
-    [projectId, activeFilePath, isJumpingToPdf, viewMode, pdfCollapsed]
+    [projectId, activeFilePath, isJumpingToPdf]
   );
 
   // Consume SyncTeX forward target once PDFViewer has processed the navigation
@@ -733,9 +737,11 @@ export const App: React.FC = () => {
     setSynctexTarget(null);
   }, []);
 
-  // SyncTeX Backward (PDF Click / Selection -> Source File & Line)
+  // SyncTeX Backward (PDF Click / Selection -> Source File & Line).
+  // revealCode: leave PDF-only view so the line can be seen. A view switch
+  // passes false, since it has already chosen the view.
   const handleSyncTexBackward = useCallback(
-    async (page: number, x: number, y: number, text?: string) => {
+    async (page: number, x: number, y: number, text?: string, revealCode = true) => {
       if (isSyncingBackward) return;
       setIsSyncingBackward(true);
       try {
@@ -754,8 +760,7 @@ export const App: React.FC = () => {
         if (res.ok) {
           const result = await res.json();
           if (result.file && result.line) {
-            // If in PDF mode only, switch to split view so the user can see their code
-            if (viewMode === 'pdf') {
+            if (revealCode && viewModeRef.current === 'pdf') {
               setViewMode('split');
             }
 
@@ -776,7 +781,7 @@ export const App: React.FC = () => {
         setIsSyncingBackward(false);
       }
     },
-    [projectId, activeFilePath, isSyncingBackward, viewMode]
+    [projectId, activeFilePath, isSyncingBackward]
   );
 
   // Dynamic context for Monaco completions (\cite, \label, \includegraphics)
@@ -1744,27 +1749,39 @@ export const App: React.FC = () => {
     }
   };
 
-  // Coordinated View Mode Transitions:
-  // 1. When switching from full PDF mode into Split or Code mode,
-  //    automatically sync Monaco editor to the section visible in the PDF.
-  // 2. When switching from full Code mode into PDF or Split mode,
-  //    automatically sync PDF preview to the cursor / visible section in the Code editor.
+  const markEditorActive = useCallback(() => {
+    lastActivePaneRef.current = 'editor';
+  }, []);
+  const markPdfActive = useCallback(() => {
+    lastActivePaneRef.current = 'pdf';
+  }, []);
+
+  // View switches keep the reader's place: the pane being shown is moved to
+  // what the user was looking at in the pane they leave.
+  // - pdf -> split/code: the editor goes to the section visible in the PDF.
+  // - code -> split/pdf: the PDF goes to the cursor / visible lines.
+  // - split -> pdf/code: whichever pane the user last worked in leads.
+  // The syncs never change the view themselves; the switch has chosen it.
   const handleViewModeChange = useCallback(
     (newMode: ViewMode) => {
       const oldMode = viewMode;
       if (oldMode === newMode) return;
 
-      if (oldMode === 'pdf' && (newMode === 'split' || newMode === 'code')) {
+      const source =
+        oldMode === 'split' ? lastActivePaneRef.current : oldMode === 'pdf' ? 'pdf' : 'editor';
+
+      if (source === 'pdf' && newMode !== 'pdf') {
         const syncTarget = pdfViewerRef.current?.getVisibleSyncTarget();
         if (syncTarget) {
-          handleSyncTexBackward(syncTarget.page, syncTarget.x, syncTarget.y, syncTarget.text);
+          handleSyncTexBackward(syncTarget.page, syncTarget.x, syncTarget.y, syncTarget.text, false);
         }
+      } else if (source === 'editor' && newMode !== 'code') {
+        handleJumpToPdf(false);
       }
 
-      if (oldMode === 'code' && (newMode === 'pdf' || newMode === 'split')) {
-        handleJumpToPdf(newMode);
-      }
-
+      // Entering split, the pane the user came from is the one they were in.
+      if (newMode === 'split') lastActivePaneRef.current = oldMode === 'pdf' ? 'pdf' : 'editor';
+      if (newMode !== 'code') setPdfCollapsed(false);
       setViewMode(newMode);
     },
     [viewMode, handleSyncTexBackward, handleJumpToPdf]
@@ -2105,6 +2122,9 @@ export const App: React.FC = () => {
               defaultSize={viewMode === 'code' || pdfCollapsed ? 82 : 42}
               minSize={20}
               className="h-full flex flex-col overflow-hidden"
+              onPointerDownCapture={markEditorActive}
+              onKeyDownCapture={markEditorActive}
+              onWheelCapture={markEditorActive}
             >
               <EditorToolbar
                 onInsertSnippet={handleInsertSnippet}
@@ -2209,6 +2229,9 @@ export const App: React.FC = () => {
               minSize={18}
               collapsible={false}
               className="h-full overflow-hidden"
+              onPointerDownCapture={markPdfActive}
+              onKeyDownCapture={markPdfActive}
+              onWheelCapture={markPdfActive}
             >
               <PDFViewer
                 ref={pdfViewerRef}
@@ -2306,8 +2329,9 @@ export const App: React.FC = () => {
     </div>
   )}
 
-      {/* Live KaTeX Equation Tooltip */}
-      {isLiveMathEnabled && (
+      {/* Live KaTeX Equation Tooltip. It previews the equation at the
+          editor's cursor, so it has nothing to point at in PDF-only view. */}
+      {isLiveMathEnabled && viewMode !== 'pdf' && (
         <EquationPreview
           equation={liveEquation}
           position={liveEquationPos}
