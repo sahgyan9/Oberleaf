@@ -352,6 +352,72 @@ export function touchProject(projectId: string): void {
   } catch {}
 }
 
+function readProjectMeta(projectDir: string): any {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(projectDir, '.meta.json'), 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+/** Project-relative, forward-slash form of a path inside the project. */
+function toProjectRelative(projectDir: string, absPath: string): string {
+  return path.relative(projectDir, absPath).replace(/\\/g, '/');
+}
+
+/**
+ * The document Compile builds: `.meta.json`'s `mainFile`, or main.tex for
+ * projects that never set one. A stored value that has stopped pointing at a
+ * .tex file inside the project (moved or deleted outside the app) falls back
+ * to main.tex rather than to a path that cannot compile.
+ */
+export function getProjectMainFile(projectDir: string): string {
+  const stored = readProjectMeta(projectDir).mainFile;
+  if (typeof stored === 'string' && stored.trim()) {
+    const abs = path.resolve(projectDir, stored.trim());
+    if (
+      isInside(projectDir, abs) &&
+      path.extname(abs).toLowerCase() === '.tex' &&
+      fs.existsSync(abs) &&
+      fs.statSync(abs).isFile()
+    ) {
+      return toProjectRelative(projectDir, abs);
+    }
+  }
+  return 'main.tex';
+}
+
+/**
+ * Makes `relPath` the document Compile builds. Throws when it is not an
+ * existing .tex file inside the project. Returns the normalised path stored.
+ */
+export function setProjectMainFile(projectDir: string, relPath: string): string {
+  const abs = path.resolve(projectDir, String(relPath || '').trim());
+  if (!isInside(projectDir, abs) || abs === path.resolve(projectDir)) {
+    throw new Error('Access outside project boundary is forbidden');
+  }
+  if (path.extname(abs).toLowerCase() !== '.tex') {
+    throw new Error('Only a .tex file can be the main document');
+  }
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+    throw new Error(`File not found: ${relPath}`);
+  }
+  const normalized = toProjectRelative(projectDir, abs);
+  const meta = readProjectMeta(projectDir);
+  meta.mainFile = normalized;
+  fs.writeFileSync(path.join(projectDir, '.meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+  return normalized;
+}
+
+/**
+ * True when `relPath` is the main document or a folder that contains it.
+ * Both arguments are project-relative.
+ */
+export function pathHoldsMainFile(mainFile: string, relPath: string): boolean {
+  const target = relPath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+  return mainFile === target || mainFile.startsWith(`${target}/`);
+}
+
 export function listProjects(): ProjectSummary[] {
   const root = getProjectsRoot();
   const entries = fs.readdirSync(root, { withFileTypes: true });
@@ -370,7 +436,9 @@ export function listProjects(): ProjectSummary[] {
       }
 
       // Check for compiled PDF
+      const mainBase = path.basename(getProjectMainFile(pPath), '.tex');
       const hasPdf =
+        fs.existsSync(path.join(pPath, `${mainBase}.pdf`)) ||
         fs.existsSync(path.join(pPath, 'main.pdf')) ||
         fs.existsSync(path.join(pPath, 'output.pdf')) ||
         fs.existsSync(path.join(pPath, '.build', 'output.pdf')) ||

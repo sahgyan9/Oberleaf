@@ -149,6 +149,11 @@ export const App: React.FC = () => {
   const [projectName, setProjectName] = useState<string>('');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFilePath, setActiveFilePath] = useState<string>('main.tex');
+  // The project's main document: the .tex file Compile builds. Stored per
+  // project in .meta.json; the ref serves callbacks memoised without it.
+  const [mainFilePath, setMainFilePath] = useState<string>('main.tex');
+  const mainFilePathRef = useRef<string>('main.tex');
+  mainFilePathRef.current = mainFilePath;
   // Seeded from the cache for the project actually being opened. A single
   // global 'last-content' key used to paint the previous project's document
   // into the editor, and if the real fetch then failed that stale text was what
@@ -525,7 +530,7 @@ export const App: React.FC = () => {
           setEditorContent(finalContent);
           setSaveStatus('saved');
           writeCachedContent(pId, relPath, finalContent);
-          if (relPath === 'main.tex') {
+          if (relPath === mainFilePathRef.current) {
             setDocTitle(extractLatexTitle(finalContent));
           }
           return true;
@@ -616,11 +621,23 @@ export const App: React.FC = () => {
     loadCitations(projectId);
     fetchGitSyncStatus(projectId);
     fetchComments(projectId);
-    setActiveFilePath('main.tex');
-    loadFileContent(projectId, 'main.tex');
+
+    // Open the main document, which is not necessarily main.tex. Set the ref
+    // before loading so loadFileContent reads the title from the right file.
+    let isMounted = true;
+    fetch(`/api/projects/${projectId}/main-file`)
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((data) => {
+        if (!isMounted) return;
+        const mf = typeof data?.mainFile === 'string' && data.mainFile ? data.mainFile : 'main.tex';
+        mainFilePathRef.current = mf;
+        setMainFilePath(mf);
+        setActiveFilePath(mf);
+        loadFileContent(projectId, mf);
+      });
 
     // Auto-detect existing compiled PDF so the user doesn't have to recompile
-    let isMounted = true;
     fetch(`/api/projects/${projectId}/pdf`, { method: 'HEAD' })
       .then((res) => {
         if (!isMounted) return;
@@ -875,7 +892,7 @@ export const App: React.FC = () => {
     setEditorContent(newVal);
     setSaveStatus('unsaved');
 
-    if (activeFilePath === 'main.tex') {
+    if (activeFilePath === mainFilePath) {
       const parsed = extractLatexTitle(newVal);
       if (parsed) {
         setDocTitle(parsed);
@@ -889,7 +906,7 @@ export const App: React.FC = () => {
       autoSaveTimerRef.current = null;
       saveActiveFile(newVal);
     }, 800);
-  }, [activeFilePath, saveActiveFile]);
+  }, [activeFilePath, mainFilePath, saveActiveFile]);
 
   // Flush a pending debounced save immediately. Anything that navigates away
   // from the current buffer -- switching files, closing the window, backgrounding
@@ -934,7 +951,7 @@ export const App: React.FC = () => {
       const res = await fetch(`/api/projects/${projectId}/compile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mainFile: 'main.tex', engine: 'pdflatex' }),
+        body: JSON.stringify({ mainFile: mainFilePath, engine: 'pdflatex' }),
       });
 
       if (res.ok) {
@@ -989,7 +1006,7 @@ export const App: React.FC = () => {
         setCompileStatus('failed');
         setCompileErrors([
           {
-            file: 'main.tex',
+            file: mainFilePath,
             line: 1,
             message: 'Compile failed to reach server.',
             friendlyExplanation: 'Ensure the local server daemon is running with npm start.',
@@ -1001,7 +1018,7 @@ export const App: React.FC = () => {
       setCompileStatus('failed');
       setCompileErrors([
         {
-          file: 'main.tex',
+          file: mainFilePath,
           line: 1,
           message: 'Local server connection error.',
           friendlyExplanation: 'Start the server daemon on port 3001 using: npm run server.',
@@ -1667,6 +1684,13 @@ export const App: React.FC = () => {
         if (activeFilePath === oldPath) {
           setActiveFilePath(data.newRelativePath);
         }
+        // The server moves the main document along with its own rename or
+        // its folder's; pick up the new path.
+        const mainRes = await fetch(`/api/projects/${projectId}/main-file`);
+        if (mainRes.ok) {
+          const { mainFile } = await mainRes.json();
+          if (typeof mainFile === 'string' && mainFile) setMainFilePath(mainFile);
+        }
         loadProjectFiles(projectId);
       } else {
         const err = await res.json();
@@ -1685,8 +1709,8 @@ export const App: React.FC = () => {
       );
       if (res.ok) {
         if (activeFilePath === pathToDelete) {
-          setActiveFilePath('main.tex');
-          loadFileContent(projectId, 'main.tex');
+          setActiveFilePath(mainFilePath);
+          loadFileContent(projectId, mainFilePath);
         }
         loadProjectFiles(projectId);
       } else {
@@ -1695,6 +1719,28 @@ export const App: React.FC = () => {
       }
     } catch (e: any) {
       addToast(`Delete error: ${e.message}`, 'error');
+    }
+  };
+
+  const handleSetMainFile = async (relPath: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/main-file`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mainFile: relPath }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        addToast(`Could not set the main document: ${data.error || res.statusText}`, 'error');
+        return;
+      }
+      setMainFilePath(data.mainFile);
+      if (activeFilePath === data.mainFile) {
+        setDocTitle(extractLatexTitle(getLiveContent()));
+      }
+      addToast(`${data.mainFile} is now the main document. Compile builds this file.`, 'success');
+    } catch (e: any) {
+      addToast(`Could not set the main document: ${e.message}`, 'error');
     }
   };
 
@@ -2085,6 +2131,8 @@ export const App: React.FC = () => {
                     onRenameItem={handleRenameItem}
                     onDeleteItem={handleDeleteItem}
                     onDuplicateItem={handleDuplicateItem}
+                    mainFilePath={mainFilePath}
+                    onSetMainFile={handleSetMainFile}
                     onToggleCollapse={() => setFileTreeCollapsed(true)}
                     onRevealInExplorer={handleRevealInExplorer}
                     onShowToast={addToast}

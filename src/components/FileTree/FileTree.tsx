@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   ChevronRight,
   ChevronDown,
+  FileInput,
 } from 'lucide-react';
 import { isImagePath, PROJECT_IMAGE_DRAG_TYPE } from '../../utils/imageHelper';
 
@@ -47,6 +48,9 @@ interface FileTreeProps {
   onRenameItem: (oldPath: string, newName: string) => void;
   onDeleteItem: (path: string) => void;
   onDuplicateItem: (path: string) => void;
+  /** Project-relative path of the main document (the file Compile builds). */
+  mainFilePath?: string;
+  onSetMainFile?: (path: string) => void;
   onToggleCollapse?: () => void;
   onRevealInExplorer?: (path?: string) => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
@@ -65,6 +69,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onRenameItem,
   onDeleteItem,
   onDuplicateItem,
+  mainFilePath = 'main.tex',
+  onSetMainFile,
   onToggleCollapse,
   onRevealInExplorer,
   onShowToast,
@@ -157,6 +163,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
     });
   };
 
+  const relPathOf = (item: FileEntry) => item.relativePath || item.name;
+  // The main document, or a folder that contains it.
+  const holdsMainFile = (item: FileEntry) => {
+    const rel = relPathOf(item);
+    return mainFilePath === rel || mainFilePath.startsWith(`${rel}/`);
+  };
+
   const renderTree = (items: FileEntry[], depth: number = 0) => {
     return items.map((item) => {
       const isSelected = selectedFilePath === item.relativePath || selectedFilePath === item.path;
@@ -224,6 +237,14 @@ export const FileTree: React.FC<FileTreeProps> = ({
           <div className="flex items-center space-x-2 truncate">
             {renderIcon(item.extension)}
             <span className="truncate">{item.name}</span>
+            {relPathOf(item) === mainFilePath && (
+              <span
+                title="Main document: Compile builds this file"
+                className="flex-shrink-0 rounded px-1 text-[10px] leading-4 font-medium text-stone-500 dark:text-stone-400 border border-surface-lightBorder dark:border-surface-darkBorder"
+              >
+                main
+              </span>
+            )}
             {/* The save indicator lives in the status bar, which says nothing
                 about *which* file is dirty. Mark it here, where the user is
                 choosing what to open next. */}
@@ -396,6 +417,22 @@ export const FileTree: React.FC<FileTreeProps> = ({
             </button>
           )}
 
+          {onSetMainFile &&
+            contextMenu.item.type === 'file' &&
+            contextMenu.item.name.toLowerCase().endsWith('.tex') &&
+            relPathOf(contextMenu.item) !== mainFilePath && (
+              <button
+                onClick={() => {
+                  onSetMainFile(relPathOf(contextMenu.item));
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-left transition"
+              >
+                <FileInput className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
+                <span>Set as Main Document</span>
+              </button>
+            )}
+
           {contextMenu.item.type === 'directory' && (
             <>
               <button
@@ -438,11 +475,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
 
           <button
             onClick={() => {
-              if (contextMenu.item.name === 'main.tex') {
+              if (holdsMainFile(contextMenu.item)) {
+                const message =
+                  relPathOf(contextMenu.item) === mainFilePath
+                    ? `${contextMenu.item.name} is the main document. Set another .tex file as the main document before deleting it.`
+                    : `${contextMenu.item.name} holds the main document (${mainFilePath}). Set another .tex file as the main document before deleting it.`;
                 if (onShowToast) {
-                  onShowToast('main.tex cannot be deleted as it is the project root document.', 'warning');
+                  onShowToast(message, 'warning');
                 } else {
-                  alert('main.tex cannot be deleted.');
+                  alert(message);
                 }
                 setContextMenu(null);
                 return;

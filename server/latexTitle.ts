@@ -170,11 +170,11 @@ export function getLatexPdfFilename(latexContent?: string | null, fallbackName?:
 }
 
 /**
- * Server-side helper to read main.tex from a project folder and determine the PDF filename.
+ * Server-side helper to read the main document from a project folder and determine the PDF filename.
  */
-export function getProjectPdfFilename(projectDir: string, fallbackId: string): string {
+export function getProjectPdfFilename(projectDir: string, fallbackId: string, mainFile: string = 'main.tex'): string {
   try {
-    const mainTexPath = path.join(projectDir, 'main.tex');
+    const mainTexPath = path.join(projectDir, mainFile);
     if (fs.existsSync(mainTexPath)) {
       const content = fs.readFileSync(mainTexPath, 'utf-8');
       const title = extractLatexTitle(content);

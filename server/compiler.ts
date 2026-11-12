@@ -2096,11 +2096,20 @@ export async function compileDocument(
     }
   }
 
+  // The log parsers file errors they attribute to the document itself under
+  // the placeholder 'main.tex' (they only see its lines, not its name). Real
+  // log paths always carry a directory, so a bare 'main.tex' is that
+  // placeholder: give it the real root's name, or "Jump to line" opens the
+  // wrong file when the main document is something else.
+  const rootName = relMainFile.replace(/\\/g, '/');
+  const namedErrors =
+    rootName === 'main.tex' ? errors : errors.map((e) => (e.file === 'main.tex' ? { ...e, file: rootName } : e));
+
   return {
     success: pdfGenerated,
     pdfUrl: pdfGenerated ? `/api/pdf?file=${encodeURIComponent(outputPdf)}` : undefined,
     durationMs,
-    errors,
+    errors: namedErrors,
     warnings,
     rawLog: fullLog + (res.stderr ? `\n${res.stderr}` : ''),
     documentTitle,

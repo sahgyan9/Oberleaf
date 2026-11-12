@@ -32,7 +32,11 @@ export class SyncTexParser {
   private records: SyncTexRecord[] = [];
   private isParsed: boolean = false;
 
-  constructor(synctexFilePath: string) {
+  /** The root document, reported when SyncTeX has no better file. */
+  private rootFile: string;
+
+  constructor(synctexFilePath: string, rootFile: string = 'main.tex') {
+    this.rootFile = rootFile;
     this.synctexFilePath = synctexFilePath;
   }
 
@@ -160,7 +164,7 @@ export class SyncTexParser {
     if (pageRecords.length === 0) {
       // Fallback: look at closest page
       return {
-        file: 'main.tex',
+        file: this.rootFile,
         line: 1,
         page,
       };
@@ -177,7 +181,7 @@ export class SyncTexParser {
       }
     }
 
-    const matchedInput = this.inputs.get(closest.tag) || 'main.tex';
+    const matchedInput = this.inputs.get(closest.tag) || this.rootFile;
     return {
       file: path.basename(matchedInput),
       line: closest.line,
@@ -193,5 +197,5 @@ export function getProjectSyncTex(projectDir: string, mainFile = 'main.tex'): Sy
   if (!fs.existsSync(synctexPath)) {
     return null;
   }
-  return new SyncTexParser(synctexPath);
+  return new SyncTexParser(synctexPath, mainFile);
 }

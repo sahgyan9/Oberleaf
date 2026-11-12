@@ -31,6 +31,9 @@ import {
   isInside,
   sanitizeProjectId,
   importProjectFromZip,
+  getProjectMainFile,
+  setProjectMainFile,
+  pathHoldsMainFile,
 } from './projects.js';
 import { ZipImportError } from './zipImport.js';
 import { installPackageForSty } from './packageInstall.js';
@@ -326,20 +329,27 @@ app.get('/api/projects/:id/zip', (req, res) => {
   }
 });
 
+// The compiler copies <main document>.pdf into the project root. The other
+// names are where older builds and imported projects left their output.
+function findProjectPdf(projectDir: string, projectId: string): string | undefined {
+  const mainBase = path.basename(getProjectMainFile(projectDir), '.tex');
+  return [
+    path.join(projectDir, `${mainBase}.pdf`),
+    path.join(projectDir, 'main.pdf'),
+    path.join(projectDir, 'output.pdf'),
+    path.join(projectDir, '.build', 'output.pdf'),
+    path.join(projectDir, `${projectId}.pdf`),
+  ].find((p) => fs.existsSync(p));
+}
+
 app.get('/api/projects/:id/download-pdf', (req, res) => {
   try {
     const projectDir = getProjectDir(req.params.id);
-    const pdfCandidates = [
-      path.join(projectDir, 'main.pdf'),
-      path.join(projectDir, 'output.pdf'),
-      path.join(projectDir, '.build', 'output.pdf'),
-      path.join(projectDir, `${req.params.id}.pdf`),
-    ];
-    const foundPdf = pdfCandidates.find((p) => fs.existsSync(p));
+    const foundPdf = findProjectPdf(projectDir, req.params.id);
     if (!foundPdf) {
       return res.status(404).json({ error: 'PDF has not been compiled yet for this project.' });
     }
-    const pdfFilename = getProjectPdfFilename(projectDir, req.params.id);
+    const pdfFilename = getProjectPdfFilename(projectDir, req.params.id, getProjectMainFile(projectDir));
     res.download(foundPdf, pdfFilename);
   } catch (error: any) {
     sendApiError(res, error);
@@ -350,13 +360,7 @@ app.get('/api/projects/:id/download-pdf', (req, res) => {
 app.get('/api/projects/:id/pdf', (req, res) => {
   try {
     const projectDir = getProjectDir(req.params.id);
-    const pdfCandidates = [
-      path.join(projectDir, 'main.pdf'),
-      path.join(projectDir, 'output.pdf'),
-      path.join(projectDir, '.build', 'output.pdf'),
-      path.join(projectDir, `${req.params.id}.pdf`),
-    ];
-    const foundPdf = pdfCandidates.find((p) => fs.existsSync(p));
+    const foundPdf = findProjectPdf(projectDir, req.params.id);
     if (!foundPdf) {
       return res.status(404).send('PDF not found');
     }
@@ -382,6 +386,43 @@ app.post('/api/projects/:id/touch', (req, res) => {
   try {
     touchProject(sanitizeProjectId(req.params.id));
     res.json({ success: true });
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// The main document: the .tex file Compile builds.
+app.get('/api/projects/:id/main-file', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    if (!fs.existsSync(projectDir)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    res.json({ mainFile: getProjectMainFile(projectDir) });
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+app.put('/api/projects/:id/main-file', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    if (!fs.existsSync(projectDir)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const requested = req.body?.mainFile;
+    if (typeof requested !== 'string' || !requested.trim()) {
+      return res.status(400).json({ error: 'mainFile is required' });
+    }
+    // Same containment as every other file route before the helper sees it.
+    const abs = resolveProjectPath(req.params.id, requested);
+    if (path.extname(abs).toLowerCase() !== '.tex') {
+      return res.status(400).json({ error: 'Only a .tex file can be the main document' });
+    }
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+      return res.status(404).json({ error: `File not found: ${requested}` });
+    }
+    res.json({ mainFile: setProjectMainFile(projectDir, path.relative(projectDir, abs)) });
   } catch (error: any) {
     sendApiError(res, error);
   }
@@ -610,10 +651,18 @@ app.post('/api/projects/:id/rename', (req, res) => {
     const sourcePath = resolveProjectPath(req.params.id, oldPath);
     const parentDir = path.dirname(sourcePath);
     const destPath = path.join(parentDir, safeName);
+    const projectDir = getProjectDir(req.params.id);
+    if (sourcePath === path.resolve(projectDir)) {
+      return res.status(400).json({ error: 'Cannot rename the project folder here' });
+    }
 
-    // Prevent renaming project root or main.tex to a non-tex name
-    if (path.basename(sourcePath) === 'main.tex' && !safeName.endsWith('.tex')) {
-      return res.status(400).json({ error: 'main.tex must remain a .tex file' });
+    const mainFile = getProjectMainFile(projectDir);
+    const oldRel = path.relative(projectDir, sourcePath).replace(/\\/g, '/');
+    const movesMainFile = pathHoldsMainFile(mainFile, oldRel);
+
+    // The main document has to stay compilable.
+    if (mainFile === oldRel && !safeName.toLowerCase().endsWith('.tex')) {
+      return res.status(400).json({ error: `${mainFile} is the main document and must remain a .tex file` });
     }
 
     if (fs.existsSync(destPath)) {
@@ -621,10 +670,15 @@ app.post('/api/projects/:id/rename', (req, res) => {
     }
 
     fs.renameSync(sourcePath, destPath);
-    const projectDir = getProjectDir(req.params.id);
+    const newRel = path.relative(projectDir, destPath).replace(/\\/g, '/');
+    // Follow the main document through a rename of itself or of its folder,
+    // so Compile does not lose track of it.
+    if (movesMainFile) {
+      setProjectMainFile(projectDir, newRel + mainFile.slice(oldRel.length));
+    }
     res.json({
       success: true,
-      newRelativePath: path.relative(projectDir, destPath).replace(/\\/g, '/'),
+      newRelativePath: newRel,
     });
   } catch (error: any) {
     sendApiError(res, error);
@@ -641,9 +695,17 @@ app.delete('/api/projects/:id/file', (req, res) => {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Safety guard: Protect main.tex
-    if (path.basename(targetPath) === 'main.tex') {
-      return res.status(400).json({ error: 'Cannot delete the primary document (main.tex)' });
+    // Safety guard: the main document (or a folder holding it) stays put.
+    const projectDir = getProjectDir(req.params.id);
+    const mainFile = getProjectMainFile(projectDir);
+    const targetRel = path.relative(projectDir, targetPath).replace(/\\/g, '/');
+    if (!targetRel || pathHoldsMainFile(mainFile, targetRel)) {
+      return res.status(400).json({
+        error:
+          mainFile === targetRel
+            ? `${mainFile} is the main document. Set another .tex file as the main document before deleting it.`
+            : `This folder holds the main document (${mainFile}). Set another .tex file as the main document before deleting it.`,
+      });
     }
 
     const stat = fs.statSync(targetPath);
@@ -744,7 +806,8 @@ app.post('/api/projects/:id/compile', async (req, res) => {
     // file outside the workspace -- and with shellEscape on, run whatever that
     // file contains. Resolve it the same way every other file route does and
     // hand the compiler a path that is known to sit inside the project.
-    const mainFileRequest = String(req.body.mainFile || 'main.tex');
+    // No mainFile in the body means the project's own main document.
+    const mainFileRequest = String(req.body.mainFile || getProjectMainFile(projectDir));
     const mainFilePath = resolveProjectPath(req.params.id, mainFileRequest);
     if (path.extname(mainFilePath).toLowerCase() !== '.tex') {
       return res.status(400).json({ error: 'Only .tex files can be compiled' });
@@ -1035,9 +1098,10 @@ app.delete('/api/projects/:id/comments/:commentId', (req, res) => {
 app.get('/api/projects/:id/synctex/forward', (req, res) => {
   try {
     const projectDir = getProjectDir(req.params.id);
-    const file = (req.query.file as string) || 'main.tex';
+    const mainFile = getProjectMainFile(projectDir);
+    const file = (req.query.file as string) || mainFile;
     const line = parseInt(req.query.line as string, 10) || 1;
-    const parser = getProjectSyncTex(projectDir);
+    const parser = getProjectSyncTex(projectDir, mainFile);
 
     if (!parser) {
       return res.status(404).json({ error: 'SyncTeX data not available. Recompile document first.' });
@@ -1062,12 +1126,13 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
     const y = parseFloat(query.y as string) || 100;
     const text = typeof query.text === 'string' ? query.text.trim() : '';
 
-    const parser = getProjectSyncTex(projectDir);
+    const mainFile = getProjectMainFile(projectDir);
+    const parser = getProjectSyncTex(projectDir, mainFile);
 
     // If user provided selected text, search source files for a high-confidence match
     if (text && text.length > 2) {
       const cleanSnippet = text.replace(/[\r\n]+/g, ' ').trim();
-      const mainPath = path.join(projectDir, 'main.tex');
+      const mainPath = path.join(projectDir, mainFile);
       if (fs.existsSync(mainPath)) {
         const fileContent = fs.readFileSync(mainPath, 'utf-8');
         const lines = fileContent.split('\n');
@@ -1083,7 +1148,7 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
           let best = candidateLines[0];
           let bestScore = Infinity;
           for (const lineIdx of candidateLines) {
-            const fwd = parser.forward('main.tex', lineIdx + 1);
+            const fwd = parser.forward(mainFile, lineIdx + 1);
             if (!fwd) continue;
             const score =
               fwd.page === page
@@ -1106,7 +1171,7 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
         }
         if (directMatches.length > 0) {
           const bestLine = pickBest(directMatches);
-          return res.json({ file: 'main.tex', line: bestLine + 1, page, matchedText: cleanSnippet });
+          return res.json({ file: mainFile, line: bestLine + 1, page, matchedText: cleanSnippet });
         }
 
         // 2. Multi-word match
@@ -1122,7 +1187,7 @@ app.all('/api/projects/:id/synctex/backward', (req, res) => {
           }
           if (multiMatches.length > 0) {
             const bestLine = pickBest(multiMatches);
-            return res.json({ file: 'main.tex', line: bestLine + 1, page, matchedText: cleanSnippet });
+            return res.json({ file: mainFile, line: bestLine + 1, page, matchedText: cleanSnippet });
           }
         }
       }
