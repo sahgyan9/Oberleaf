@@ -2105,9 +2105,12 @@ export const App: React.FC = () => {
 
               {/* Resize Handle between FileTree and Editor */}
               <PanelResizeHandle
-                hitAreaMargins={{ coarse: 20, fine: 12 }}
+                // The library widens the hit area equally on both sides and
+                // swallows pointer events inside it, so a wide margin covers
+                // the neighbouring panel's scrollbar. Keep it small.
+                hitAreaMargins={{ coarse: 12, fine: 3 }}
                 onDragging={setIsResizing}
-                className="w-1.5 hover:w-2 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-all cursor-col-resize z-20 relative group before:content-[''] before:absolute before:inset-y-0 before:-left-2.5 before:-right-2.5 before:z-30"
+                className="w-2 shrink-0 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group"
               >
                 <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
               </PanelResizeHandle>
@@ -2186,12 +2189,14 @@ export const App: React.FC = () => {
           {/* Resize Handle between Editor and PDF with Overleaf-style SyncTeX divider pill */}
           {viewMode === 'split' && !pdfCollapsed && (
             <PanelResizeHandle
-              hitAreaMargins={{ coarse: 24, fine: 14 }}
+              // Monaco's vertical scrollbar (14px) sits flush against this
+              // handle; a margin wider than a few px swallows its pointer events.
+              hitAreaMargins={{ coarse: 12, fine: 3 }}
               onDragging={setIsResizing}
-              className="w-1.5 hover:w-2 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-all cursor-col-resize z-20 relative group before:content-[''] before:absolute before:inset-y-0 before:-left-2.5 before:-right-2.5 before:z-30"
+              className="w-2 shrink-0 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group"
             >
-              {/* Overleaf-Style Divider Control Pill */}
-              <div className="absolute top-1/2 -translate-y-1/2 -left-3.5 z-40 flex flex-col items-center select-none">
+              {/* Overleaf-Style Divider Control Pill, centred on the handle so it does not cover the editor scrollbar */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex flex-col items-center select-none">
                 <div className="flex flex-col items-center bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-full shadow-md py-1 px-0.5 space-y-1 transition-all group-hover:border-scholarly dark:group-hover:border-scholarly-dark group-hover:shadow-lg">
                   {/* Jump to PDF button (SyncTeX Forward) */}
                   <button
