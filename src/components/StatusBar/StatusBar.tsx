@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FolderOpen, Activity, CheckCircle2, Loader2, Cpu, FileCode, Type } from 'lucide-react';
+import { FolderOpen, Activity, CheckCircle2, Loader2, Cpu, FileCode, Type, FileText } from 'lucide-react';
 import { describeWordCount, type WordCount } from '../../utils/wordCount';
 
 interface StatusBarProps {
@@ -14,6 +14,8 @@ interface StatusBarProps {
   isLoadingFile?: boolean;
   /** Words in the open file; omitted for files that are not LaTeX */
   wordCount?: WordCount | null;
+  /** Pages in the current PDF; null when there is no PDF or the count is unknown */
+  pageCount?: number | null;
   onOpenDoctor: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
@@ -31,6 +33,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   isDoctorHealthy,
   isLoadingFile = false,
   wordCount,
+  pageCount = null,
   onOpenDoctor,
   onShowToast,
 }) => {
@@ -133,8 +136,19 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         )}
       </div>
 
-      {/* Right: word count, folder, cursor, diagnostics */}
+      {/* Right: page count, word count, folder, cursor, diagnostics */}
       <div className="flex items-center gap-2.5 flex-shrink-0">
+        {pageCount !== null && (
+          <>
+            <span className="flex items-center gap-1" title={`The PDF from the last compile has ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`}>
+              <FileText className="w-3 h-3 text-stone-400" />
+              <span>
+                {pageCount.toLocaleString()} <span className="hidden sm:inline">{pageCount === 1 ? 'page' : 'pages'}</span>
+              </span>
+            </span>
+            {SEPARATOR}
+          </>
+        )}
         {wordCount && (
           <>
             <span className="flex items-center gap-1" title={describeWordCount(wordCount)}>

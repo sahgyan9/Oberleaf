@@ -2005,6 +2005,33 @@ export const App: React.FC = () => {
     [deferredContent, activeFilePath]
   );
 
+  // Page count of the current PDF, refreshed whenever a new PDF is shown
+  // (project open, compile, a collaborator's compile). Asked of the server
+  // so it works in code-only view, where no PDF is loaded in the page.
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  // What the PDF viewer counted, used when the log has no page line (a log
+  // cut short, or a PDF made outside Oberleaf). Only known while it is open.
+  const [viewerPageCount, setViewerPageCount] = useState<number | null>(null);
+  useEffect(() => setViewerPageCount(null), [projectId]);
+  useEffect(() => {
+    if (!projectId || !lastValidPdfUrl) {
+      setPageCount(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf-info`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((info) => {
+        if (!cancelled) setPageCount(typeof info?.pages === 'number' ? info.pages : null);
+      })
+      .catch(() => {
+        if (!cancelled) setPageCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, lastValidPdfUrl]);
+
   // Everything the command palette can reach. Built only while it is open.
   const paletteItems = useMemo<PaletteItem[]>(() => {
     if (!isPaletteOpen) return [];
@@ -2480,6 +2507,7 @@ export const App: React.FC = () => {
               <PDFViewer
                 ref={pdfViewerRef}
                 pdfUrl={pdfUrl}
+                onPageCountChange={setViewerPageCount}
                 lastValidPdfUrl={lastValidPdfUrl}
                 compileDuration={compileDuration}
                 compileStatus={compileStatus}
@@ -2568,6 +2596,7 @@ export const App: React.FC = () => {
         isDoctorHealthy={isDoctorHealthy}
         isLoadingFile={isLoadingFile}
         wordCount={wordCount}
+        pageCount={pageCount ?? viewerPageCount}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onShowToast={addToast}
       />

@@ -138,6 +138,8 @@ interface PDFViewerProps {
   isSyncingBackward?: boolean;
   downloadFileName?: string;
   onApplyFix?: (fix: SuggestedFix, error: CompileErrorItem) => void;
+  /** Pages in the PDF just loaded, or null when none loaded. */
+  onPageCountChange?: (pages: number | null) => void;
   onUndoFix?: () => void;
   fixReceipt?: FixReceipt | null;
   onDismissFixReceipt?: () => void;
@@ -324,6 +326,7 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   isSyncingBackward,
   downloadFileName,
   onApplyFix,
+  onPageCountChange,
   onUndoFix,
   fixReceipt,
   onDismissFixReceipt,
@@ -837,11 +840,13 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
         if (cancelled) return;
         setNumPages(doc.numPages);
         setPageDims(dims);
+        onPageCountChange?.(doc.numPages);
       })
       .catch(() => {
         if (!cancelled) {
           pdfDocRef.current = null;
           setNumPages(0);
+          onPageCountChange?.(null);
           setPageDims([]);
         }
       });

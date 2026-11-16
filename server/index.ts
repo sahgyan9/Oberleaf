@@ -72,6 +72,7 @@ import {
 import { getSessionToken, isLocalRequest, hasValidToken } from './auth.js';
 import { mountBuiltClient, isServingBuild } from './staticApp.js';
 import { relaunchSelf } from './restart.js';
+import { getPdfPageCount } from './pdfInfo.js';
 
 const app = express();
 // Overridable so a second instance can be run alongside a live one (tests,
@@ -378,6 +379,21 @@ app.get('/api/projects/:id/download-pdf', (req, res) => {
     }
     const pdfFilename = getProjectPdfFilename(projectDir, req.params.id, getProjectMainFile(projectDir));
     res.download(foundPdf, pdfFilename);
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// Page count of the project's current PDF, for the status bar. Read from the
+// TeX log rather than the PDF, so the page needs no PDF parser in code view.
+app.get('/api/projects/:id/pdf-info', (req, res) => {
+  try {
+    const projectDir = getProjectDir(req.params.id);
+    const pdf = findProjectPdf(projectDir, req.params.id);
+    if (!pdf) return res.json({ pages: null });
+    // Named after the PDF actually served, not the main file: when the main
+    // document was switched, the PDF shown can still be an older main.pdf.
+    res.json({ pages: getPdfPageCount(projectDir, path.basename(pdf, '.pdf')) });
   } catch (error: any) {
     sendApiError(res, error);
   }
