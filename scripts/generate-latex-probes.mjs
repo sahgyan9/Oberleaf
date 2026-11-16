@@ -1,24 +1,24 @@
 // Regenerates the LaTeX warm-up probes embedded in scripts/install.ps1 from
-// server/projects.ts, which is the real source of truth for what a fresh
-// install will be asked to compile.
+// the template sources under templates/, which are the real source of truth
+// for what a fresh install will be asked to compile.
 //
 //   node scripts/generate-latex-probes.mjs           rewrite the block
 //   node scripts/generate-latex-probes.mjs --check   fail if it is stale
 //
-// The installer cannot read projects.ts at runtime: it is downloaded and run
+// The installer cannot read the templates at runtime: it is downloaded and run
 // before the repository is cloned, so the package list has to be baked in.
 // It was maintained by hand for exactly one commit before this replaced it -
 // the failure mode is silent, since a stale list still installs cleanly and
 // only shows up as a stall on the first compile of whichever template gained a
 // package.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "..");
-const SOURCE = path.join(repo, "server", "projects.ts");
+const TEMPLATES = path.join(repo, "templates");
 const TARGET = path.join(repo, "scripts", "install.ps1");
 
 const BEGIN = "    # BEGIN GENERATED PROBES";
@@ -27,10 +27,10 @@ const END = "    # END GENERATED PROBES";
 // Every document class the app can produce, mapped to the union of packages
 // used with it. Order follows first appearance so the output is stable.
 function collectProbes(source) {
-  // The LaTeX lives inside TypeScript template literals, so each backslash is
-  // doubled in the file text: `\\documentclass` on disk is \documentclass.
-  const CLASS = /\\\\documentclass(?:\[[^\]]*\])?\{([^}]+)\}/g;
-  const USE = /\\\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}/g;
+  // Anchored to the line start, which skips commented-out lines and the
+  // \verb examples in the templates' prose.
+  const CLASS = /^\\documentclass(?:\[[^\]]*\])?\{([^}]+)\}/gm;
+  const USE = /^\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}/gm;
 
   const events = [];
   for (const m of source.matchAll(CLASS)) {
@@ -65,7 +65,7 @@ function collectProbes(source) {
 function renderBlock(probes) {
   const lines = [
     BEGIN,
-    "    # Generated from server/projects.ts. Do not edit by hand - run",
+    "    # Generated from templates/*/main.tex. Do not edit by hand - run",
     "    #   npm run generate:latex-probes",
     "    # Class options are dropped on purpose: which package MiKTeX has to",
     "    # download does not depend on them, and templates disagree about them.",
@@ -90,11 +90,17 @@ function renderBlock(probes) {
   return lines.join("\n");
 }
 
-const source = readFileSync(SOURCE, "utf8");
+// Every template's main.tex, in the catalog's order so the output is stable.
+const catalog = JSON.parse(readFileSync(path.join(TEMPLATES, "catalog.json"), "utf8"));
+const source = catalog.templates
+  .map((t) => path.join(TEMPLATES, t.id, "main.tex"))
+  .filter((file) => existsSync(file))
+  .map((file) => readFileSync(file, "utf8"))
+  .join("\n");
 const probes = collectProbes(source);
 
 if (probes.size === 0) {
-  console.error("[probes] found no \\documentclass in server/projects.ts - refusing to write an empty block.");
+  console.error("[probes] found no \\documentclass in templates/*/main.tex - refusing to write an empty block.");
   process.exit(1);
 }
 
@@ -117,7 +123,7 @@ const summary = [...probes]
 if (process.argv.includes("--check")) {
   if (updated !== target) {
     console.error(
-      "[probes] scripts/install.ps1 is out of date with server/projects.ts.\n" +
+      "[probes] scripts/install.ps1 is out of date with templates/*/main.tex.\n" +
         "         Run: npm run generate:latex-probes"
     );
     process.exit(1);

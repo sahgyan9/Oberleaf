@@ -1,0 +1,65 @@
+% Research proposal: the structure most fellowship and grant calls ask for.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\title{Proposal Title}
+\author{Applicant Name \\ Proposed supervisor: Supervisor Name \\ Department, University}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{Summary}
+Four or five sentences a reviewer outside the subfield can follow: the gap,
+the idea, the plan and the expected outcome.
+
+\section{Background and Motivation}
+What is known, what is missing and why it matters now~\cite{lamport1994}.
+
+\section{Research Questions}
+\begin{enumerate}[label=\textbf{Q\arabic*.}]
+  \item First question, stated so that an experiment or proof can answer it.
+  \item Second question.
+\end{enumerate}
+
+\section{Methodology}
+\subsection{Approach}
+How each question will be answered: data, instruments, models.
+
+\subsection{Preliminary Results}
+Evidence that the approach is feasible.
+
+\section{Work Plan}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Timeline by quarter.}
+  \begin{tabular}{llp{7.5cm}}
+    \toprule
+    Period & Phase & Milestone \\
+    \midrule
+    Q1--Q2 & Setup       & Literature review complete; apparatus commissioned \\
+    Q3--Q4 & Experiments & First data set; conference abstract \\
+    Q5--Q6 & Analysis    & Model validated; journal manuscript submitted \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Expected Outcomes and Impact}
+Publications, data sets, software, and who benefits.
+
+\section{Resources and Budget}
+Equipment, travel and consumables, each with a one-line justification.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

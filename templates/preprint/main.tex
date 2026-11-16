@@ -1,0 +1,85 @@
+% Preprint: the layout most arXiv submissions use. Single column, wide text
+% block, numbered citations with natbib.
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[numbers,sort&compress]{natbib}  % \citep{key} and \citet{key}
+\usepackage[hidelinks]{hyperref}
+\usepackage{cleveref}                       % \cref{fig:x} writes "Figure 1" for you
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+
+\title{\textbf{Preprint Title: One Line That Says What Is New}}
+\author{
+  First Author \\ Department of Physics \\ University Name \\ \texttt{first@example.edu}
+  \and
+  Second Author \\ Research Institute \\ City, Country \\ \texttt{second@example.org}
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+A preprint abstract is read far more often than the paper. Give the problem,
+the method, the headline number and the implication.
+\end{abstract}
+
+\noindent\textbf{Keywords:} first keyword, second keyword, third keyword
+
+\section{Introduction}
+
+Use \verb|\citet| when the authors are part of the sentence, as in
+\citet{lamport1994}, and \verb|\citep| for a parenthetical citation
+\citep{einstein1905}. With \texttt{cleveref}, \verb|\cref{thm:main}| prints
+\cref{thm:main} without typing the word ``Theorem''.
+
+\section{Main Result}
+
+\begin{theorem}\label{thm:main}
+For every $n \ge 1$,
+\begin{equation}
+  \sum_{k=1}^{n} k = \frac{n(n+1)}{2}.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+By induction on $n$. The case $n = 1$ is immediate, and adding $n + 1$ to
+both sides gives the statement for $n + 1$.
+\end{proof}
+
+\section{Experiments}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison with a baseline.}
+  \label{tab:comparison}
+  \begin{tabular}{lrr}
+    \toprule
+    Method & Accuracy (\%) & Runtime (s) \\
+    \midrule
+    Baseline & 91.2 & 14.0 \\
+    Ours     & 94.7 &  9.5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\Cref{tab:comparison} compares the two methods.
+
+\section{Conclusion}
+
+Summarise the contribution and its limits.
+
+\section*{Acknowledgements}
+Funding, facilities and people who helped.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  FolderOpen,
-  Activity,
-  CheckCircle2,
-  Loader2,
-  Cpu,
-  FileCode,
-} from 'lucide-react';
+import { FolderOpen, Activity, CheckCircle2, Loader2, Cpu, FileCode, Type } from 'lucide-react';
+import { describeWordCount, type WordCount } from '../../utils/wordCount';
 
 interface StatusBarProps {
   projectId?: string;
@@ -18,9 +12,13 @@ interface StatusBarProps {
   cursorColumn?: number;
   isDoctorHealthy: boolean | null;
   isLoadingFile?: boolean;
+  /** Words in the open file; omitted for files that are not LaTeX */
+  wordCount?: WordCount | null;
   onOpenDoctor: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
+
+const SEPARATOR = <span aria-hidden="true" className="flex-shrink-0 text-stone-300 dark:text-stone-700">|</span>;
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   projectId,
@@ -32,6 +30,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   cursorColumn,
   isDoctorHealthy,
   isLoadingFile = false,
+  wordCount,
   onOpenDoctor,
   onShowToast,
 }) => {
@@ -83,97 +82,104 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     }
   };
 
+  const serverAddress = window.location.host;
+
   return (
-    <footer className="h-7 w-full bg-surface-lightPanel dark:bg-surface-darkPanel border-t border-surface-lightBorder dark:border-surface-darkBorder px-3 flex items-center justify-between text-[11px] font-mono select-none z-30 transition-colors flex-shrink-0 text-stone-600 dark:text-stone-400">
-      {/* Left side: Server status & Compile state */}
-      <div className="flex items-center space-x-3 overflow-hidden">
-        {/* Local daemon badge */}
-        <div className="flex items-center space-x-1.5" title="Oberleaf local server daemon running on port 3001">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] animate-pulse" />
-          <span className="font-semibold text-stone-700 dark:text-stone-300">Local Daemon :3001</span>
+    // One line, always: every item is nowrap, the right group keeps its width
+    // and the left group gives way, truncating the file path first. On a
+    // narrow window the items used to wrap onto a second line and overflow
+    // the bar.
+    <footer className="h-7 w-full bg-surface-lightPanel dark:bg-surface-darkPanel border-t border-surface-lightBorder dark:border-surface-darkBorder px-3 flex items-center justify-between gap-3 text-[11px] font-mono select-none z-30 transition-colors flex-shrink-0 text-stone-600 dark:text-stone-400 whitespace-nowrap overflow-hidden">
+      {/* Left: server, compile state, file */}
+      <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
+        <div className="hidden md:flex items-center gap-1.5 flex-shrink-0" title={`Oberleaf is running on this computer at ${serverAddress}`}>
+          <span className="w-2 h-2 rounded-full bg-scholarly dark:bg-scholarly-dark" />
+          <span className="font-medium text-stone-700 dark:text-stone-300">Local</span>
         </div>
 
-        <span className="text-stone-300 dark:text-stone-700">|</span>
+        <span className="hidden md:inline">{SEPARATOR}</span>
 
-        {/* Compiler engine state */}
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0" role="status" aria-live="polite">
           {isCompiling ? (
-            <div className="flex items-center space-x-1.5 text-scholarly-teal dark:text-scholarly-tealDark animate-pulse">
+            <span className="flex items-center gap-1.5 text-scholarly dark:text-scholarly-dark">
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span>
-                Compiling {activeFilePath || 'document'}... {(elapsedMs / 1000).toFixed(1)}s
-              </span>
-            </div>
+              <span>Compiling {(elapsedMs / 1000).toFixed(1)}s</span>
+            </span>
           ) : compileDuration !== null ? (
-            <div className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400">
+            <span className="flex items-center gap-1 text-scholarly dark:text-scholarly-dark">
               <CheckCircle2 className="w-3 h-3" />
               <span>Built in {(compileDuration / 1000).toFixed(2)}s</span>
-            </div>
+            </span>
           ) : (
-            <div className="flex items-center space-x-1 text-stone-500 dark:text-stone-400">
+            <span className="flex items-center gap-1">
               <Cpu className="w-3 h-3" />
-              <span>LaTeX Engine Ready</span>
-            </div>
+              <span>Ready</span>
+            </span>
           )}
         </div>
 
-        {/* Active Project & File indicator */}
         {projectName && (
           <>
-            <span className="text-stone-300 dark:text-stone-700 hidden sm:inline">|</span>
-            <div className="hidden sm:flex items-center space-x-1.5 text-stone-700 dark:text-stone-300 truncate max-w-[240px]">
+            {SEPARATOR}
+            <div className="flex items-center gap-1.5 min-w-0 text-stone-700 dark:text-stone-300" title={`${projectName} / ${activeFilePath ?? ''}`}>
               <FileCode className="w-3 h-3 text-stone-400 flex-shrink-0" />
-              <span className="truncate">{projectName}</span>
-              {activeFilePath && <span className="text-stone-400">/ {activeFilePath}</span>}
-              {isLoadingFile && (
-                <span className="flex items-center space-x-1 text-stone-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Opening...</span>
-                </span>
-              )}
+              <span className="truncate min-w-0">
+                <span className="hidden lg:inline">{projectName} / </span>
+                {activeFilePath}
+              </span>
+              {isLoadingFile && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 text-stone-400" />}
             </div>
           </>
         )}
       </div>
 
-      {/* Right side: Explorer Reveal, Editor Coordinates, TeX Doctor */}
-      <div className="flex items-center space-x-2.5 flex-shrink-0">
-        {/* Reveal in Explorer Action */}
-        <button
-          onClick={handleRevealInExplorer}
-          disabled={isOpeningExplorer}
-          title="Open project folder in Windows File Explorer"
-          className="flex items-center space-x-1 px-1.5 py-0.5 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle hover:text-stone-900 dark:hover:text-stone-100 transition text-[11px] font-sans font-medium text-stone-600 dark:text-stone-300 cursor-pointer"
-        >
-          {isOpeningExplorer ? (
-            <Loader2 className="w-3 h-3 animate-spin text-stone-500" />
-          ) : (
-            <FolderOpen className="w-3.5 h-3.5 text-scholarly-teal dark:text-scholarly-tealDark" />
-          )}
-          <span className="hidden md:inline">Reveal in Explorer</span>
-        </button>
-
-        <span className="text-stone-300 dark:text-stone-700">|</span>
-
-        {/* Cursor Position */}
-        {cursorLine !== undefined && cursorColumn !== undefined && (
+      {/* Right: word count, folder, cursor, diagnostics */}
+      <div className="flex items-center gap-2.5 flex-shrink-0">
+        {wordCount && (
           <>
-            <span className="text-stone-500 dark:text-stone-400">
-              Ln {cursorLine}, Col {cursorColumn}
+            <span className="flex items-center gap-1" title={describeWordCount(wordCount)}>
+              <Type className="w-3 h-3 text-stone-400" />
+              <span>
+                {wordCount.words.toLocaleString()} <span className="hidden sm:inline">words</span>
+              </span>
             </span>
-            <span className="text-stone-300 dark:text-stone-700">|</span>
+            {SEPARATOR}
           </>
         )}
 
-        {/* Dependency Doctor Pill */}
         <button
+          type="button"
+          onClick={handleRevealInExplorer}
+          disabled={isOpeningExplorer}
+          aria-label="Open the project folder in File Explorer"
+          title="Open the project folder in File Explorer"
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle hover:text-stone-900 dark:hover:text-stone-100 transition font-sans font-medium"
+        >
+          {isOpeningExplorer ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+          <span className="hidden xl:inline">Open Folder</span>
+        </button>
+
+        {cursorLine !== undefined && cursorColumn !== undefined && (
+          <>
+            {SEPARATOR}
+            <span>
+              Ln {cursorLine}, Col {cursorColumn}
+            </span>
+          </>
+        )}
+
+        {SEPARATOR}
+
+        <button
+          type="button"
           onClick={onOpenDoctor}
-          className={`flex items-center space-x-1 px-1.5 py-0.5 rounded transition ${
+          aria-label={isDoctorHealthy === false ? 'TeX Doctor: something needs attention' : 'TeX Doctor'}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition font-sans font-medium ${
             isDoctorHealthy === false
-              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
-              : 'hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-600 dark:text-stone-300'
+              ? 'bg-diagnostic/10 text-diagnostic dark:text-diagnostic-dark hover:bg-diagnostic/20'
+              : 'hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle hover:text-stone-900 dark:hover:text-stone-100'
           }`}
-          title="TeX Toolchain Health Doctor"
+          title="Check the LaTeX installation and this document"
         >
           <Activity className="w-3 h-3" />
           <span className="hidden lg:inline">TeX Doctor</span>

@@ -1,0 +1,77 @@
+% APS / Physical Review manuscript (REVTeX 4.2).
+% Change "prl" to pra, prb, prc, prd, pre, prx or rmp for another journal.
+% Change "reprint" to "preprint" for the double-spaced submission layout.
+\documentclass[aps,prl,reprint,superscriptaddress]{revtex4-2}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{bm}          % bold math: \bm{k}
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+
+\title{Title of the Letter}
+
+\author{First Author}
+\email{first@example.edu}
+\affiliation{Department of Physics, University Name, City, Country}
+
+\author{Second Author}
+\affiliation{Department of Physics, University Name, City, Country}
+\affiliation{Research Institute, City, Country}
+
+\date{\today}
+
+\begin{abstract}
+One paragraph, no citations, no displayed equations. Physical Review Letters
+limits the abstract to 600 characters.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+REVTeX numbers citations in order of appearance~\cite{einstein1905}. The
+Hamiltonian of a spin in a field $\bm{B}$ is
+\begin{equation}
+  H = -\gamma\, \bm{S} \cdot \bm{B},
+  \label{eq:hamiltonian}
+\end{equation}
+and Eq.~\eqref{eq:hamiltonian} is referred to by its label.
+
+\section{Results}
+
+\begin{figure}[b]
+  \fbox{\parbox[c][3.5cm][c]{0.9\linewidth}{\centering Figure placeholder}}
+  \caption{A single-column figure. Use \texttt{figure*} for one that spans
+  both columns.}
+  \label{fig:example}
+\end{figure}
+
+Figure~\ref{fig:example} marks where the first figure goes, and
+Table~\ref{tab:values} lists fitted parameters.
+
+\begin{table}[b]
+  \caption{Fitted parameters.}
+  \label{tab:values}
+  \begin{ruledtabular}
+    \begin{tabular}{lcc}
+      Sample & $T_c$ (K) & $\Delta$ (meV) \\
+      \hline
+      A & 9.2 & 1.5 \\
+      B & 7.1 & 1.1 \\
+    \end{tabular}
+  \end{ruledtabular}
+\end{table}
+
+\section{Conclusion}
+
+State the result and its consequence.
+
+\begin{acknowledgments}
+Funding and thanks.
+\end{acknowledgments}
+
+\bibliography{references}
+
+\end{document}

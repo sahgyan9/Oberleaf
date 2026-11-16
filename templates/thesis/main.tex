@@ -1,0 +1,56 @@
+% Thesis: one file per chapter, so a long document stays manageable.
+%
+% This file holds the settings and the order of the parts. The text lives in
+% frontmatter/ and chapters/. Oberleaf always compiles this file, whichever
+% chapter you have open.
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[left=3.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}  % wide left margin for binding
+\usepackage{setspace}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\onehalfspacing
+
+% Fill these in once; the title page uses them.
+\newcommand{\thesistitle}{Title of the Thesis}
+\newcommand{\candidate}{Candidate Name}
+\newcommand{\degree}{Doctor of Philosophy}
+\newcommand{\department}{Department of Physics}
+\newcommand{\university}{University Name}
+\newcommand{\supervisor}{Professor Supervisor Name}
+\newcommand{\submitted}{Month Year}
+
+\begin{document}
+
+\input{frontmatter/titlepage}
+
+\pagenumbering{roman}
+\input{frontmatter/abstract}
+\input{frontmatter/acknowledgements}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\pagenumbering{arabic}
+
+% To work on one chapter faster, comment out the others here.
+\include{chapters/introduction}
+\include{chapters/literature-review}
+\include{chapters/methods}
+\include{chapters/results}
+\include{chapters/conclusion}
+
+\appendix
+\include{chapters/appendix}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

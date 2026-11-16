@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { chooseMainFile, readZip, unwrapSingleFolder, ZipImportError } from './zipImport.js';
+import { getTemplate, getTemplateCatalog, readTemplateFile, writeTemplateInto } from './templates.js';
 
 // ----------------------------------------------------
 // Path containment helpers (canonical definitions)
@@ -63,193 +64,17 @@ export interface FileItem {
   children?: FileItem[];
 }
 
-export const TEMPLATES: Record<string, { mainTex: string; files?: Record<string, string> }> = {
-  cv: {
-    mainTex: `\\documentclass[a4paper, 10pt]{article}
-
-\\usepackage[
-  top=1.5cm, bottom=1.5cm,
-  left=1.5cm, right=1.5cm
-]{geometry}
-\\usepackage[T1]{fontenc}
-\\usepackage{lmodern}
-\\usepackage{microtype}
-\\usepackage{xcolor}
-\\usepackage{titlesec}
-\\usepackage{enumitem}
-\\usepackage{hyperref}
-\\usepackage{parskip}
-
-% Color Palette
-\\definecolor{primary}{HTML}{1E293B}   % Deep slate
-\\definecolor{accent}{HTML}{2563EB}    % Scholarly blue
-\\definecolor{muted}{HTML}{64748B}     % Slate muted
-
-\\hypersetup{
-  colorlinks=true,
-  urlcolor=accent,
-  linkcolor=accent
-}
-
-\\titleformat{\\section}
-  {\\large\\bfseries\\color{primary}}
-  {}
-  {0em}
-  {}
-  [\\vspace{1pt}\\color{accent}\\hrule\\vspace{4pt}]
-\\titlespacing{\\section}{0pt}{10pt}{4pt}
-
-\\setlist[itemize]{
-  leftmargin=1.2em,
-  itemsep=1.5pt,
-  topsep=1.5pt,
-  parsep=0pt
-}
-\\pagestyle{empty}
-
-\\begin{document}
-
-\\begin{center}
-  {\\Huge \\textbf{Your Name}} \\\\ \\vspace{4pt}
-  \\small \\color{muted}
-  Email: \\href{mailto:you@example.com}{you@example.com} \\quad | \\quad
-  Phone: +1 (555) 019-2834 \\quad | \\quad
-  LinkedIn: \\href{https://linkedin.com}{linkedin.com/in/yourprofile} \\quad | \\quad
-  GitHub: \\href{https://github.com}{github.com/yourhandle}
-\\end{center}
-
-\\vspace{6pt}
-
-\\section{Education}
-\\textbf{Master of Science in Computer Science} \\hfill 2022 -- 2024 \\\\
-\\textit{University Name} \\hfill City, State \\\\
-Relevant Coursework: Distributed Systems, Machine Learning, Advanced Algorithms.
-
-\\vspace{3pt}
-\\textbf{Bachelor of Science in Physics} \\hfill 2018 -- 2022 \\\\
-\\textit{University Name} \\hfill City, State
-
-\\section{Experience}
-\\textbf{Software Engineer} \\hfill Jan 2024 -- Present \\\\
-\\textit{Company Name} \\hfill City, State
-\\begin{itemize}
-  \\item Designed and deployed scalable REST and WebSocket APIs serving 50k+ daily active users.
-  \\item Optimized core compilation pipeline latency by 35\\% using caching and connection pooling.
-  \\item Collaborated with cross-functional engineering teams in an agile, CI/CD-driven workflow.
-\\end{itemize}
-
-\\vspace{3pt}
-\\textbf{Research Fellow} \\hfill Jun 2022 -- Dec 2023 \\\\
-\\textit{Laboratory / Institute Name} \\hfill City, State
-\\begin{itemize}
-  \\item Developed automated computational scripts for numerical data analysis and visualization.
-  \\item Co-authored research findings published in peer-reviewed scientific proceedings.
-\\end{itemize}
-
-\\section{Technical Projects}
-\\textbf{Oberleaf --- Local TeX Studio} \\hfill \\href{https://github.com}{github.com/project}
-\\begin{itemize}
-  \\item Built a responsive offline LaTeX desktop editor with instant live PDF preview and SyncTeX.
-  \\item Engineered cross-platform background processes, local project discovery, and zero-loss uninstaller.
-\\end{itemize}
-
-\\section{Technical Skills}
-\\textbf{Languages:} Python, TypeScript, C++, LaTeX, SQL, Bash. \\\\
-\\textbf{Frameworks \\& Tools:} React, Node.js, Express, Git, Docker, Linux, Vite.
-
-\\end{document}
-`,
-  },
-  blank: {
-    mainTex: `\\documentclass{article}
-\\usepackage{amsmath}
-\\usepackage{graphicx}
-
-\\title{Untitled Document}
-\\author{Author Name}
-\\date{\\today}
-
-\\begin{document}
-
-\\maketitle
-
-\\section{Introduction}
-Start typing your document here. To test live equations, type $E = mc^2$ or:
-\\begin{equation}
-  \\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
-\\end{equation}
-
-\\end{document}
-`,
-  },
-  ieee: {
-    mainTex: `\\documentclass[conference]{IEEEtran}
-\\usepackage{amsmath,amssymb,amsfonts}
-\\usepackage{graphicx}
-\\usepackage{textcomp}
-\\usepackage{xcolor}
-
-\\title{Conference Paper Title*\\\\
-{\\footnotesize \\textsuperscript{*}Note: Sub-title here}}
-
-\\author{\\IEEEauthorblockN{First Author}
-\\IEEEauthorblockA{\\textit{dept. name of organization} \\\\
-\\textit{name of organization}\\\\
-City, Country \\\\
-email@example.com}
-}
-
-\\begin{document}
-
-\\maketitle
-
-\\begin{abstract}
-This document is a model and template for \\LaTeX\\ conferences.
-\\end{abstract}
-
-\\section{Introduction}
-This template provides conference layout compliance.
-
-\\section{Methodology}
-Equations render immediately in the editor:
-\\begin{equation}
-\\mathbf{y} = \\mathbf{X}\\boldsymbol{\\beta} + \\boldsymbol{\\varepsilon}
-\\end{equation}
-
-\\end{document}
-`,
-  },
-  thesis: {
-    mainTex: `\\documentclass[12pt,a4paper]{report}
-\\usepackage[utf8]{inputenc}
-\\usepackage{amsmath}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-
-\\title{Master's Thesis Title}
-\\author{Candidate Name}
-\\date{\\today}
-
-\\begin{document}
-
-\\maketitle
-
-\\begin{abstract}
-A concise summary of the research methodology and key contributions.
-\\end{abstract}
-
-\\tableofcontents
-
-\\chapter{Introduction}
-Background and motivation for the research.
-
-\\chapter{Literature Review}
-Prior work in the domain.
-
-\\end{document}
-`,
-  },
-};
+// Templates live as real files under templates/ (see server/templates.ts).
+// This record is the same data in the shape scripts/benchmark.ts compiles.
+export const TEMPLATES: Record<string, { mainTex: string; files?: Record<string, string> }> = Object.fromEntries(
+  getTemplateCatalog().templates.map((t) => [
+    t.id,
+    {
+      mainTex: readTemplateFile(t.id, 'main.tex'),
+      files: Object.fromEntries(t.files.filter((f) => f !== 'main.tex').map((f) => [f, readTemplateFile(t.id, f)])),
+    },
+  ])
+);
 
 export function getProjectsRoot(): string {
   // 1. Explicit override via environment variable
@@ -704,11 +529,12 @@ export function importProjectFromZip(name: string, zip: Buffer, mainFile?: strin
 }
 
 export function createProject(name: string, templateKey: string = 'cv'): ProjectSummary {
-  const { slug: finalSlug, dir: projectDir } = allocateProjectDir(name, 'my-cv');
+  const { slug: finalSlug, dir: projectDir } = allocateProjectDir(name, 'untitled');
   fs.mkdirSync(path.join(projectDir, 'figures'), { recursive: true });
 
-  const template = TEMPLATES[templateKey] || TEMPLATES.cv || TEMPLATES.blank;
-  fs.writeFileSync(path.join(projectDir, 'main.tex'), template.mainTex, 'utf-8');
+  // An unknown key (an older client, a typo) still creates a usable project.
+  if (!getTemplate(templateKey)) templateKey = 'blank';
+  writeTemplateInto(templateKey, projectDir);
 
   const nowIso = new Date().toISOString();
   writeProjectMeta(projectDir, name, templateKey, nowIso);

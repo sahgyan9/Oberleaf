@@ -11,7 +11,9 @@ import {
   FileText,
   Loader2,
   Bookmark,
+  Globe,
 } from 'lucide-react';
+import { CitationLookup } from './CitationLookup';
 
 export interface CitationItem {
   key: string;
@@ -24,6 +26,7 @@ export interface CitationItem {
   publisher?: string;
   volume?: string;
   pages?: string;
+  doi?: string;
   raw?: string;
   bibFile?: string;
 }
@@ -43,7 +46,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
   onInsert,
   onCitationAdded,
 }) => {
-  const [activeTab, setActiveTab] = useState<'browse' | 'add'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'lookup' | 'add'>('browse');
   const [citations, setCitations] = useState<CitationItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -91,6 +94,15 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
     }
   }, [isOpen, loadCitations]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   // Handle Copy Key to Clipboard
   const handleCopyKey = (key: string) => {
     navigator.clipboard.writeText(key);
@@ -136,7 +148,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        setSaveSuccess(`Added citation "${data.key}"!`);
+        setSaveSuccess(`Added citation "${data.key}".`);
         setRawBibtex('');
         setFormKey('');
         setFormTitle('');
@@ -188,7 +200,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                 </span>
               </h2>
               <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                Browse project references, insert \cite commands, or add new papers
+                Cite a reference, or add one from its DOI, arXiv ID or title
               </p>
             </div>
           </div>
@@ -202,29 +214,41 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center border-b border-surface-lightBorder dark:border-surface-darkBorder px-5 bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs flex-shrink-0">
+        <div className="flex items-center border-b border-surface-lightBorder dark:border-surface-darkBorder px-5 bg-surface-lightSubtle dark:bg-surface-darkSubtle text-xs flex-shrink-0 overflow-x-auto [scrollbar-width:thin]">
           <button
             onClick={() => setActiveTab('browse')}
-            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile ${
+            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile whitespace-nowrap ${
               activeTab === 'browse'
                 ? 'border-scholarly dark:border-scholarly-dark text-scholarly dark:text-scholarly-dark font-semibold'
                 : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Browse Citations ({citations.length})</span>
+            <span>In This Project ({citations.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('lookup')}
+            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile whitespace-nowrap ${
+              activeTab === 'lookup'
+                ? 'border-scholarly dark:border-scholarly-dark text-scholarly dark:text-scholarly-dark font-semibold'
+                : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Look Up</span>
           </button>
 
           <button
             onClick={() => setActiveTab('add')}
-            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile ${
+            className={`py-2.5 px-3 font-medium transition border-b-2 flex items-center space-x-1.5 btn-tactile whitespace-nowrap ${
               activeTab === 'add'
                 ? 'border-scholarly dark:border-scholarly-dark text-scholarly dark:text-scholarly-dark font-semibold'
                 : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Reference</span>
+            <span>Add by Hand</span>
           </button>
         </div>
 
@@ -258,10 +282,15 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
                       ? 'No citations in this project yet.'
                       : 'No citations match your search.'}
                   </p>
-                  <p className="text-[11px] text-stone-400 max-w-sm">
-                    Switch to the <span className="text-scholarly-green dark:text-scholarly-greenDark font-semibold">Add Reference</span> tab
-                    to paste BibTeX markup from Google Scholar or arXiv.
-                  </p>
+                  {citations.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('lookup')}
+                      className="mt-1 px-3 py-1.5 rounded-lg bg-scholarly dark:bg-scholarly-dark hover:bg-scholarly-hover dark:hover:bg-scholarly-darkHover text-white text-xs font-semibold transition btn-tactile"
+                    >
+                      Look Up a Paper
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredCitations.map((item) => (
@@ -335,7 +364,21 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Add New Reference */}
+        {/* Tab 2: Look a reference up online */}
+        {activeTab === 'lookup' && (
+          <CitationLookup
+            projectId={projectId}
+            citations={citations}
+            onInsert={onInsert}
+            onAdded={async () => {
+              await loadCitations();
+              onCitationAdded?.();
+            }}
+            onClose={onClose}
+          />
+        )}
+
+        {/* Tab 3: Add New Reference by hand */}
         {activeTab === 'add' && (
           <form onSubmit={handleSaveCitation} className="flex-1 flex flex-col overflow-hidden p-5 space-y-4">
             {/* Mode Switcher */}

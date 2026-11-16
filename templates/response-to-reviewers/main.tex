@@ -1,0 +1,66 @@
+% Response to reviewers: each comment quoted, followed by the reply and the
+% change made in the manuscript.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{reviewer}{HTML}{57534E}
+\definecolor{change}{HTML}{1B5E20}
+
+% \comment{...}   the reviewer's words
+% \reply{...}     your answer
+% \change{...}    the revised text, quoted from the manuscript
+\newcounter{reviewer}
+\newcounter{comment}[reviewer]
+\newcommand{\reviewer}{\stepcounter{reviewer}\section*{Reviewer \thereviewer}}
+\newcommand{\comment}[1]{\stepcounter{comment}%
+  \textbf{Comment \thereviewer.\thecomment.}\ {\color{reviewer}\itshape #1}\par}
+\newcommand{\reply}[1]{\textbf{Reply.}\ #1\par}
+\newcommand{\change}[1]{\textbf{Change in manuscript.}\ {\color{change}#1}\par\medskip}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Response to Reviewers} \\[6pt]
+  Manuscript ID: XXXX-0000 \\
+  ``Manuscript Title'' \\[4pt]
+  \today
+\end{center}
+
+Dear Editor,
+
+We thank the reviewers for their careful reading. Each comment is reproduced
+below, followed by our reply and the corresponding change. Page and line
+numbers refer to the revised manuscript.
+
+\reviewer
+
+\comment{The description of the calibration procedure is too brief to be
+reproduced.}
+\reply{We agree. Section 2.3 now gives the full procedure, including the
+reference standard and the number of repetitions.}
+\change{Page 4, lines 112--124: ``The detector was calibrated against a
+reference source before each run...''}
+
+\comment{Figure 3 lacks error bars.}
+\reply{Error bars showing one standard deviation over five runs have been
+added, and the caption states this.}
+\change{Figure 3 and its caption, page 7.}
+
+\reviewer
+
+\comment{The authors should compare with the method of Smith et al.}
+\reply{We have added this comparison as a new row in Table 2. Our method is
+more accurate at a similar runtime.}
+\change{Table 2, page 8; discussion on page 9, lines 201--209.}
+
+\bigskip
+Sincerely, \\
+The authors
+
+\end{document}

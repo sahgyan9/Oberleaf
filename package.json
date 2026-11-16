@@ -12,6 +12,7 @@
     "generate:latex-probes": "node scripts/generate-latex-probes.mjs",
     "check:latex-probes": "node scripts/generate-latex-probes.mjs --check",
     "build:icons": "node ./scripts/generate-icons.cjs",
+    "build:template-previews": "tsx scripts/build-template-previews.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "server": "tsx watch server/index.ts",

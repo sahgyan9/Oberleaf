@@ -179,11 +179,15 @@ if (Test-PortOpen "127.0.0.1" $Port 80) {
 # STEP 2: Splash. Same palette as the app: light by default, dark when
 # Windows apps are set to dark (which is also what the app follows until
 # the user picks a theme in it).
+#
+# The window runs on its own thread with its own message loop. The launcher
+# below blocks for seconds at a time (process queries, HTTP probes), and a
+# splash pumped from this thread froze during exactly those waits. The two
+# sides share one synchronized hashtable: the launcher writes the step and
+# detail, the splash reads them on a timer and draws.
 # ------------------------------------------------------------------
-$splash = $null
-$lblStatus = $null
-$lblDetail = $null
-$barFill = $null
+$splashState = $null
+$splashShell = $null
 $StepNames = @('Checking Node.js', 'Installing dependencies', 'Building the app', 'Starting the server', 'Opening the browser')
 
 function Get-WindowsUsesDarkApps {
@@ -195,131 +199,373 @@ function Get-WindowsUsesDarkApps {
     }
 }
 
+function Get-AppVersion {
+    try {
+        $pkg = Get-Content -Path (Join-Path $ProjectRoot 'package.json') -Raw -ErrorAction Stop
+        if ($pkg -match '"version"\s*:\s*"([^"]+)"') { return $Matches[1] }
+    } catch {}
+    return ''
+}
+
+$SplashScript = {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+
+    $W = 540
+    $H = 300
+    # Windows' "show animations" setting: off means no fade and no moving parts.
+    $animate = [System.Windows.Forms.SystemInformation]::UIEffectsEnabled
+
+    function New-Color([int]$r, [int]$g, [int]$b) { [System.Drawing.Color]::FromArgb($r, $g, $b) }
+    if ($S.Dark) {
+        $cCanvas = New-Color 28 28 31;    $cBorder = New-Color 46 46 53
+        $cText   = New-Color 245 245 244; $cMuted  = New-Color 168 162 158
+        $cTrack  = New-Color 38 38 43;    $cAccent = New-Color 46 160 67
+        $cPage   = New-Color 20 20 22;    $cInk    = New-Color 87 83 78
+    } else {
+        $cCanvas = New-Color 255 255 255; $cBorder = New-Color 231 229 223
+        $cText   = New-Color 28 25 23;    $cMuted  = New-Color 87 83 78
+        $cTrack  = New-Color 244 243 239; $cAccent = New-Color 27 94 32
+        $cPage   = New-Color 251 251 250; $cInk    = New-Color 214 211 205
+    }
+
+    $bCanvas = New-Object System.Drawing.SolidBrush $cCanvas
+    $bText   = New-Object System.Drawing.SolidBrush $cText
+    $bMuted  = New-Object System.Drawing.SolidBrush $cMuted
+    $bTrack  = New-Object System.Drawing.SolidBrush $cTrack
+    $bAccent = New-Object System.Drawing.SolidBrush $cAccent
+    $bPage   = New-Object System.Drawing.SolidBrush $cPage
+    $bInk    = New-Object System.Drawing.SolidBrush $cInk
+    $bSheen  = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(110, $cAccent))
+    $pBorder = New-Object System.Drawing.Pen $cBorder, 1
+    $pGlyph  = New-Object System.Drawing.Pen $cMuted, 1.6
+
+    $fTitle  = New-Object System.Drawing.Font('Georgia', 24, [System.Drawing.FontStyle]::Bold)
+    $fSub    = New-Object System.Drawing.Font('Segoe UI', 9.5)
+    $fStatus = New-Object System.Drawing.Font('Segoe UI', 10.5)
+    $fDetail = New-Object System.Drawing.Font('Segoe UI', 8.5)
+    $fMono   = New-Object System.Drawing.Font('Consolas', 8)
+
+    $noWrap = New-Object System.Drawing.StringFormat
+    $noWrap.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
+    $noWrap.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter
+    $rightAlign = New-Object System.Drawing.StringFormat
+    $rightAlign.Alignment = [System.Drawing.StringAlignment]::Far
+    $rightAlign.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
+
+    $logo = $null
+    try { $logo = [System.Drawing.Image]::FromFile($S.IconPath) } catch {}
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.FormBorderStyle = 'None'
+    $form.StartPosition = 'CenterScreen'
+    $form.ClientSize = New-Object System.Drawing.Size($W, $H)
+    $form.BackColor = $cCanvas
+    $form.Text = 'Oberleaf'
+    # In the taskbar and not always-on-top: it can be minimized, restored and
+    # covered by other windows while a first-run install or a build runs.
+    $form.ShowInTaskbar = $true
+    $form.TopMost = $false
+    $form.MinimizeBox = $true
+    if ($animate) { $form.Opacity = 0 }
+    if ($logo) {
+        try {
+            $bmp = New-Object System.Drawing.Bitmap($logo)
+            $form.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+        } catch {}
+    }
+
+    # A PictureBox is double-buffered, so one Paint handler draws the whole
+    # splash without flicker.
+    $canvas = New-Object System.Windows.Forms.PictureBox
+    $canvas.Dock = 'Fill'
+    $form.Controls.Add($canvas)
+
+    $minRect = New-Object System.Drawing.Rectangle(($W - 42), 8, 32, 26)
+    $tip = New-Object System.Windows.Forms.ToolTip
+
+    # Mutable view state lives in one table so the event handlers can change it.
+    $view = @{
+        Shown = 0.0            # eased 0..1 progress
+        Tick = 0
+        LastStep = -1
+        StepStart = [DateTime]::UtcNow
+        HoverMin = $false
+        Drag = $null
+        TipShown = $false
+    }
+
+    # Line widths (fraction of the text block) of the page the splash "typesets"
+    # as startup advances: a title, body text and one displayed equation.
+    $pageLines = @(
+        @{ W = 0.62; Center = $true;  Bold = $true },
+        @{ W = 0.34; Center = $true;  Bold = $false },
+        @{ W = 0.0 },
+        @{ W = 1.0 }, @{ W = 1.0 }, @{ W = 0.94 }, @{ W = 0.55 },
+        @{ W = 0.0 },
+        @{ W = 0.46; Center = $true;  Bold = $true },
+        @{ W = 0.0 },
+        @{ W = 1.0 }, @{ W = 0.97 }, @{ W = 0.72 }
+    )
+
+    $canvas.Add_Paint({
+        param($sender, $e)
+        try {
+            $g = $e.Graphics
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+            $g.Clear($cCanvas)
+
+            # Brand
+            if ($logo) { $g.DrawImage($logo, 36, 40, 52, 52) }
+            $g.DrawString('Oberleaf', $fTitle, $bText, 98, 40)
+            $sub = 'Local LaTeX studio'
+            if ($S.Version) { $sub = "$sub  $([char]0x00B7)  version $($S.Version)" }
+            $g.DrawString($sub, $fSub, $bMuted, 102, 80)
+
+            # Minimize button
+            if ($view.HoverMin) { $g.FillRectangle($bTrack, $minRect) }
+            $my = $minRect.Y + 15
+            $g.DrawLine($pGlyph, ($minRect.X + 11), $my, ($minRect.X + 21), $my)
+
+            # The page being typeset
+            $px = 384; $py = 54; $pw = 112; $ph = 146
+            $g.FillRectangle($bPage, $px, $py, $pw, $ph)
+            $g.DrawRectangle($pBorder, $px, $py, $pw, $ph)
+            $tx = $px + 14; $tw = $pw - 28; $ty = $py + 16
+            $count = $pageLines.Count
+            $written = [double]$view.Shown * $count
+            $caretX = -1; $caretY = -1
+            for ($i = 0; $i -lt $count; $i++) {
+                $line = $pageLines[$i]
+                $frac = [Math]::Max(0.0, [Math]::Min(1.0, $written - $i))
+                if ($frac -le 0) { break }
+                $y = $ty + $i * 9
+                if ($line.W -le 0) { continue }
+                $full = [int]($tw * $line.W)
+                $lw = [int]($full * $frac)
+                $lx = $tx
+                if ($line.Center) { $lx = $tx + [int](($tw - $full) / 2) }
+                $lh = 2
+                $brush = $bInk
+                if ($line.Bold) { $lh = 3; $brush = $bMuted }
+                if ($lw -gt 0) { $g.FillRectangle($brush, $lx, $y, $lw, $lh) }
+                if ($frac -lt 1) { $caretX = $lx + $lw + 1; $caretY = $y - 3 }
+            }
+            # Caret at the writing position; it blinks while a step is running.
+            if ($caretX -ge 0 -and ((-not $animate) -or (([int]($view.Tick / 8)) % 2 -eq 0))) {
+                $g.FillRectangle($bAccent, $caretX, $caretY, 2, 8)
+            }
+
+            # Status
+            $step = [int]$S.Step
+            $total = [int]$S.StepCount
+            $name = 'Ready'
+            if ($step -lt $total) { $name = $S.StepNames[$step] }
+            $g.DrawString($name, $fStatus, $bText, 34, 192)
+            if ($step -lt $total) {
+                $counter = "Step $($step + 1) of $total"
+                $elapsed = [int]([DateTime]::UtcNow - $view.StepStart).TotalSeconds
+                if ($elapsed -ge 3) { $counter = "$counter  $([char]0x00B7)  $elapsed s" }
+                $g.DrawString($counter, $fDetail, $bMuted, (New-Object System.Drawing.RectangleF(204, 196, 160, 18)), $rightAlign)
+            }
+            if ($S.Detail) {
+                $g.DrawString([string]$S.Detail, $fDetail, $bMuted, (New-Object System.Drawing.RectangleF(36, 216, 330, 18)), $noWrap)
+            }
+            if ($S.Activity) {
+                $g.DrawString([string]$S.Activity, $fMono, $bMuted, (New-Object System.Drawing.RectangleF(36, 240, ($W - 72), 16)), $noWrap)
+            }
+
+            # Progress: completed steps are solid. The step that is running is
+            # not a made-up percentage; a band sweeps across its share of the bar.
+            $barY = $H - 5
+            $g.FillRectangle($bTrack, 0, $barY, $W, 5)
+            $fill = [int]($W * [double]$view.Shown)
+            if ($fill -gt 0) { $g.FillRectangle($bAccent, 0, $barY, $fill, 5) }
+            if ($animate -and $step -lt $total) {
+                $segEnd = [int]($W * ($step + 1) / $total)
+                $segW = $segEnd - $fill
+                if ($segW -gt 24) {
+                    $bandW = [Math]::Min(56, [int]($segW / 2))
+                    $period = 44
+                    $pos = (($view.Tick % $period) / [double]$period) * ($segW + $bandW) - $bandW
+                    $bx = $fill + [int]$pos
+                    $bx0 = [Math]::Max($fill, $bx)
+                    $bx1 = [Math]::Min($segEnd, $bx + $bandW)
+                    if ($bx1 -gt $bx0) { $g.FillRectangle($bSheen, $bx0, $barY, ($bx1 - $bx0), 5) }
+                }
+            }
+
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
+            $g.DrawRectangle($pBorder, 0, 0, ($W - 1), ($H - 1))
+        } catch {}
+    })
+
+    # The window has no title bar: drag it by its body, minimize with the button.
+    $canvas.Add_MouseDown({
+        param($sender, $e)
+        if ($e.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
+        if ($minRect.Contains($e.Location)) {
+            $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+            return
+        }
+        $view.Drag = @{ Mouse = [System.Windows.Forms.Cursor]::Position; Origin = $form.Location }
+    })
+    $canvas.Add_MouseMove({
+        param($sender, $e)
+        $hover = $minRect.Contains($e.Location)
+        if ($hover -ne $view.HoverMin) {
+            $view.HoverMin = $hover
+            if ($hover) { $tip.Show('Minimize', $canvas, ($minRect.X - 20), ($minRect.Bottom + 4), 1500) } else { $tip.Hide($canvas) }
+            $canvas.Invalidate()
+        }
+        if ($view.Drag) {
+            $now = [System.Windows.Forms.Cursor]::Position
+            $form.Location = New-Object System.Drawing.Point(
+                ($view.Drag.Origin.X + $now.X - $view.Drag.Mouse.X),
+                ($view.Drag.Origin.Y + $now.Y - $view.Drag.Mouse.Y))
+        }
+    })
+    $canvas.Add_MouseUp({ $view.Drag = $null })
+    $canvas.Add_MouseLeave({
+        if ($view.HoverMin) { $view.HoverMin = $false; $tip.Hide($canvas); $canvas.Invalidate() }
+    })
+
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 33
+    $timer.Add_Tick({
+        try {
+            if ($S.Close) {
+                if ($animate -and $form.Opacity -gt 0.15 -and $form.WindowState -ne 'Minimized') {
+                    $form.Opacity = [Math]::Max(0, $form.Opacity - 0.2)
+                } else {
+                    $timer.Stop()
+                    $form.Close()
+                }
+                return
+            }
+            if ($animate -and $form.Opacity -lt 1) { $form.Opacity = [Math]::Min(1, $form.Opacity + 0.14) }
+
+            $step = [int]$S.Step
+            if ($step -ne $view.LastStep) {
+                $view.LastStep = $step
+                $view.StepStart = [DateTime]::UtcNow
+            }
+            $target = [Math]::Min(1.0, $step / [double]$S.StepCount)
+            $delta = $target - $view.Shown
+            if ((-not $animate) -or [Math]::Abs($delta) -lt 0.002) { $view.Shown = $target } else { $view.Shown += $delta * 0.14 }
+            $view.Tick++
+
+            # Nothing to draw while minimized.
+            if ($form.WindowState -ne 'Minimized') { $canvas.Invalidate() }
+        } catch {}
+    })
+
+    $form.Add_Shown({
+        # Raise it once so it does not open behind the window the user launched
+        # from, then let go: it must not stay above their other work.
+        $form.TopMost = $true
+        $form.Activate()
+        $form.TopMost = $false
+        $S.Ready = $true
+    })
+    $form.Add_FormClosed({ $timer.Stop() })
+    $timer.Start()
+    try {
+        [System.Windows.Forms.Application]::Run($form)
+    } finally {
+        $S.Closed = $true
+    }
+}
+
 if (-not $NoSplash) {
     try {
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        [System.Windows.Forms.Application]::EnableVisualStyles()
-
-        if (Get-WindowsUsesDarkApps) {
-            $cCanvas = [System.Drawing.Color]::FromArgb(28, 28, 31)   # #1C1C1F
-            $cBorder = [System.Drawing.Color]::FromArgb(46, 46, 53)   # #2E2E35
-            $cText   = [System.Drawing.Color]::FromArgb(245, 245, 244) # #F5F5F4
-            $cMuted  = [System.Drawing.Color]::FromArgb(168, 162, 158) # #A8A29E
-            $cTrack  = [System.Drawing.Color]::FromArgb(38, 38, 43)   # #26262B
-            $cAccent = [System.Drawing.Color]::FromArgb(46, 160, 67)  # #2EA043
-        } else {
-            $cCanvas = [System.Drawing.Color]::FromArgb(255, 255, 255) # #FFFFFF
-            $cBorder = [System.Drawing.Color]::FromArgb(231, 229, 223) # #E7E5DF
-            $cText   = [System.Drawing.Color]::FromArgb(28, 25, 23)    # #1C1917
-            $cMuted  = [System.Drawing.Color]::FromArgb(87, 83, 78)    # #57534E
-            $cTrack  = [System.Drawing.Color]::FromArgb(244, 243, 239) # #F4F3EF
-            $cAccent = [System.Drawing.Color]::FromArgb(27, 94, 32)    # #1B5E20
-        }
-
-        $splash = New-Object System.Windows.Forms.Form
-        $splash.FormBorderStyle = "None"
-        $splash.StartPosition = "CenterScreen"
-        $splash.Size = New-Object System.Drawing.Size(380, 150)
-        $splash.BackColor = $cBorder   # 1 px frame around the inner panel
-        $splash.Padding = New-Object System.Windows.Forms.Padding(1)
-        $splash.TopMost = $true
-        $splash.ShowInTaskbar = $false
-        $splash.Text = "Oberleaf"
-
-        $panel = New-Object System.Windows.Forms.Panel
-        $panel.Dock = "Fill"
-        $panel.BackColor = $cCanvas
-        $splash.Controls.Add($panel)
-
-        try {
-            # Read from disk rather than embedded as base64: a changed script is
-            # scanned before its first run, and the 9 KB blob added about 2 s.
-            $img = [System.Drawing.Image]::FromFile((Join-Path $ProjectRoot "assets\icon.png"))
-
-            $picLogo = New-Object System.Windows.Forms.PictureBox
-            $picLogo.Size = New-Object System.Drawing.Size(40, 40)
-            $picLogo.Location = New-Object System.Drawing.Point(24, 22)
-            $picLogo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-            $picLogo.Image = $img
-            $panel.Controls.Add($picLogo)
-
-            $bmp = New-Object System.Drawing.Bitmap($img)
-            $splash.Icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
-        } catch {}
-
-        $lblTitle = New-Object System.Windows.Forms.Label
-        $lblTitle.Text = "Oberleaf"
-        $lblTitle.Font = New-Object System.Drawing.Font("Georgia", 18, [System.Drawing.FontStyle]::Bold)
-        $lblTitle.ForeColor = $cText
-        $lblTitle.Location = New-Object System.Drawing.Point(74, 27)
-        $lblTitle.AutoSize = $true
-        $panel.Controls.Add($lblTitle)
-
-        $lblStatus = New-Object System.Windows.Forms.Label
-        $lblStatus.Text = "Starting"
-        $lblStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
-        $lblStatus.ForeColor = $cText
-        $lblStatus.Location = New-Object System.Drawing.Point(24, 80)
-        $lblStatus.Size = New-Object System.Drawing.Size(330, 20)
-        $panel.Controls.Add($lblStatus)
-
-        $lblDetail = New-Object System.Windows.Forms.Label
-        $lblDetail.Text = ""
-        $lblDetail.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
-        $lblDetail.ForeColor = $cMuted
-        $lblDetail.Location = New-Object System.Drawing.Point(24, 100)
-        $lblDetail.Size = New-Object System.Drawing.Size(330, 18)
-        $panel.Controls.Add($lblDetail)
-
-        # Determinate step bar: fills by completed steps, no marquee.
-        $barTrack = New-Object System.Windows.Forms.Panel
-        $barTrack.BackColor = $cTrack
-        $barTrack.Dock = "Bottom"
-        $barTrack.Height = 3
-        $panel.Controls.Add($barTrack)
-
-        $barFill = New-Object System.Windows.Forms.Panel
-        $barFill.BackColor = $cAccent
-        $barFill.Location = New-Object System.Drawing.Point(0, 0)
-        $barFill.Size = New-Object System.Drawing.Size(0, 3)
-        $barTrack.Controls.Add($barFill)
-
-        $splash.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-    } catch {}
+        $splashState = [hashtable]::Synchronized(@{
+            Step      = 0
+            StepCount = $StepNames.Count
+            StepNames = $StepNames
+            Detail    = ''
+            Activity  = ''
+            Close     = $false
+            Closed    = $false
+            Ready     = $false
+            Dark      = (Get-WindowsUsesDarkApps)
+            IconPath  = (Join-Path $ProjectRoot 'assets\icon.png')
+            Version   = (Get-AppVersion)
+        })
+        $splashRunspace = [runspacefactory]::CreateRunspace()
+        $splashRunspace.ApartmentState = 'STA'
+        $splashRunspace.ThreadOptions = 'ReuseThread'
+        $splashRunspace.Open()
+        $splashRunspace.SessionStateProxy.SetVariable('S', $splashState)
+        $splashShell = [powershell]::Create()
+        $splashShell.Runspace = $splashRunspace
+        [void]$splashShell.AddScript($SplashScript.ToString())
+        [void]$splashShell.BeginInvoke()
+    } catch {
+        $splashState = $null
+        $splashShell = $null
+    }
 }
 
 # Shows the step that is running now. $Index is the step's position in
 # $StepNames; the bar shows how many steps are behind it.
 function Update-Splash([int]$Index, [string]$Detail = "") {
-    $text = $StepNames[$Index]
-    Write-StartupLog "Step: $text"
-    if ($script:lblStatus) {
-        try {
-            $script:lblStatus.Text = $text
-            $script:lblDetail.Text = $Detail
-            $width = $script:barFill.Parent.ClientSize.Width
-            $script:barFill.Width = [int]($width * $Index / $StepNames.Count)
-            [System.Windows.Forms.Application]::DoEvents()
-        } catch {}
+    if ($Index -lt $StepNames.Count) { Write-StartupLog "Step: $($StepNames[$Index])" }
+    if ($script:splashState) {
+        $script:splashState.Detail = $Detail
+        $script:splashState.Activity = ''
+        $script:splashState.Step = $Index
     }
+}
+
+# One line under the status saying what the running step is doing right now.
+function Set-SplashActivity([string]$Text) {
+    if ($script:splashState) { $script:splashState.Activity = $Text }
 }
 
 function Close-Splash {
-    if ($script:splash) {
-        try { $script:splash.Close() } catch {}
-        $script:splash = $null
+    if ($script:splashState) {
+        $script:splashState.Close = $true
+        # Let the fade-out finish; never wait long on a window that is going away.
+        $until = [DateTime]::UtcNow.AddMilliseconds(600)
+        while (-not $script:splashState.Closed -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 20 }
+        $script:splashState = $null
+    }
+    if ($script:splashShell) {
+        try { $script:splashShell.Runspace.Dispose() } catch {}
+        try { $script:splashShell.Dispose() } catch {}
+        $script:splashShell = $null
     }
 }
 
-# Waits for a process while keeping the splash responsive.
+# The newest line of this session's log, cleaned up for one line of the splash.
+function Get-LogActivity {
+    try {
+        $last = Get-Content -Path $LogFile -Tail 3 -ErrorAction Stop | Where-Object { $_ -and $_.Trim() } | Select-Object -Last 1
+        if (-not $last) { return '' }
+        # Drop ANSI colour codes and anything the splash font cannot show.
+        $clean = ($last -replace "$([char]27)\[[0-9;]*[A-Za-z]", '') -replace '[^\x20-\x7E]', ''
+        return $clean.Trim()
+    } catch {
+        return ''
+    }
+}
+
+# Waits for a process, showing what it last wrote to the log.
 function Wait-Process-WithSplash($Proc) {
+    $nextRead = [DateTime]::UtcNow
     while (-not $Proc.HasExited) {
-        if ($script:splash) { [System.Windows.Forms.Application]::DoEvents() }
+        if ($script:splashState -and [DateTime]::UtcNow -ge $nextRead) {
+            Set-SplashActivity (Get-LogActivity)
+            $nextRead = [DateTime]::UtcNow.AddMilliseconds(400)
+        }
         Start-Sleep -Milliseconds 100
     }
     $Proc.WaitForExit()
+    Set-SplashActivity ''
 }
 
 # ------------------------------------------------------------------
@@ -447,7 +693,6 @@ if ($useBuild) {
 $ready = $false
 $deadline = [DateTime]::UtcNow.AddSeconds(90)
 while ([DateTime]::UtcNow -lt $deadline) {
-    if ($splash) { [System.Windows.Forms.Application]::DoEvents() }
     if ($useBuild) {
         $ready = (Test-PortOpen "127.0.0.1" $Port 40) -and (Test-HttpOk "$AppUrl/health" 1000)
     } else {
@@ -463,10 +708,11 @@ if ($ready) {
     Write-StartupLog "Server ready after $($launchClock.ElapsedMilliseconds) ms; opening $openUrl"
     Open-App $openUrl
     # The page shows its own startup screen; keep the splash up while the
-    # browser window appears so there is no blank gap between the two.
-    if ($splash) {
-        $until = [DateTime]::UtcNow.AddMilliseconds(700)
-        while ([DateTime]::UtcNow -lt $until) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
+    # browser window appears so there is no blank gap between the two. Marking
+    # every step done lets the bar reach the end before the window fades.
+    if ($splashState) {
+        Update-Splash $StepNames.Count
+        Start-Sleep -Milliseconds 700
     }
     Close-Splash
     exit 0

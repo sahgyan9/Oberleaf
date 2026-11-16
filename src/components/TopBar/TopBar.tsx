@@ -22,9 +22,11 @@ import {
   Users,
   Eraser,
   MonitorUp,
-  MoreHorizontal,
+  Wrench,
   ArrowDownToLine,
+  Search,
 } from 'lucide-react';
+import { OverflowBar, OverflowItem } from '../Common/OverflowBar';
 import { useTheme } from '../../context/ThemeContext';
 
 export type ViewMode = 'split' | 'code' | 'pdf';
@@ -71,7 +73,22 @@ interface TopBarProps {
   onOpenUpdateModal?: () => void;
   onCheckForUpdates?: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onOpenCommandPalette?: () => void;
 }
+
+const ICON_ACTION =
+  'flex items-center justify-center w-8 h-8 rounded-lg text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile';
+const LABEL_ACTION_BASE =
+  'flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition border btn-tactile whitespace-nowrap';
+const LABEL_ACTION_IDLE =
+  'text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder';
+const LABEL_ACTION = `${LABEL_ACTION_BASE} ${LABEL_ACTION_IDLE}`;
+
+const VIEW_MODES: { id: ViewMode; label: string; menuLabel: string; hint: string; Icon: typeof Code2 }[] = [
+  { id: 'code', label: 'Full Code Mode (Ctrl+7)', menuLabel: 'Editor only', hint: 'Ctrl+7', Icon: Code2 },
+  { id: 'split', label: 'Split Mode (Ctrl+8)', menuLabel: 'Editor and PDF', hint: 'Ctrl+8', Icon: Columns },
+  { id: 'pdf', label: 'Full PDF Mode (Ctrl+9)', menuLabel: 'PDF only', hint: 'Ctrl+9', Icon: FileText },
+];
 
 export const TopBar: React.FC<TopBarProps> = ({
   projectName,
@@ -104,6 +121,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenUpdateModal,
   onCheckForUpdates,
   onShowToast,
+  onOpenCommandPalette,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
@@ -186,9 +204,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className="h-14 border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel px-3 sm:px-4 flex items-center justify-between select-none relative z-30 transition-colors gap-2">
+    <header className="h-14 border-b border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel px-3 sm:px-4 flex items-center select-none relative z-30 transition-colors gap-2 min-w-0">
       {/* Left: Back to Projects, Brand / Project Switcher, and Save Status */}
-      <div className="flex items-center space-x-2.5 flex-shrink-0">
+      <div className="flex items-center gap-2 min-w-0 flex-shrink">
         {onBackToProjects && (
           <button
             aria-label="Back to All Projects"
@@ -202,12 +220,12 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
 
         {/* Brand & Project Switcher Dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative min-w-0" ref={dropdownRef}>
           <button
             aria-label="Switch or Browse Projects"
             onClick={() => setIsProjectsDropdownOpen((prev) => !prev)}
             title="Switch or Browse Projects"
-            className="flex items-center space-x-2 h-8 px-2.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition text-left group border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+            className="flex items-center gap-2 h-8 px-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition text-left group border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile max-w-full min-w-0"
           >
             <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
               <img
@@ -216,11 +234,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                 className="w-full h-full object-contain"
               />
             </div>
-            <span className="font-serif font-semibold text-sm tracking-tight text-[#1C1917] dark:text-[#F5F5F4] whitespace-nowrap">
+            <span className="hidden xl:inline font-serif font-semibold text-sm tracking-tight text-[#1C1917] dark:text-[#F5F5F4] whitespace-nowrap">
               Ober<span className="text-scholarly dark:text-scholarly-dark italic font-normal">leaf</span>
             </span>
-            <span className="text-stone-300 dark:text-stone-600 font-light text-xs select-none">/</span>
-            <span className="text-xs font-medium text-stone-700 dark:text-stone-300 group-hover:text-[#1C1917] dark:group-hover:text-white transition truncate max-w-[150px]">
+            <span className="hidden xl:inline text-stone-300 dark:text-stone-600 font-light text-xs select-none">/</span>
+            <span className="text-xs font-medium text-stone-700 dark:text-stone-300 group-hover:text-[#1C1917] dark:group-hover:text-white transition truncate min-w-0 max-w-[180px]" title={projectName}>
               {projectName || 'Select Project'}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-200 flex-shrink-0" />
@@ -327,7 +345,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Center Actions: Tactile Oxford Green Recompile Button */}
-      <div className="flex items-center space-x-2 flex-shrink-0 px-2">
+      <div className="flex items-center gap-2 flex-shrink-0 px-1">
         <button
           aria-label="Compile LaTeX (Ctrl+Enter)"
           onClick={onCompile}
@@ -341,7 +359,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Play className="w-3.5 h-3.5 fill-current" />
           )}
           <span>{isCompiling ? 'Compiling...' : 'Recompile'}</span>
-          <kbd className="hidden sm:inline-flex items-center ml-1 text-[10px] bg-black/25 text-white/95 px-1.5 py-0.5 rounded font-mono font-normal">
+          <kbd className="hidden md:inline-flex items-center ml-1 text-[10px] bg-black/25 text-white/95 px-1.5 py-0.5 rounded font-mono font-normal">
             Ctrl+↵
           </kbd>
         </button>
@@ -353,291 +371,380 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
       </div>
 
-      {/* Right Controls: View Mode, Collaboration, Tools & System */}
-      <div className="flex items-center space-x-1.5 flex-shrink-0">
-        {/* Layout Switchers */}
-        <div className="flex items-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder h-8">
-          <button
-            aria-label="Full Code Mode (Ctrl+7)"
-            onClick={() => onViewModeChange('code')}
-            title="Full Code Mode (Ctrl+7)"
-            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
-              viewMode === 'code'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
-                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
-            }`}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            aria-label="Split Mode (Ctrl+8)"
-            onClick={() => onViewModeChange('split')}
-            title="Split Mode (Ctrl+8)"
-            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
-              viewMode === 'split'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
-                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
-            }`}
-          >
-            <Columns className="w-3.5 h-3.5" />
-          </button>
-          <button
-            aria-label="Full PDF Mode (Ctrl+9)"
-            onClick={() => onViewModeChange('pdf')}
-            title="Full PDF Mode (Ctrl+9)"
-            className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
-              viewMode === 'pdf'
-                ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
-                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1 hidden sm:block" />
-
-        {/* Comments Button */}
-        {onOpenComments && (
-          <button
-            aria-label="Review Comments (Alt+M)"
-            onClick={onOpenComments}
-            title="Review Comments (Alt+M)"
-            className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-            <span className="hidden md:inline">Comments</span>
-            {openCommentsCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-scholarly dark:bg-scholarly-dark text-white text-[10px] font-bold">
-                {openCommentsCount}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* Live Collab Button */}
-        {onOpenCollab && (
-          <button
-            aria-label="Live Peer-to-Peer Collaboration"
-            onClick={onOpenCollab}
-            title="Live Peer-to-Peer Collaboration"
-            className={`flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition border btn-tactile whitespace-nowrap ${
-              isCollabActive
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                : 'text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder'
-            }`}
-          >
-            <Users className={`w-3.5 h-3.5 ${isCollabActive ? 'text-emerald-500 animate-pulse' : ''}`} />
-            <span className="hidden md:inline">
-              {isCollabActive ? `Live (${collabPeersCount})` : 'Collab'}
-            </span>
-          </button>
-        )}
-
-        {/* History & Checkpoints Button */}
-        {onOpenHistory && (
-          <button
-            aria-label="Version History & Git Checkpoints"
-            onClick={onOpenHistory}
-            title="Version History & Git Checkpoints"
-            className="flex items-center space-x-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-scholarly dark:hover:text-scholarly-dark hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile whitespace-nowrap"
-          >
-            <History className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
-            <span className="hidden md:inline">History</span>
-          </button>
-        )}
-
-        {/* Update Available Badge */}
-        {hasUpdate && onOpenUpdateModal && (
-          <button
-            aria-label="A new Oberleaf update is available! Click to view details and install."
-            onClick={onOpenUpdateModal}
-            title="A new Oberleaf update is available! Click to view details and install."
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold animate-pulse hover:bg-emerald-500/25 transition btn-tactile cursor-pointer mr-0.5"
-          >
-            <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="hidden sm:inline">Update Available</span>
-          </button>
-        )}
-
-        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1 hidden sm:block" />
-
-        {/* Workspace Tools Dropdown */}
-        <div className="relative" ref={toolsRef}>
-          <button
-            aria-label="Workspace Tools & Diagnostics"
-            onClick={() => setIsToolsOpen((prev) => !prev)}
-            title="Workspace Tools & Diagnostics"
-            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-            {((isDoctorHealthy !== null && !isDoctorHealthy) || (gitSyncStatus && gitSyncStatus.ahead > 0)) && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-diagnostic dark:bg-diagnostic-dark" />
-            )}
-          </button>
-
-          {isToolsOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100 z-50">
-              <div className="px-2.5 py-1 text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wider font-sans">
-                Workspace Tools
-              </div>
-
-              {/* GitHub Remote Sync */}
-              {onOpenSyncModal && (
-                <button
-                  onClick={() => {
-                    setIsToolsOpen(false);
-                    onOpenSyncModal();
-                  }}
-                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Github className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                    <span>GitHub Remote Sync</span>
-                  </div>
-                  {gitSyncStatus && gitSyncStatus.ahead > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
-                      ↑{gitSyncStatus.ahead}
-                    </span>
-                  )}
-                </button>
-              )}
-
-              {/* Dependency Doctor */}
-              <button
-                onClick={() => {
-                  setIsToolsOpen(false);
-                  onOpenDoctor();
-                }}
-                className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
-              >
-                <div className="flex items-center space-x-2">
-                  <Activity className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                  <span>TeX Diagnostics & Doctor</span>
-                </div>
-                {isDoctorHealthy !== null && (
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      isDoctorHealthy ? 'bg-scholarly dark:bg-scholarly-dark' : 'bg-diagnostic dark:bg-diagnostic-dark'
-                    }`}
-                  />
-                )}
-              </button>
-
-              {/* Clean Build Cache */}
-              {onCleanBuild && (
-                <button
-                  onClick={() => {
-                    setIsToolsOpen(false);
-                    onCleanBuild();
-                  }}
-                  className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
-                >
-                  <Eraser className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                  <span>Clean Build Cache</span>
-                </button>
-              )}
-
-              {/* Reveal in File Explorer */}
-              <button
-                onClick={async () => {
-                  setIsToolsOpen(false);
-                  try {
-                    const res = await fetch('/api/system/reveal-in-explorer', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ projectId }),
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                      onShowToast?.(`Opened in File Explorer: ${data.path}`, 'info');
-                    } else {
-                      onShowToast?.(data.error || 'Failed to open File Explorer.', 'error');
-                    }
-                  } catch (err: any) {
-                    onShowToast?.(`Connection error: ${err.message}`, 'error');
-                  }
-                }}
-                className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
-              >
-                <FolderOpen className="w-4 h-4 text-scholarly-teal dark:text-scholarly-tealDark" />
-                <span>Reveal in File Explorer</span>
-              </button>
-
-              {/* Add Desktop Shortcut */}
-              <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">
-                <button
-                  onClick={handleAddShortcut}
-                  disabled={isAddingShortcut}
-                  className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left disabled:opacity-50"
-                >
-                  {isAddingShortcut ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
-                  ) : shortcutAdded ? (
-                    <Check className="w-4 h-4 text-scholarly" />
-                  ) : (
-                    <MonitorUp className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                  )}
-                  <span>{shortcutAdded ? 'Shortcut Added!' : (hasShortcut ? 'Recreate Desktop Shortcut' : 'Add Desktop Shortcut')}</span>
-                </button>
-                {onCheckForUpdates && (
+      {/* Right controls. They sit in an OverflowBar so that on a narrow window the
+          labels drop first and the rest move into its More menu; before this
+          the row was fixed-width and its last buttons were pushed off screen. */}
+      <OverflowBar
+        className="flex-1"
+        gap={6}
+        moreLabel="More actions"
+        moreButtonClassName={ICON_ACTION}
+        items={[
+          { id: 'spacer', spacer: true, render: () => null },
+          {
+            id: 'view-mode',
+            priority: 9,
+            render: () => (
+              <div className="flex items-center bg-surface-lightSubtle dark:bg-surface-darkSubtle p-0.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder h-8">
+                {VIEW_MODES.map((m) => (
                   <button
-                    onClick={() => {
-                      setIsToolsOpen(false);
-                      onCheckForUpdates();
-                    }}
-                    className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                    key={m.id}
+                    type="button"
+                    aria-label={m.label}
+                    aria-pressed={viewMode === m.id}
+                    onClick={() => onViewModeChange(m.id)}
+                    title={m.label}
+                    className={`h-7 px-2 rounded-md text-xs transition btn-tactile flex items-center justify-center ${
+                      viewMode === m.id
+                        ? 'bg-surface-lightPanel dark:bg-stone-800 text-scholarly dark:text-scholarly-dark shadow-xs font-medium'
+                        : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+                    }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <ArrowDownToLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>Check for Updates</span>
-                    </div>
-                    {hasUpdate && (
-                      <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-white text-[10px] font-bold">New</span>
-                    )}
+                    <m.Icon className="w-3.5 h-3.5" />
                   </button>
+                ))}
+              </div>
+            ),
+            menu: VIEW_MODES.map((m) => ({
+              label: m.menuLabel,
+              icon: <m.Icon className="w-3.5 h-3.5" />,
+              onClick: () => onViewModeChange(m.id),
+              active: viewMode === m.id,
+              hint: m.hint,
+            })),
+          },
+          ...(onOpenCommandPalette
+            ? [
+                {
+                  id: 'palette',
+                  priority: 7,
+                  render: (compact: boolean) => (
+                    <button
+                      type="button"
+                      aria-label="Search files, sections and commands (Ctrl+K)"
+                      onClick={onOpenCommandPalette}
+                      title="Search files, sections and commands (Ctrl+K)"
+                      className={LABEL_ACTION}
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      {!compact && <kbd className="font-mono text-[10px] text-stone-400 dark:text-stone-500">Ctrl+K</kbd>}
+                    </button>
+                  ),
+                  menu: [{ label: 'Search and commands', icon: <Search className="w-3.5 h-3.5" />, onClick: onOpenCommandPalette, hint: 'Ctrl+K' }],
+                } as OverflowItem,
+              ]
+            : []),
+          ...(onOpenComments
+            ? [
+                {
+                  id: 'comments',
+                  priority: 5,
+                  render: (compact: boolean) => (
+                    <button
+                      type="button"
+                      aria-label="Review Comments (Alt+M)"
+                      onClick={onOpenComments}
+                      title="Review Comments (Alt+M)"
+                      className={LABEL_ACTION}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                      {!compact && <span>Comments</span>}
+                      {openCommentsCount > 0 && (
+                        <span className="px-1.5 rounded-full bg-scholarly dark:bg-scholarly-dark text-white text-[10px] font-bold">
+                          {openCommentsCount}
+                        </span>
+                      )}
+                    </button>
+                  ),
+                  menu: [
+                    {
+                      label: openCommentsCount > 0 ? `Comments (${openCommentsCount} open)` : 'Comments',
+                      icon: <MessageSquare className="w-3.5 h-3.5" />,
+                      onClick: onOpenComments,
+                      hint: 'Alt+M',
+                    },
+                  ],
+                } as OverflowItem,
+              ]
+            : []),
+          ...(onOpenCollab
+            ? [
+                {
+                  id: 'collab',
+                  priority: 4,
+                  render: (compact: boolean) => (
+                    <button
+                      type="button"
+                      aria-label="Live Peer-to-Peer Collaboration"
+                      onClick={onOpenCollab}
+                      title="Live Peer-to-Peer Collaboration"
+                      className={`${LABEL_ACTION_BASE} ${
+                        isCollabActive
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : LABEL_ACTION_IDLE
+                      }`}
+                    >
+                      <Users className={`w-3.5 h-3.5 ${isCollabActive ? 'text-emerald-500' : ''}`} />
+                      {(!compact || isCollabActive) && <span>{isCollabActive ? `Live (${collabPeersCount})` : 'Collab'}</span>}
+                    </button>
+                  ),
+                  menu: [
+                    {
+                      label: isCollabActive ? `Collaboration: live (${collabPeersCount})` : 'Collaborate',
+                      icon: <Users className="w-3.5 h-3.5" />,
+                      onClick: onOpenCollab,
+                    },
+                  ],
+                } as OverflowItem,
+              ]
+            : []),
+          ...(onOpenHistory
+            ? [
+                {
+                  id: 'history',
+                  priority: 6,
+                  render: (compact: boolean) => (
+                    <button
+                      type="button"
+                      aria-label="Version History & Git Checkpoints"
+                      onClick={onOpenHistory}
+                      title="Version History & Git Checkpoints"
+                      className={LABEL_ACTION}
+                    >
+                      <History className="w-3.5 h-3.5 text-scholarly dark:text-scholarly-dark" />
+                      {!compact && <span>History</span>}
+                    </button>
+                  ),
+                  menu: [{ label: 'Version history', icon: <History className="w-3.5 h-3.5" />, onClick: onOpenHistory }],
+                } as OverflowItem,
+              ]
+            : []),
+          ...(hasUpdate && onOpenUpdateModal
+            ? [
+                {
+                  id: 'update',
+                  priority: 8,
+                  render: (compact: boolean) => (
+                    <button
+                      type="button"
+                      aria-label="An Oberleaf update is available. View details and install."
+                      onClick={onOpenUpdateModal}
+                      title="An Oberleaf update is available. View details and install."
+                      className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-500/25 transition btn-tactile whitespace-nowrap"
+                    >
+                      <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      {!compact && <span>Update Available</span>}
+                    </button>
+                  ),
+                  menu: [{ label: 'Update available', icon: <ArrowDownToLine className="w-3.5 h-3.5" />, onClick: onOpenUpdateModal }],
+                } as OverflowItem,
+              ]
+            : []),
+          {
+            id: 'sep-tools',
+            separator: true,
+            render: () => <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder" />,
+          },
+          {
+            // No menu entry: this one always stays in the bar.
+            id: 'tools',
+            priority: 100,
+            render: () => (
+              <div className="relative" ref={toolsRef}>
+                <button
+                  aria-label="Workspace Tools & Diagnostics"
+                  onClick={() => setIsToolsOpen((prev) => !prev)}
+                  title="Workspace Tools & Diagnostics"
+                  className="relative flex items-center justify-center w-8 h-8 rounded-lg text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
+                >
+                  <Wrench className="w-4 h-4" />
+                  {((isDoctorHealthy !== null && !isDoctorHealthy) || (gitSyncStatus && gitSyncStatus.ahead > 0)) && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-diagnostic dark:bg-diagnostic-dark" />
+                  )}
+                </button>
+
+                {isToolsOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder shadow-xl p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100 z-50">
+                    <div className="px-2.5 py-1 text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wider font-sans">
+                      Workspace Tools
+                    </div>
+
+                    {/* GitHub Remote Sync */}
+                    {onOpenSyncModal && (
+                      <button
+                        onClick={() => {
+                          setIsToolsOpen(false);
+                          onOpenSyncModal();
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Github className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                          <span>GitHub Remote Sync</span>
+                        </div>
+                        {gitSyncStatus && gitSyncStatus.ahead > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
+                            ↑{gitSyncStatus.ahead}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Dependency Doctor */}
+                    <button
+                      onClick={() => {
+                        setIsToolsOpen(false);
+                        onOpenDoctor();
+                      }}
+                      className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Activity className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                        <span>TeX Diagnostics & Doctor</span>
+                      </div>
+                      {isDoctorHealthy !== null && (
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            isDoctorHealthy ? 'bg-scholarly dark:bg-scholarly-dark' : 'bg-diagnostic dark:bg-diagnostic-dark'
+                          }`}
+                        />
+                      )}
+                    </button>
+
+                    {/* Clean Build Cache */}
+                    {onCleanBuild && (
+                      <button
+                        onClick={() => {
+                          setIsToolsOpen(false);
+                          onCleanBuild();
+                        }}
+                        className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                      >
+                        <Eraser className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                        <span>Clean Build Cache</span>
+                      </button>
+                    )}
+
+                    {/* Reveal in File Explorer */}
+                    <button
+                      onClick={async () => {
+                        setIsToolsOpen(false);
+                        try {
+                          const res = await fetch('/api/system/reveal-in-explorer', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ projectId }),
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            onShowToast?.(`Opened in File Explorer: ${data.path}`, 'info');
+                          } else {
+                            onShowToast?.(data.error || 'Failed to open File Explorer.', 'error');
+                          }
+                        } catch (err: any) {
+                          onShowToast?.(`Connection error: ${err.message}`, 'error');
+                        }
+                      }}
+                      className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                    >
+                      <FolderOpen className="w-4 h-4 text-scholarly-teal dark:text-scholarly-tealDark" />
+                      <span>Reveal in File Explorer</span>
+                    </button>
+
+                    {/* Add Desktop Shortcut */}
+                    <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">
+                      <button
+                        onClick={handleAddShortcut}
+                        disabled={isAddingShortcut}
+                        className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left disabled:opacity-50"
+                      >
+                        {isAddingShortcut ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-scholarly" />
+                        ) : shortcutAdded ? (
+                          <Check className="w-4 h-4 text-scholarly" />
+                        ) : (
+                          <MonitorUp className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                        )}
+                        <span>{shortcutAdded ? 'Shortcut Added!' : (hasShortcut ? 'Recreate Desktop Shortcut' : 'Add Desktop Shortcut')}</span>
+                      </button>
+                      {onCheckForUpdates && (
+                        <button
+                          onClick={() => {
+                            setIsToolsOpen(false);
+                            onCheckForUpdates();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <ArrowDownToLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span>Check for Updates</span>
+                          </div>
+                          {hasUpdate && (
+                            <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-white text-[10px] font-bold">New</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-        <div className="h-4 w-px bg-surface-lightBorder dark:bg-surface-darkBorder mx-1" />
-
-        {/* Dark/Light Toggle */}
-        <button
-          aria-label="Toggle Light / Dark Mode"
-          onClick={toggleTheme}
-          title="Toggle Light / Dark Mode"
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition border border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder btn-tactile"
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-stone-700" />}
-        </button>
-
-        {/* Full Screen Zen Mode Toggle */}
-        {onToggleFullscreen && (
-          <button
-            aria-label={
-              isFullscreen
-                ? 'Exit Full Screen Zen Mode (F11, Ctrl+Shift+F, or Esc)'
-                : 'Enter Full Screen Zen Mode (F11 or Ctrl+Shift+F)'
-            }
-            onClick={onToggleFullscreen}
-            title={
-              isFullscreen
-                ? 'Exit Full Screen Zen Mode (F11, Ctrl+Shift+F, or Esc)'
-                : 'Enter Full Screen Zen Mode (F11 or Ctrl+Shift+F)'
-            }
-            className={`flex items-center justify-center w-8 h-8 rounded-lg transition border btn-tactile ${
-              isFullscreen
-                ? 'bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark shadow-xs border-scholarly/20 dark:border-scholarly-dark/30'
-                : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle border-transparent hover:border-surface-lightBorder dark:hover:border-surface-darkBorder'
-            }`}
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        )}
-      </div>
+            ),
+          },
+          {
+            id: 'theme',
+            priority: 2,
+            render: () => (
+              <button
+                type="button"
+                aria-label="Toggle Light / Dark Mode"
+                onClick={toggleTheme}
+                title="Toggle Light / Dark Mode"
+                className={ICON_ACTION}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-stone-700" />}
+              </button>
+            ),
+            menu: [
+              {
+                label: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+                icon: theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />,
+                onClick: toggleTheme,
+              },
+            ],
+          },
+          ...(onToggleFullscreen
+            ? [
+                {
+                  id: 'fullscreen',
+                  priority: 1,
+                  render: () => (
+                    <button
+                      type="button"
+                      aria-label={isFullscreen ? 'Exit Full Screen (F11, Ctrl+Shift+F, or Esc)' : 'Enter Full Screen (F11 or Ctrl+Shift+F)'}
+                      onClick={onToggleFullscreen}
+                      title={isFullscreen ? 'Exit Full Screen (F11, Ctrl+Shift+F, or Esc)' : 'Enter Full Screen (F11 or Ctrl+Shift+F)'}
+                      className={
+                        isFullscreen
+                          ? 'flex items-center justify-center w-8 h-8 rounded-lg transition border btn-tactile bg-scholarly-subtle dark:bg-scholarly-darkSubtle text-scholarly dark:text-scholarly-dark border-scholarly/20 dark:border-scholarly-dark/30'
+                          : ICON_ACTION
+                      }
+                    >
+                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+                  ),
+                  menu: [
+                    {
+                      label: isFullscreen ? 'Exit full screen' : 'Full screen',
+                      icon: isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />,
+                      onClick: onToggleFullscreen,
+                      hint: 'F11',
+                    },
+                  ],
+                } as OverflowItem,
+              ]
+            : []),
+        ]}
+      />
     </header>
   );
 };

@@ -1,0 +1,72 @@
+% Lecture notes: numbered definitions, theorems and examples, with a table
+% of contents.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+
+% Theorem-like environments share one counter per section.
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+% Shortcuts you will type a hundred times.
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+
+\title{Course Name: Lecture Notes}
+\author{Lecturer: Professor Name \\ Notes by Your Name}
+\date{Semester, Year}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Sequences and Limits}
+
+\begin{definition}
+A sequence $(a_n)$ in $\R$ \emph{converges} to $L$ if for every
+$\varepsilon > 0$ there is an $N \in \N$ such that $\abs{a_n - L} < \varepsilon$
+for all $n \ge N$.
+\end{definition}
+
+\begin{example}
+The sequence $a_n = 1/n$ converges to $0$: given $\varepsilon > 0$, take
+$N > 1/\varepsilon$.
+\end{example}
+
+\begin{theorem}[Uniqueness of limits]\label{thm:unique}
+A convergent sequence has exactly one limit.
+\end{theorem}
+
+\begin{proof}
+Suppose $a_n \to L$ and $a_n \to M$. For any $\varepsilon > 0$ and $n$ large,
+\[
+  \abs{L - M} \le \abs{L - a_n} + \abs{a_n - M} < 2\varepsilon,
+\]
+so $L = M$.
+\end{proof}
+
+\begin{remark}
+Theorem~\ref{thm:unique} is what makes the notation $\lim a_n$ meaningful.
+\end{remark}
+
+\section{Continuity}
+
+\begin{definition}
+A function $f \colon \R \to \R$ is \emph{continuous} at $c$ if
+$\lim_{x \to c} f(x) = f(c)$.
+\end{definition}
+
+\end{document}

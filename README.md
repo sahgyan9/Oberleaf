@@ -73,14 +73,18 @@ Your numbers will differ with CPU, TeX distribution, antivirus scanning and docu
 - **Live equation preview:** a floating KaTeX card for inline (`$...$`), `\[...\]` and display environments (`equation`, `align`, `gather`, `multline` and their starred forms) at the cursor.
 - **Authoring tools:**
   - **Insert Image:** pick an uploaded figure, set width, caption and label.
-  - **Insert Table:** grid-size picker with header and border options.
-  - **Project templates:** Blank Document, CV, IEEE Conference Paper and Master's/PhD Thesis.
+  - **Insert Table:** paste cells copied from Excel or Google Sheets, a CSV file or a Markdown table and get a `booktabs` table. Numeric columns are right-aligned, and `&`, `%`, `_` and similar characters are escaped. An empty grid is still available.
+  - **Template gallery:** 15 templates with a preview of each first page, grouped by use: research article, arXiv preprint, IEEE conference paper, Physical Review (REVTeX), response to reviewers, multi-file thesis, research proposal, lab report, problem set, lecture notes, Beamer slides, A0 poster, CV, cover letter and blank document. Each one is a folder of plain `.tex` files under [templates/](templates/), and every one is compiled by `npm run build:template-previews`.
+  - **Symbols and reference panel** (`Ctrl + Shift + M`): a searchable grid of math symbols, a cheat sheet of the constructs a first document needs, and the keyboard shortcuts. It stays open beside the editor. A symbol clicked outside an equation is wrapped in `$...$`.
+  - **Search and commands** (`Ctrl + K`): jump to any file, heading or project, or run any toolbar action, from one box.
+  - **Word count:** the status bar counts the words of the open file, leaving out commands, comments, math and the preamble.
   - **File upload:** drag and drop `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.pdf`, `.bib`, `.tex`, `.sty`, `.cls` and `.txt` files into the file tree.
 - **Auto-save:** edits are saved 800 ms after you stop typing, and any pending save is flushed before each compile.
 - **Error explanations:** 52 common LaTeX and BibTeX mistakes, drawn from Overleaf's error guide and l2tabu, are explained in plain English. 27 of them come with a one-click fix you can preview first: a typo correction such as `\textbff` to `\textbf`, the missing package, an escaped `&`, a matching `\end{...}`, or a unit for `width=0.5`. Each one is a test case compiled with real TeX, with logs recorded on both MiKTeX and TeX Live; [docs/ERROR_COVERAGE.md](docs/ERROR_COVERAGE.md) lists them. Errors outside that list show the raw TeX message with a generic hint.
 - **Document outline:** a section tree in the sidebar. Click a heading to jump to it, or drag a section to move it and everything under it.
 - **SyncTeX:** `Ctrl + Alt + J` jumps from the cursor to the matching place in the PDF, and double-clicking the PDF jumps back to the source.
-- **Citations and references:** autocomplete for `\cite`, `\ref`, `\eqref` and `\includegraphics`, and an Insert Citation dialog that lists the project's bibliography and can add a new BibTeX entry.
+- **Citations and references:** autocomplete for `\cite`, `\ref`, `\eqref` and `\includegraphics`, and an Insert Citation dialog that lists the project's bibliography. Its Look Up tab takes a DOI, an arXiv ID, a link to either, or a paper title, writes the BibTeX entry, picks a citation key and inserts the `\cite`. A paper already in the bibliography is cited, not added twice.
+- **Toolbars that do not hide controls:** on a narrow window or panel, toolbar labels drop to icons first and the remaining controls move into a More menu. Panels have minimum widths in pixels, so the sidebar cannot be squeezed below what its header needs.
 - **Review comments:** press `Alt + M` on a line or selection to start a comment thread anchored to it. Threads can be replied to and resolved, and are stored in the project folder.
 - **History and GitHub sync:** each project is a Git repository. Commit with a message, mark milestones, compare any version in a side-by-side diff, and push to or pull from a GitHub remote.
 - **Live collaboration:** share a project over the local network or through a temporary public link, and edit it together with live cursors. See [Network & Privacy](#network-and-privacy) for what this sends where.
@@ -157,10 +161,11 @@ Projects are stored and compiled on your machine. Oberleaf makes these network r
 | Every launch | UI fonts | Google Fonts (`fonts.googleapis.com`) |
 | Shortly after launch | Check for a newer version (`git fetch` of `main`; an update is only offered, and only applied, as a fast-forward that cannot discard local commits or edits) | GitHub (`github.com`) |
 | First compile that needs a missing package (MiKTeX) | Package download | MiKTeX package repositories |
+| Only when you press Look Up in the citation dialog | The DOI, arXiv ID or title you typed | `doi.org`, `export.arxiv.org` or `api.crossref.org` |
 | Only when you start collaboration | Peer discovery; edits then travel peer-to-peer | Public y-webrtc signaling servers |
 | Only when you start a share tunnel | Expose the local app at a public URL | Cloudflare (`cloudflared`) |
 
-No document content is sent anywhere unless you start collaboration or a share tunnel.
+No document content is sent anywhere unless you start collaboration or a share tunnel. A citation lookup sends only the text typed into the lookup box.
 
 ---
 
@@ -185,6 +190,8 @@ No document content is sent anywhere unless you start collaboration or a share t
 | `Ctrl + I` (or `Cmd + I`) | Italic (`\textit`) in the editor |
 | `Ctrl + S` (or `Cmd + S`) | Save active file |
 | `Ctrl + Alt + J` | SyncTeX forward search (cursor to PDF) |
+| `Ctrl + K` (or `Ctrl + Shift + P`) | Search files, headings, projects and commands |
+| `Ctrl + Shift + M` | Symbols and reference panel |
 
 ---
 
@@ -199,7 +206,10 @@ Oberleaf/
 │   ├── compiler.ts          # latexmk/pdflatex runner, log parser, error explanations
 │   ├── doctor.ts            # TeX Diagnostics checks and repairs
 │   ├── texKnowledge.ts      # Package/command tables the error rules look up
-│   └── projects.ts          # Project storage and templates
+│   ├── projects.ts          # Project storage
+│   ├── templates.ts         # Template catalog, read from templates/
+│   └── citationLookup.ts    # DOI, arXiv and title lookup to BibTeX
+├── templates/               # One folder of .tex files per project template
 ├── tests/                   # Error corpus, recorded TeX logs, unit tests
 ├── src/                     # React 18 + Vite + Tailwind CSS frontend
 │   ├── components/

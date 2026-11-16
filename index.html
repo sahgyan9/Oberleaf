@@ -55,10 +55,14 @@
         background: #FFFFFF; border: 1px solid #E7E5DF; border-radius: 10px; overflow: hidden;
       }
       html.dark .boot-card { background: #1C1C1F; border-color: #2E2E35; }
+      /* Entrance and exit: the card settles in, and eases out with the fade. */
+      .boot-card { animation: boot-rise 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both; transition: transform 160ms ease-out; }
+      #boot.boot-hide .boot-card { transform: scale(0.985); }
+      .boot-brand img { animation: boot-logo 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
       .boot-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
       .boot-brand span { font: 600 20px/1 Newsreader, Georgia, 'Times New Roman', serif; letter-spacing: -0.01em; }
       .boot-steps { list-style: none; margin: 0; padding: 0; }
-      .boot-steps li { display: flex; align-items: center; gap: 10px; padding: 5px 0; color: #57534E; }
+      .boot-steps li { display: flex; align-items: center; gap: 10px; padding: 5px 0; color: #57534E; transition: color 160ms ease-out; }
       html.dark .boot-steps li { color: #A8A29E; }
       .boot-steps li[data-state="active"], .boot-steps li[data-state="error"] { color: inherit; }
       .boot-mark { flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #D6D3CD; color: #1B5E20; }
@@ -66,7 +70,7 @@
       li[data-state="active"] .boot-mark { border-color: #E7E5DF; border-top-color: #1B5E20; animation: boot-spin 0.9s linear infinite; }
       html.dark li[data-state="active"] .boot-mark { border-color: #2E2E35; border-top-color: #2EA043; }
       li[data-state="done"] .boot-mark, li[data-state="error"] .boot-mark { border: 0; }
-      .boot-mark svg { display: block; width: 14px; height: 14px; }
+      .boot-mark svg { display: block; width: 14px; height: 14px; animation: boot-pop 240ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
       .boot-msg { margin: 12px 0 0; font-size: 13px; color: #57534E; }
       html.dark .boot-msg { color: #A8A29E; }
       .boot-msg code { font: 12px 'JetBrains Mono', Consolas, monospace; }
@@ -78,15 +82,29 @@
       .boot-actions button.boot-primary { background: #1B5E20; border-color: #1B5E20; color: #FFFFFF; }
       html.dark .boot-actions button { background: #26262B; border-color: #2E2E35; }
       html.dark .boot-actions button.boot-primary { background: #2EA043; border-color: #2EA043; color: #141416; }
-      .boot-bar { height: 3px; margin: 20px -24px 0; background: #F4F3EF; }
+      .boot-bar { position: relative; overflow: hidden; height: 3px; margin: 20px -24px 0; background: #F4F3EF; }
       html.dark .boot-bar { background: #26262B; }
-      .boot-bar div { height: 100%; width: 0; background: #1B5E20; transition: width 200ms ease-out; }
+      .boot-bar div { position: relative; z-index: 1; height: 100%; width: 0; background: #1B5E20; transition: width 320ms cubic-bezier(0.2, 0.7, 0.2, 1); }
       html.dark .boot-bar div { background: #2EA043; }
+      /* The solid fill counts finished steps. While a step runs, a band sweeps
+         the part of the track that is still empty: activity, not a made-up
+         percentage. */
+      .boot-bar::after {
+        content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 28%;
+        background: rgba(27, 94, 32, 0.35); animation: boot-sweep 1.2s linear infinite;
+      }
+      html.dark .boot-bar::after { background: rgba(46, 160, 67, 0.4); }
+      #boot.boot-stalled .boot-bar::after, #boot.boot-hide .boot-bar::after { animation: none; opacity: 0; }
       #boot [hidden] { display: none !important; }
       @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-rise { from { opacity: 0; transform: translateY(8px) scale(0.985); } }
+      @keyframes boot-logo { from { opacity: 0; transform: scale(0.8) rotate(-8deg); } }
+      @keyframes boot-pop { from { transform: scale(0.4); opacity: 0; } }
+      @keyframes boot-sweep { from { transform: translateX(-100%); } to { transform: translateX(460%); } }
       @media (prefers-reduced-motion: reduce) {
-        #boot, .boot-bar div { transition: none; }
-        li[data-state="active"] .boot-mark { animation: none; }
+        #boot, .boot-bar div, .boot-card, .boot-steps li { transition: none; }
+        li[data-state="active"] .boot-mark, .boot-card, .boot-brand img, .boot-mark svg { animation: none; }
+        .boot-bar::after { display: none; }
       }
     </style>
   </head>
@@ -137,8 +155,10 @@
           steps.forEach(function (s) {
             var st = state[s.id] || 'pending';
             var li = document.getElementById('boot-step-' + s.id);
-            li.setAttribute('data-state', st);
-            li.firstChild.innerHTML = st === 'done' ? CHECK : st === 'error' ? ALERT : '';
+            if (li.getAttribute('data-state') !== st) {
+              li.setAttribute('data-state', st);
+              li.firstChild.innerHTML = st === 'done' ? CHECK : st === 'error' ? ALERT : '';
+            }
             if (st === 'done') done++;
           });
           bar.style.width = Math.round((done / steps.length) * 100) + '%';
@@ -161,6 +181,7 @@
           msg.appendChild(document.createTextNode(' in the Oberleaf folder.'));
           msg.hidden = false;
           actions.hidden = false;
+          root.className = 'boot-stalled';
         }
 
         document.getElementById('boot-retry').onclick = function () { location.reload(); };

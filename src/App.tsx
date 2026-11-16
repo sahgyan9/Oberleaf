@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle, ImperativePanelHandle } from 'react-resizable-panels';
 import { TopBar, ViewMode, ProjectInfo } from './components/TopBar/TopBar';
 import { StatusBar } from './components/StatusBar/StatusBar';
@@ -33,6 +33,13 @@ import { UpdateModal, UpdateInfo } from './components/Update/UpdateModal';
 import { extractLatexTitle, getLatexPdfFilename } from './utils/latexTitle';
 import { useToast, ToastContainer } from './components/Toast/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useWindowWidth, pxToPanelPercent } from './hooks/useElementWidth';
+import { CommandPalette, type PaletteItem } from './components/CommandPalette/CommandPalette';
+import { ReferencePanel } from './components/Reference/ReferencePanel';
+import { countLatexWords } from './utils/wordCount';
+import { extractMathAtPosition } from './utils/mathDetector';
+import { parseLatexOutline } from './utils/latexOutline';
+import { useTheme } from './context/ThemeContext';
 import {
   DetectedMissingPackage,
   scanMissingPackages,
@@ -223,6 +230,9 @@ export const App: React.FC = () => {
   const [imageModalNeedsGraphicx, setImageModalNeedsGraphicx] = useState<boolean>(false);
   const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState<boolean>(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
+  const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
+  const { theme, toggleTheme } = useTheme();
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
   const [uploadQueue, setUploadQueue] = useState<UploadFileItem[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -303,6 +313,16 @@ export const App: React.FC = () => {
   // The \includegraphics{} an in-flight picker upload will fill once it lands.
   const pendingPickRef = useRef<ImageAtCursor | null>(null);
   const pdfViewerRef = useRef<PDFViewerHandle>(null);
+  // Panel floors in pixels, converted to the percentages the panel library
+  // takes: a percentage floor alone let the sidebar shrink to under 100 px on
+  // a small window, which is what crushed its header controls.
+  const windowWidth = useWindowWidth();
+  const panelGroupWidth = Math.max(320, windowWidth - (fileTreeCollapsed ? 40 : 0));
+  const sidebarMinSize = pxToPanelPercent(190, panelGroupWidth);
+  const sidebarMaxSize = Math.max(sidebarMinSize + 5, Math.min(45, pxToPanelPercent(480, panelGroupWidth, 45)));
+  const sidebarDefaultSize = Math.min(sidebarMaxSize, Math.max(sidebarMinSize, pxToPanelPercent(240, panelGroupWidth)));
+  const contentMinSize = pxToPanelPercent(300, panelGroupWidth);
+
   const fileTreePanelRef = useRef<ImperativePanelHandle>(null);
   const pdfPanelRef = useRef<ImperativePanelHandle>(null);
   const autoSaveTimerRef = useRef<any>(null);
@@ -1340,11 +1360,14 @@ export const App: React.FC = () => {
           /(\\documentclass(?:\[.*?\])?\{.*?\})/,
           `$1\n${preambleAddition}`
         );
+        setEditorContent(updatedContent);
+        saveActiveFile(updatedContent);
       } else {
-        updatedContent = preambleAddition + '\n' + updatedContent;
+        // A chapter or section file has no preamble. Writing \usepackage at
+        // its top would put it after \begin{document}, which is an error; the
+        // line belongs in the main document instead.
+        addToast(`This needs ${preambleAddition.trim()} in the preamble of ${mainFilePath}. Add it there if it is not already.`, 'info');
       }
-      setEditorContent(updatedContent);
-      saveActiveFile(updatedContent);
     }
 
     if (monacoEditorRef.current) {
@@ -1925,6 +1948,126 @@ export const App: React.FC = () => {
     }, 250);
   }, []);
 
+  // Inserts a math symbol from the reference panel. In running text the
+  // symbol would be an error ("Missing $ inserted"), so it is wrapped there.
+  const handleInsertSymbol = useCallback((command: string) => {
+    const editor = monacoEditorRef.current;
+    if (!editor) return;
+    const model = editor.getModel();
+    const position = editor.getPosition();
+    let text = command;
+    if (model && position) {
+      const inMath = extractMathAtPosition(model.getValue(), model.getOffsetAt(position)) !== null;
+      if (!inMath) text = `$${command}$`;
+    }
+    editor.executeEdits('insert-symbol', [{ range: editor.getSelection(), text, forceMoveMarkers: true }]);
+    editor.focus();
+  }, []);
+
+  // Word count of the open file, computed off the typing path.
+  const deferredContent = useDeferredValue(editorContent);
+  const wordCount = useMemo(
+    () => (/\.(tex|ltx)$/i.test(activeFilePath) ? countLatexWords(deferredContent) : null),
+    [deferredContent, activeFilePath]
+  );
+
+  // Everything the command palette can reach. Built only while it is open.
+  const paletteItems = useMemo<PaletteItem[]>(() => {
+    if (!isPaletteOpen) return [];
+    const items: PaletteItem[] = [];
+    const inEditor = currentView === 'editor';
+    const command = (id: string, label: string, run: () => void, extra: Partial<PaletteItem> = {}) =>
+      items.push({ id: `cmd:${id}`, group: 'Commands', label, run, ...extra });
+
+    if (inEditor) {
+      command('compile', 'Recompile', () => handleCompile(), { shortcut: 'Ctrl+Enter', keywords: 'build pdf run' });
+      command('cite', 'Insert citation or look up a paper', () => setIsCitationModalOpen(true), { keywords: 'doi arxiv bibtex reference bibliography' });
+      command('table', 'Insert table', () => setIsTableModalOpen(true), { keywords: 'excel csv paste spreadsheet tabular' });
+      command('figure', 'Insert figure', () => openImageModal(), { keywords: 'image picture includegraphics' });
+      command('symbols', 'Symbols and LaTeX reference', () => setIsReferenceOpen(true), { shortcut: 'Ctrl+Shift+M', keywords: 'greek math cheat sheet help shortcuts' });
+      command('new-file', 'New file', () => handleNewFile(), { keywords: 'create tex chapter' });
+      command('view-split', 'View: editor and PDF', () => handleViewModeChange('split'), { shortcut: 'Ctrl+8' });
+      command('view-code', 'View: editor only', () => handleViewModeChange('code'), { shortcut: 'Ctrl+7' });
+      command('view-pdf', 'View: PDF only', () => handleViewModeChange('pdf'), { shortcut: 'Ctrl+9' });
+      command('sidebar', fileTreeCollapsed ? 'Show sidebar' : 'Hide sidebar', () => setFileTreeCollapsed((c) => !c), { keywords: 'files outline panel' });
+      command('outline', 'Show document outline', () => { setSidebarTab('outline'); setFileTreeCollapsed(false); }, { keywords: 'sections headings structure' });
+      command('jump-pdf', 'Jump to this line in the PDF', () => handleJumpToPdf(), { shortcut: 'Ctrl+Alt+J', keywords: 'synctex' });
+      command('history', 'Version history', () => setIsHistoryOpen(true), { keywords: 'git checkpoint restore undo' });
+      command('comments', 'Review comments', () => setIsCommentsDrawerOpen(true), { shortcut: 'Alt+M' });
+      command('collab', 'Collaborate', () => setIsCollabModalOpen(true), { keywords: 'share invite live' });
+      command('doctor', 'TeX Doctor: check installation and document', () => setIsDoctorOpen(true), { keywords: 'diagnostics lint packages missing' });
+      command('clean', 'Clean build cache', () => handleCleanBuild(), { keywords: 'aux reset rebuild' });
+      command('fullscreen', 'Toggle full screen', () => handleToggleFullscreen(), { shortcut: 'F11', keywords: 'zen focus' });
+      command('projects', 'Back to all projects', () => handleBackToProjects(), { keywords: 'dashboard home' });
+    }
+    command('new-project', 'New project from a template', () => setIsNewProjectModalOpen(true), { keywords: 'create thesis paper cv import zip' });
+    command('theme', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', () => toggleTheme(), { keywords: 'appearance mode night day' });
+
+    if (inEditor) {
+      const walk = (entries: FileEntry[]) => {
+        for (const entry of entries) {
+          if (entry.type === 'directory') walk(entry.children ?? []);
+          else {
+            const rel = entry.relativePath || entry.name;
+            items.push({
+              id: `file:${rel}`,
+              group: 'Files',
+              label: entry.name,
+              detail: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : undefined,
+              run: () => handleSelectFile(rel),
+            });
+          }
+        }
+      };
+      walk(files);
+
+      for (const node of parseLatexOutline(getLiveContent()).flat) {
+        items.push({
+          id: `heading:${node.id}`,
+          group: 'Headings',
+          label: node.title || '(untitled)',
+          detail: `${node.command}, line ${node.startLine}`,
+          run: () => handleJumpToSectionLine(node.startLine),
+        });
+      }
+    }
+
+    for (const p of projects) {
+      if (inEditor && p.id === projectId) continue;
+      items.push({ id: `project:${p.id}`, group: 'Projects', label: p.name, run: () => handleOpenProject(p.id) });
+    }
+    return items;
+    // The handlers are recreated every render; the palette only needs the
+    // set that existed when it opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaletteOpen, currentView, files, projects, projectId, theme, fileTreeCollapsed]);
+
+  // Ctrl+K opens the palette and Ctrl+Shift+M the reference panel. Capture
+  // phase, because Monaco treats Ctrl+K as the first key of a chord and would
+  // swallow it.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if ((key === 'k' && !e.shiftKey) || (key === 'p' && e.shiftKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsPaletteOpen((open) => !open);
+      } else if (key === 'm' && e.shiftKey && currentView === 'editor') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsReferenceOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [currentView]);
+
+  // The reference panel belongs to the editor.
+  useEffect(() => {
+    if (currentView !== 'editor') setIsReferenceOpen(false);
+  }, [currentView]);
+
   // Global Keyboard Shortcuts
   useKeyboardShortcuts({
     viewMode,
@@ -2015,6 +2158,7 @@ export const App: React.FC = () => {
                   onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
                   onCheckForUpdates={() => handleCheckForUpdates(true, true)}
                   onShowToast={addToast}
+                  onOpenCommandPalette={() => setIsPaletteOpen(true)}
                 />
               </div>
             </div>
@@ -2050,6 +2194,7 @@ export const App: React.FC = () => {
               onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
               onCheckForUpdates={() => handleCheckForUpdates(true, true)}
               onShowToast={addToast}
+              onOpenCommandPalette={() => setIsPaletteOpen(true)}
             />
           )}
 
@@ -2113,9 +2258,9 @@ export const App: React.FC = () => {
                 ref={fileTreePanelRef}
                 id="file-tree-panel"
                 order={1}
-                defaultSize={18}
-                minSize={12}
-                maxSize={35}
+                defaultSize={sidebarDefaultSize}
+                minSize={sidebarMinSize}
+                maxSize={sidebarMaxSize}
                 collapsible={false}
                 className="h-full"
               >
@@ -2171,7 +2316,7 @@ export const App: React.FC = () => {
               id="editor-panel"
               order={2}
               defaultSize={viewMode === 'code' || pdfCollapsed ? 82 : 42}
-              minSize={20}
+              minSize={contentMinSize}
               className="h-full flex flex-col overflow-hidden"
               onPointerDownCapture={markEditorActive}
               onKeyDownCapture={markEditorActive}
@@ -2183,6 +2328,7 @@ export const App: React.FC = () => {
                 onOpenImageModal={() => openImageModal()}
                 onOpenTableModal={() => setIsTableModalOpen(true)}
                 onOpenCitationModal={() => setIsCitationModalOpen(true)}
+                onOpenSymbols={() => setIsReferenceOpen((open) => !open)}
                 onJumpToPdf={handleJumpToPdf}
                 isJumpingToPdf={isJumpingToPdf}
                 isLiveMathEnabled={isLiveMathEnabled}
@@ -2279,7 +2425,7 @@ export const App: React.FC = () => {
               id="pdf-panel"
               order={3}
               defaultSize={viewMode === 'pdf' ? 100 : 40}
-              minSize={18}
+              minSize={contentMinSize}
               collapsible={false}
               className="h-full overflow-hidden"
               onPointerDownCapture={markPdfActive}
@@ -2376,6 +2522,7 @@ export const App: React.FC = () => {
         cursorColumn={cursorPosition.column}
         isDoctorHealthy={isDoctorHealthy}
         isLoadingFile={isLoadingFile}
+        wordCount={wordCount}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onShowToast={addToast}
       />
@@ -2641,6 +2788,17 @@ export const App: React.FC = () => {
         updateInfo={updateInfo}
         onCheckAgain={() => handleCheckForUpdates(true, true)}
         isChecking={isCheckingUpdate}
+      />
+
+      {/* Search and commands (Ctrl+K) */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} items={paletteItems} />
+
+      {/* Symbols and LaTeX reference (Ctrl+Shift+M); stays open beside the editor */}
+      <ReferencePanel
+        isOpen={isReferenceOpen && currentView === 'editor'}
+        onClose={() => setIsReferenceOpen(false)}
+        onInsertSymbol={handleInsertSymbol}
+        onInsertSnippet={(snippet) => handleInsertSnippet(snippet)}
       />
 
       {/* Toast Notifications (replaces window.alert) */}

@@ -708,7 +708,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     )}
                   </div>
                 </th>
-                <th className="py-3.5 px-4 font-semibold hidden sm:table-cell w-32">Owner</th>
+                <th className="py-3.5 px-4 font-semibold hidden lg:table-cell w-28">Owner</th>
                 <th
                   onClick={() => {
                     if (sortField === 'updatedAt') {
@@ -718,7 +718,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                       setSortDirection('desc');
                     }
                   }}
-                  className="py-3.5 px-4 font-semibold cursor-pointer hover:text-stone-900 dark:hover:text-white transition w-48 md:w-60"
+                  className="py-3.5 px-4 font-semibold cursor-pointer hover:text-stone-900 dark:hover:text-white transition whitespace-nowrap hidden md:table-cell"
                 >
                   <div className="flex items-center space-x-1.5">
                     <span>Last modified</span>
@@ -733,7 +733,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     )}
                   </div>
                 </th>
-                <th className="py-3.5 px-4 font-semibold text-right pr-6 w-48 sm:w-56">Actions</th>
+                <th className="py-3.5 px-4 font-semibold text-right pr-4 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-lightBorder dark:divide-surface-darkBorder text-sm">
@@ -791,22 +791,22 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                       </td>
 
                       {/* Title */}
-                      <td className="py-3.5 px-4 font-serif font-medium text-[15px] text-stone-900 dark:text-stone-100 group-hover:text-scholarly-green dark:group-hover:text-scholarly-greenDark transition">
-                        <span className="truncate max-w-[240px] md:max-w-md block">{project.name}</span>
+                      <td className="py-3.5 px-4 w-full max-w-0 truncate font-serif font-medium text-[15px] text-stone-900 dark:text-stone-100 group-hover:text-scholarly-green dark:group-hover:text-scholarly-greenDark transition" title={project.name}>
+                        <span className="block truncate">{project.name}</span>
                       </td>
 
                       {/* Owner */}
-                      <td className="py-3.5 px-4 text-stone-600 dark:text-stone-300 text-xs hidden sm:table-cell">
+                      <td className="py-3.5 px-4 text-stone-600 dark:text-stone-300 text-xs hidden lg:table-cell">
                         {project.owner || 'You'}
                       </td>
 
                       {/* Last Modified */}
-                      <td className="py-3.5 px-4 text-stone-500 dark:text-stone-400 font-mono text-xs truncate">
+                      <td className="py-3.5 px-4 text-stone-500 dark:text-stone-400 font-mono text-xs whitespace-nowrap hidden md:table-cell">
                         {project.lastModifiedRelative || 'Recently by You'}
                       </td>
 
                       {/* Actions Column */}
-                      <td className="py-3 px-4 text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-2 sm:px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end space-x-1.5 text-stone-500">
                           {/* Reveal in Explorer */}
                           <button

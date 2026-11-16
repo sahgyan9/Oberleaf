@@ -36,6 +36,8 @@ import {
   pathHoldsMainFile,
 } from './projects.js';
 import { ZipImportError } from './zipImport.js';
+import { getTemplate, getTemplateCatalog, getTemplatePreviewPath, readTemplateFile } from './templates.js';
+import { lookupCitation, LookupError } from './citationLookup.js';
 import { installPackageForSty } from './packageInstall.js';
 import {
   createProjectCommit,
@@ -263,6 +265,31 @@ app.post('/api/projects', (req, res) => {
     if (!name) return res.status(400).json({ error: 'Project name is required' });
     const project = createProject(name, template || 'cv');
     res.json(project);
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// Template gallery: the catalog, and each template's first-page preview.
+app.get('/api/templates', (_req, res) => {
+  try {
+    res.json(getTemplateCatalog());
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+app.get('/api/templates/:id/preview', (req, res) => {
+  const file = getTemplatePreviewPath(req.params.id);
+  if (!file) return res.status(404).json({ error: 'No preview for this template' });
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('image/webp').sendFile(file);
+});
+
+app.get('/api/templates/:id/source', (req, res) => {
+  try {
+    if (!getTemplate(req.params.id)) return res.status(404).json({ error: 'Unknown template' });
+    res.type('text/plain').send(readTemplateFile(req.params.id, 'main.tex'));
   } catch (error: any) {
     sendApiError(res, error);
   }
@@ -1214,6 +1241,21 @@ app.get('/api/projects/:id/citations', (req, res) => {
     const citations = getProjectCitations(projectDir);
     res.json(citations);
   } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// Looks a reference up by DOI, arXiv ID or title (server/citationLookup.ts).
+// The only request Oberleaf makes to the internet for the user's writing, and
+// only when they ask for it.
+app.get('/api/citations/lookup', async (req, res) => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    if (!q) return res.status(400).json({ error: 'Type a DOI, an arXiv ID, or a title.' });
+    if (q.length > 500) return res.status(400).json({ error: 'That is too long to look up.' });
+    res.json(await lookupCitation(q));
+  } catch (error: any) {
+    if (error instanceof LookupError) return res.status(error.status).json({ error: error.message });
     sendApiError(res, error);
   }
 });

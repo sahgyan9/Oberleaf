@@ -1,0 +1,93 @@
+\documentclass[a4paper, 10pt]{article}
+
+\usepackage[
+  top=1.5cm, bottom=1.5cm,
+  left=1.5cm, right=1.5cm
+]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+
+% Color Palette
+\definecolor{primary}{HTML}{1E293B}   % Deep slate
+\definecolor{accent}{HTML}{2563EB}    % Scholarly blue
+\definecolor{muted}{HTML}{64748B}     % Slate muted
+
+\hypersetup{
+  colorlinks=true,
+  urlcolor=accent,
+  linkcolor=accent
+}
+
+\titleformat{\section}
+  {\large\bfseries\color{primary}}
+  {}
+  {0em}
+  {}
+  [\vspace{1pt}\color{accent}\hrule\vspace{4pt}]
+\titlespacing{\section}{0pt}{10pt}{4pt}
+
+\setlist[itemize]{
+  leftmargin=1.2em,
+  itemsep=1.5pt,
+  topsep=1.5pt,
+  parsep=0pt
+}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+  {\Huge \textbf{Your Name}} \\ \vspace{4pt}
+  \small \color{muted}
+  Email: \href{mailto:you@example.com}{you@example.com} \quad | \quad
+  Phone: +1 (555) 019-2834 \quad | \quad
+  LinkedIn: \href{https://linkedin.com}{linkedin.com/in/yourprofile} \quad | \quad
+  GitHub: \href{https://github.com}{github.com/yourhandle}
+\end{center}
+
+\vspace{6pt}
+
+\section{Education}
+\textbf{Master of Science in Computer Science} \hfill 2022 -- 2024 \\
+\textit{University Name} \hfill City, State \\
+Relevant Coursework: Distributed Systems, Machine Learning, Advanced Algorithms.
+
+\vspace{3pt}
+\textbf{Bachelor of Science in Physics} \hfill 2018 -- 2022 \\
+\textit{University Name} \hfill City, State
+
+\section{Experience}
+\textbf{Software Engineer} \hfill Jan 2024 -- Present \\
+\textit{Company Name} \hfill City, State
+\begin{itemize}
+  \item Designed and deployed scalable REST and WebSocket APIs serving 50k+ daily active users.
+  \item Optimized core compilation pipeline latency by 35\% using caching and connection pooling.
+  \item Collaborated with cross-functional engineering teams in an agile, CI/CD-driven workflow.
+\end{itemize}
+
+\vspace{3pt}
+\textbf{Research Fellow} \hfill Jun 2022 -- Dec 2023 \\
+\textit{Laboratory / Institute Name} \hfill City, State
+\begin{itemize}
+  \item Developed automated computational scripts for numerical data analysis and visualization.
+  \item Co-authored research findings published in peer-reviewed scientific proceedings.
+\end{itemize}
+
+\section{Technical Projects}
+\textbf{Oberleaf --- Local TeX Studio} \hfill \href{https://github.com}{github.com/project}
+\begin{itemize}
+  \item Built a responsive offline LaTeX desktop editor with instant live PDF preview and SyncTeX.
+  \item Engineered cross-platform background processes, local project discovery, and zero-loss uninstaller.
+\end{itemize}
+
+\section{Technical Skills}
+\textbf{Languages:} Python, TypeScript, C++, LaTeX, SQL, Bash. \\
+\textbf{Frameworks \& Tools:} React, Node.js, Express, Git, Docker, Linux, Vite.
+
+\end{document}

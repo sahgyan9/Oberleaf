@@ -1,0 +1,84 @@
+% Research article: a single-column paper with an abstract, sections, a
+% figure, a table, an equation and a bibliography.
+%
+% Recompile with the green button or Ctrl+Enter. Lines starting with % are
+% comments: LaTeX ignores them.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}   % equations and math symbols
+\usepackage{graphicx}          % \includegraphics
+\usepackage{booktabs}          % clean table rules: \toprule, \midrule, \bottomrule
+\usepackage[hidelinks]{hyperref}        % clickable references and links
+
+\title{A Clear and Specific Title for Your Article}
+\author{First Author\thanks{Department, University. \texttt{first@example.edu}}
+  \and Second Author\thanks{Institute, City.}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+State the problem, the approach, the main result and why it matters, in
+about 150 words. Write the abstract last: it is easier once the paper exists.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Open with the question the paper answers. Cite earlier work with
+\verb|\cite{key}|, for example the original \LaTeX{} manual~\cite{lamport1994}
+and a classic paper~\cite{einstein1905}. Section~\ref{sec:method} describes
+the method and Section~\ref{sec:results} the results.
+
+\section{Method}
+\label{sec:method}
+
+Numbered equations get a label so the text can refer to them. Equation
+\eqref{eq:gaussian} is the Gaussian integral:
+\begin{equation}
+  \int_{-\infty}^{\infty} e^{-x^{2}}\,dx = \sqrt{\pi}.
+  \label{eq:gaussian}
+\end{equation}
+
+\section{Results}
+\label{sec:results}
+
+Table~\ref{tab:results} summarises the measurements and
+Figure~\ref{fig:example} shows where a figure goes.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Example results. Captions go above tables.}
+  \label{tab:results}
+  \begin{tabular}{lcc}
+    \toprule
+    Sample & Value & Uncertainty \\
+    \midrule
+    A & 1.23 & 0.04 \\
+    B & 2.34 & 0.05 \\
+    C & 3.45 & 0.07 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  % Drop an image onto the editor (or paste one) and Oberleaf writes the
+  % \includegraphics line for you. Until then this box marks the place.
+  \fbox{\parbox[c][4cm][c]{0.7\linewidth}{\centering Figure placeholder}}
+  \caption{Example figure. Captions go below figures.}
+  \label{fig:example}
+\end{figure}
+
+\section{Conclusion}
+
+Say what was shown, what it means, and what remains open.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

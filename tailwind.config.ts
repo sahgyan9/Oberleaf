@@ -1,4 +1,6 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
+import animate from 'tailwindcss-animate';
 
 const config: Config = {
   darkMode: 'class',
@@ -19,6 +21,15 @@ const config: Config = {
           darkHover: '#278638',
           subtle: '#E8F5E9',
           darkSubtle: '#1B3522',
+          // The components below were written against these names, which the
+          // palette never defined: about 110 uses (a Save button's background,
+          // focus rings, status colours) compiled to no CSS at all. They map
+          // onto the existing brand colours rather than adding new ones.
+          green: '#1B5E20',
+          greenDark: '#2EA043',
+          blue: '#2563EB',
+          teal: '#0F766E',
+          tealDark: '#2DD4BF',
         },
         citation: {
           DEFAULT: '#2563EB',
@@ -57,9 +68,29 @@ const config: Config = {
           mint: '#1B5E20',
         },
       },
+      // Tailwind 4 spellings used throughout src/, which Tailwind 3 does not
+      // know: without these the classes were silently dropped.
+      boxShadow: {
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+      },
+      backdropBlur: {
+        xs: '2px',
+      },
+      scale: {
+        98: '0.98',
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    // `animate-in fade-in zoom-in-95` on menus and dialogs comes from this
+    // plugin; it was installed but never enabled.
+    animate,
+    plugin(({ addUtilities }) => {
+      addUtilities({
+        '.outline-hidden': { outline: '2px solid transparent', 'outline-offset': '2px' },
+      });
+    }),
+  ],
 };
 
 export default config;

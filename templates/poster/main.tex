@@ -1,0 +1,105 @@
+% Conference poster, A0 portrait, built with tikzposter.
+% Blocks stack inside columns; change the column widths to rebalance.
+\documentclass[25pt,a0paper,portrait]{tikzposter}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+
+\title{Poster Title in One Line}
+\author{First Author, Second Author, Third Author}
+\institute{Department, University \quad\textbullet\quad \texttt{you@example.edu}}
+
+% Colours. Change "accent" to restyle the whole poster.
+\definecolor{accent}{HTML}{1B5E20}
+\definecolorstyle{Oberleaf}{}{
+  \colorlet{backgroundcolor}{white}
+  \colorlet{framecolor}{accent}
+  \colorlet{titlefgcolor}{white}
+  \colorlet{titlebgcolor}{accent}
+  \colorlet{blocktitlebgcolor}{accent}
+  \colorlet{blocktitlefgcolor}{white}
+  \colorlet{blockbodybgcolor}{accent!6}
+  \colorlet{blockbodyfgcolor}{black}
+}
+\usetheme{Simple}
+\usecolorstyle{Oberleaf}
+
+% A framed box that marks where a figure goes: \placeholder{height}
+\newcommand{\placeholder}[1]{%
+  \begin{center}
+    \fbox{\parbox[c][#1][c]{0.9\linewidth}{\centering Figure placeholder}}
+  \end{center}}
+
+\begin{document}
+
+\maketitle
+
+\begin{columns}
+  \column{0.5}
+
+  \block{Motivation}{
+    A poster is read from two metres away, in about a minute. State the
+    question in two or three sentences and let the figures carry the rest.
+    \begin{itemize}
+      \item What is the open problem?
+      \item Why does it matter now?
+      \item What did you do about it?
+    \end{itemize}
+  }
+
+  \block{Method}{
+    Describe the approach in a few steps, with the one equation that matters:
+    \begin{equation*}
+      i\hbar\,\frac{\partial \psi}{\partial t} = \hat{H}\,\psi
+    \end{equation*}
+    \placeholder{22cm}
+    \begin{enumerate}
+      \item First step
+      \item Second step
+      \item Third step
+    \end{enumerate}
+  }
+
+  \block{Setup}{
+    \placeholder{20cm}
+    One caption-length sentence saying what the figure shows.
+  }
+
+  \column{0.5}
+
+  \block{Results}{
+    \placeholder{26cm}
+    \begin{center}
+      \begin{tabular}{lcc}
+        \toprule
+        Method & Accuracy & Runtime \\
+        \midrule
+        Baseline & 91.2\% & 14.0 s \\
+        Ours     & 94.7\% & 9.5 s \\
+        \bottomrule
+      \end{tabular}
+    \end{center}
+    Say what the reader should see in the figure and the table.
+  }
+
+  \block{Conclusion}{
+    \begin{itemize}
+      \item The one result a visitor should walk away with.
+      \item What it changes.
+      \item What comes next.
+    \end{itemize}
+  }
+
+  \block{References}{
+    \begin{enumerate}
+      \item A. Author, \emph{Journal Name} \textbf{12}, 345 (2024).
+      \item B. Author, \emph{Conference Proceedings}, 67--89 (2023).
+    \end{enumerate}
+  }
+
+  \block{Acknowledgements}{
+    Funding bodies and collaborators.
+  }
+\end{columns}
+
+\end{document}

@@ -97,7 +97,7 @@ function Install-Package {
 
 function Initialize-LatexPackages {
     # BEGIN GENERATED PROBES
-    # Generated from server/projects.ts. Do not edit by hand - run
+    # Generated from templates/*/main.tex. Do not edit by hand - run
     #   npm run generate:latex-probes
     # Class options are dropped on purpose: which package MiKTeX has to
     # download does not depend on them, and templates disagree about them.
@@ -105,14 +105,21 @@ function Initialize-LatexPackages {
         "probe-article.tex" = @(
             '\documentclass{article}',
             '\usepackage{amsmath}',
+            '\usepackage{amssymb}',
+            '\usepackage{amsthm}',
+            '\usepackage{booktabs}',
+            '\usepackage{cleveref}',
             '\usepackage{enumitem}',
+            '\usepackage{fancyhdr}',
             '\usepackage{fontenc}',
             '\usepackage{geometry}',
             '\usepackage{graphicx}',
             '\usepackage{hyperref}',
             '\usepackage{lmodern}',
             '\usepackage{microtype}',
+            '\usepackage{natbib}',
             '\usepackage{parskip}',
+            '\usepackage{siunitx}',
             '\usepackage{titlesec}',
             '\usepackage{xcolor}',
             '\begin{document}',
@@ -124,6 +131,8 @@ function Initialize-LatexPackages {
             '\usepackage{amsfonts}',
             '\usepackage{amsmath}',
             '\usepackage{amssymb}',
+            '\usepackage{booktabs}',
+            '\usepackage{cite}',
             '\usepackage{graphicx}',
             '\usepackage{textcomp}',
             '\usepackage{xcolor}',
@@ -131,12 +140,44 @@ function Initialize-LatexPackages {
             'Oberleaf package warm-up. $E = mc^2$',
             '\end{document}'
         )
+        "probe-revtex4-2.tex" = @(
+            '\documentclass{revtex4-2}',
+            '\usepackage{amsmath}',
+            '\usepackage{amssymb}',
+            '\usepackage{bm}',
+            '\usepackage{graphicx}',
+            '\usepackage{hyperref}',
+            '\begin{document}',
+            'Oberleaf package warm-up. $E = mc^2$',
+            '\end{document}'
+        )
         "probe-report.tex" = @(
             '\documentclass{report}',
             '\usepackage{amsmath}',
+            '\usepackage{amssymb}',
+            '\usepackage{booktabs}',
+            '\usepackage{fontenc}',
+            '\usepackage{geometry}',
             '\usepackage{graphicx}',
             '\usepackage{hyperref}',
-            '\usepackage{inputenc}',
+            '\usepackage{setspace}',
+            '\begin{document}',
+            'Oberleaf package warm-up. $E = mc^2$',
+            '\end{document}'
+        )
+        "probe-beamer.tex" = @(
+            '\documentclass{beamer}',
+            '\usepackage{amsmath}',
+            '\usepackage{booktabs}',
+            '\usepackage{graphicx}',
+            '\begin{document}',
+            'Oberleaf package warm-up. $E = mc^2$',
+            '\end{document}'
+        )
+        "probe-tikzposter.tex" = @(
+            '\documentclass{tikzposter}',
+            '\usepackage{amsmath}',
+            '\usepackage{booktabs}',
             '\begin{document}',
             'Oberleaf package warm-up. $E = mc^2$',
             '\end{document}'

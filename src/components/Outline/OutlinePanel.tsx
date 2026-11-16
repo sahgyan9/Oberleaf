@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { SidebarTabs } from '../Common/SidebarTabs';
 import {
   ListTree,
   ChevronRight,
@@ -239,60 +240,32 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
 
   return (
     <aside className="h-full w-full bg-surface-lightPanel dark:bg-surface-darkPanel flex flex-col select-none relative transition-colors">
-      {/* Outline Header */}
-      <div className="p-3 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between flex-shrink-0">
-        {onTabChange ? (
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center bg-stone-200/60 dark:bg-stone-800 rounded-md p-0.5 text-xs">
-              <button
-                onClick={() => onTabChange('files')}
-                className={`px-2 py-0.5 rounded font-medium transition ${
-                  activeTab === 'files'
-                    ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
-                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
-                }`}
-              >
-                Files
-              </button>
-              <button
-                onClick={() => onTabChange('outline')}
-                className={`px-2 py-0.5 rounded font-medium transition ${
-                  activeTab === 'outline'
-                    ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
-                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
-                }`}
-              >
-                Outline
-              </button>
-            </div>
-            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
-              ({flat.length})
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center space-x-1.5">
-            <ListTree className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 font-sans">
+      {/* Outline Header: same height and tab position as the Files header */}
+      <div className="h-11 px-2 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between gap-2 flex-shrink-0 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          {onTabChange ? (
+            <SidebarTabs activeTab={activeTab ?? 'outline'} onTabChange={onTabChange} />
+          ) : (
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-stone-500 dark:text-stone-400">
+              <ListTree className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500" />
               Outline
             </span>
-            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
-              ({flat.length})
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center space-x-1">
-          {onToggleCollapse && (
-            <button
-              aria-label="Collapse Sidebar (Ctrl+B)"
-              onClick={onToggleCollapse}
-              title="Collapse Sidebar (Ctrl+B)"
-              className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile"
-            >
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            </button>
           )}
+          <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono truncate" title={`${flat.length} headings`}>
+            {flat.length}
+          </span>
         </div>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            aria-label="Collapse Sidebar (Ctrl+B)"
+            onClick={onToggleCollapse}
+            title="Collapse Sidebar (Ctrl+B)"
+            className="flex-shrink-0 p-1.5 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition btn-tactile"
+          >
+            <PanelLeftClose className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Section List / Tree */}

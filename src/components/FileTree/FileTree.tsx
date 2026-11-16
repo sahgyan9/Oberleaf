@@ -19,6 +19,17 @@ import {
   FileInput,
 } from 'lucide-react';
 import { isImagePath, PROJECT_IMAGE_DRAG_TYPE } from '../../utils/imageHelper';
+import { OverflowBar, OverflowItem } from '../Common/OverflowBar';
+import { SidebarTabs } from '../Common/SidebarTabs';
+
+const HEADER_ACTION =
+  'p-1.5 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 dark:text-stone-400 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile';
+
+const headerAction = (label: string, onClick: () => void, icon: React.ReactNode) => (
+  <button type="button" aria-label={label} title={label} onClick={onClick} className={HEADER_ACTION}>
+    {icon}
+  </button>
+);
 
 export interface FileEntry {
   name: string;
@@ -181,10 +192,10 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <div
               onClick={(e) => toggleFolder(item.relativePath, e)}
               onContextMenu={(e) => handleContextMenu(e, item)}
-              className="group flex items-center justify-between px-2 py-1.5 rounded text-xs text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle cursor-pointer transition btn-tactile"
-              style={{ paddingLeft: `${Math.max(8, depth * 14 + 8)}px` }}
+              title={item.name}
+              className="group flex items-center gap-1 pl-1.5 pr-1 py-1.5 rounded text-xs text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle cursor-pointer transition"
             >
-              <div className="flex items-center space-x-1.5 truncate">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
                 {isOpen ? (
                   <ChevronDown className="w-3 h-3 text-stone-400 flex-shrink-0" />
                 ) : (
@@ -195,19 +206,22 @@ export const FileTree: React.FC<FileTreeProps> = ({
                 ) : (
                   <Folder className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 flex-shrink-0" />
                 )}
-                <span className="font-medium truncate">{item.name}</span>
+                <span className="font-medium truncate min-w-0">{item.name}</span>
               </div>
 
               <button
+                type="button"
+                aria-label={`Actions for ${item.name}`}
                 onClick={(e) => handleContextMenu(e, item)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
+                className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
               >
-                <MoreVertical className="w-3 h-3" />
+                <MoreVertical className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {isOpen && item.children && (
-              <div className="border-l border-surface-lightBorder dark:border-surface-darkBorder ml-3">
+              // The guide line carries the indentation; rows inside need none of their own.
+              <div className="border-l border-surface-lightBorder dark:border-surface-darkBorder ml-[11px] pl-1 space-y-0.5">
                 {renderTree(item.children, depth + 1)}
               </div>
             )}
@@ -226,17 +240,16 @@ export const FileTree: React.FC<FileTreeProps> = ({
             e.dataTransfer.setData(PROJECT_IMAGE_DRAG_TYPE, item.relativePath);
             e.dataTransfer.effectAllowed = 'copy';
           }}
-          title={isImagePath(item.name) ? 'Drag into the editor to insert as a figure' : undefined}
-          className={`group flex items-center justify-between px-2.5 py-1.5 rounded text-xs cursor-pointer transition select-none btn-tactile ${
+          title={isImagePath(item.name) ? `${item.name}. Drag into the editor to insert as a figure.` : item.name}
+          className={`group flex items-center gap-1 pl-1.5 pr-1 py-1.5 rounded text-xs cursor-pointer transition select-none border-l-2 ${
             isSelected
-              ? 'bg-stone-200/70 dark:bg-stone-800 text-[#1C1917] dark:text-[#F5F5F4] font-medium border-l-2 border-scholarly dark:border-scholarly-dark shadow-xs'
-              : 'text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
+              ? 'bg-stone-200/70 dark:bg-stone-800 text-[#1C1917] dark:text-[#F5F5F4] font-medium border-scholarly dark:border-scholarly-dark'
+              : 'border-transparent text-stone-700 dark:text-stone-300 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle'
           }`}
-          style={{ paddingLeft: `${Math.max(10, depth * 14 + 10)}px` }}
         >
-          <div className="flex items-center space-x-2 truncate">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {renderIcon(item.extension)}
-            <span className="truncate">{item.name}</span>
+            <span className="truncate min-w-0">{item.name}</span>
             {relPathOf(item) === mainFilePath && (
               <span
                 title="Main document: Compile builds this file"
@@ -258,10 +271,12 @@ export const FileTree: React.FC<FileTreeProps> = ({
           </div>
 
           <button
+            type="button"
+            aria-label={`Actions for ${item.name}`}
             onClick={(e) => handleContextMenu(e, item)}
-            className="opacity-0 group-hover:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded"
           >
-            <MoreVertical className="w-3 h-3" />
+            <MoreVertical className="w-3.5 h-3.5" />
           </button>
         </div>
       );
@@ -287,82 +302,75 @@ export const FileTree: React.FC<FileTreeProps> = ({
         accept=".png,.jpg,.jpeg,.svg,.webp,.pdf,.bib,.tex,.sty,.cls,.txt"
       />
 
-      {/* Header */}
-      <div className="p-3 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center justify-between flex-shrink-0">
-        {onTabChange ? (
-          <div className="flex items-center bg-stone-200/60 dark:bg-stone-800 rounded-md p-0.5 text-xs">
-            <button
-              onClick={() => onTabChange('files')}
-              className={`px-2 py-0.5 rounded font-medium transition ${
-                activeTab === 'files'
-                  ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
-              }`}
-            >
-              Files
-            </button>
-            <button
-              onClick={() => onTabChange('outline')}
-              className={`px-2 py-0.5 rounded font-medium transition ${
-                activeTab === 'outline'
-                  ? 'bg-white dark:bg-surface-darkPanel text-stone-900 dark:text-stone-100 shadow-sm'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
-              }`}
-            >
-              Outline
-            </button>
-          </div>
-        ) : (
-          <span className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 font-sans">
-            Files
-          </span>
-        )}
-        <div className="flex items-center space-x-0.5">
-          <button
-            aria-label="Import Files (or Drag & Drop multiple)"
-            onClick={() => fileInputRef.current?.click()}
-            title="Import Files (or Drag & Drop multiple)"
-            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
-          >
-            <Upload className="w-3.5 h-3.5" />
-          </button>
-          <button
-            aria-label="New File"
-            onClick={() => onNewFile()}
-            title="New File"
-            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            aria-label="New Folder"
-            onClick={() => onNewFolder()}
-            title="New Folder"
-            className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-          </button>
-          {onRevealInExplorer && (
-            <button
-              aria-label="Reveal Project in Windows File Explorer"
-              onClick={() => onRevealInExplorer()}
-              title="Reveal Project in Windows File Explorer"
-              className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-scholarly dark:hover:text-scholarly-dark transition btn-tactile"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {onToggleCollapse && (
-            <button
-              aria-label="Collapse Sidebar (Ctrl+B)"
-              onClick={onToggleCollapse}
-              title="Collapse Sidebar (Ctrl+B)"
-              className="p-1 rounded hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition ml-0.5 btn-tactile"
-            >
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      {/* Header: tabs stay, actions fold into a menu when the sidebar is narrow */}
+      <div className="h-11 px-2 border-b border-surface-lightBorder dark:border-surface-darkBorder flex items-center flex-shrink-0">
+        <OverflowBar
+          className="flex-1"
+          gap={2}
+          moreLabel="More file actions"
+          menuAlign="left"
+          moreButtonClassName={HEADER_ACTION}
+          items={[
+            {
+              id: 'tabs',
+              priority: 10,
+              render: () =>
+                onTabChange ? (
+                  <SidebarTabs activeTab={activeTab} onTabChange={onTabChange} />
+                ) : (
+                  <span className="px-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-stone-400 dark:text-stone-500">
+                    Files
+                  </span>
+                ),
+            },
+            { id: 'spacer', spacer: true, render: () => null },
+            {
+              id: 'new-file',
+              priority: 5,
+              render: () => headerAction('New File', () => onNewFile(), <Plus className="w-3.5 h-3.5" />),
+              menu: [{ label: 'New file', icon: <Plus className="w-3.5 h-3.5" />, onClick: () => onNewFile() }],
+            },
+            {
+              id: 'new-folder',
+              priority: 3,
+              render: () => headerAction('New Folder', () => onNewFolder(), <FolderPlus className="w-3.5 h-3.5" />),
+              menu: [{ label: 'New folder', icon: <FolderPlus className="w-3.5 h-3.5" />, onClick: () => onNewFolder() }],
+            },
+            {
+              id: 'upload',
+              priority: 4,
+              render: () =>
+                headerAction('Upload Files (or drop them on this panel)', () => fileInputRef.current?.click(), <Upload className="w-3.5 h-3.5" />),
+              menu: [{ label: 'Upload files', icon: <Upload className="w-3.5 h-3.5" />, onClick: () => fileInputRef.current?.click() }],
+            },
+            ...(onRevealInExplorer
+              ? [
+                  {
+                    id: 'reveal',
+                    priority: 1,
+                    render: () =>
+                      headerAction('Show Project Folder in File Explorer', () => onRevealInExplorer(), <FolderOpen className="w-3.5 h-3.5" />),
+                    menu: [
+                      { label: 'Show in File Explorer', icon: <FolderOpen className="w-3.5 h-3.5" />, onClick: () => onRevealInExplorer() },
+                    ],
+                  } as OverflowItem,
+                ]
+              : []),
+            ...(onToggleCollapse
+              ? [
+                  {
+                    id: 'collapse',
+                    priority: 8,
+                    render: () =>
+                      headerAction('Collapse Sidebar (Ctrl+B)', onToggleCollapse, <PanelLeftClose className="w-3.5 h-3.5" />),
+                    menu: [
+                      { label: 'Collapse sidebar', icon: <PanelLeftClose className="w-3.5 h-3.5" />, onClick: onToggleCollapse, hint: 'Ctrl+B' },
+                    ],
+                  } as OverflowItem,
+                ]
+              : []),
+          ]}
+        />
       </div>
 
       {/* File List */}

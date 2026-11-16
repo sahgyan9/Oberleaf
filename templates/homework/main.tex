@@ -1,0 +1,68 @@
+% Problem set: numbered problems with boxed final answers.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+% Fill these in once; the header uses them on every page.
+\newcommand{\coursename}{PHY 301: Quantum Mechanics}
+\newcommand{\assignment}{Problem Set 1}
+\newcommand{\studentname}{Your Name}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\coursename}
+\chead{\assignment}
+\rhead{\studentname}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+% \problem{points} starts a numbered problem.
+\newcounter{problem}
+\newcommand{\problem}[1]{%
+  \stepcounter{problem}%
+  \section*{Problem \theproblem\ \normalfont\small(#1 points)}}
+\newenvironment{solution}{\noindent\textbf{Solution.}\ }{\hfill$\square$\par\medskip}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries \assignment} \\[4pt]
+  \coursename \quad\textbullet\quad \studentname \quad\textbullet\quad Due \today
+\end{center}
+
+\problem{10}
+Show that $\sum_{k=1}^{n} k = \dfrac{n(n+1)}{2}$.
+
+\begin{solution}
+Write the sum forwards and backwards and add the two lines term by term:
+\begin{align*}
+  S  &= 1 + 2 + \dots + n, \\
+  S  &= n + (n-1) + \dots + 1, \\
+  2S &= n(n+1).
+\end{align*}
+Hence
+\[
+  \boxed{S = \frac{n(n+1)}{2}}
+\]
+\end{solution}
+
+\problem{15}
+A particle is in the state $\psi(x) = A e^{-x^{2}/2a^{2}}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Find the normalisation constant $A$.
+  \item Compute $\langle x^{2} \rangle$.
+\end{enumerate}
+
+\begin{solution}
+\begin{enumerate}[label=(\alph*)]
+  \item Requiring $\int_{-\infty}^{\infty} |\psi|^{2}\,dx = 1$ gives
+        $|A|^{2}\, a\sqrt{\pi} = 1$, so $A = (\pi a^{2})^{-1/4}$.
+  \item $\langle x^{2} \rangle = a^{2}/2$.
+\end{enumerate}
+\end{solution}
+
+\end{document}

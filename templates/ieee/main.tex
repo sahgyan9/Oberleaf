@@ -1,0 +1,88 @@
+% IEEE conference paper, two columns (IEEEtran).
+% For a journal article, change [conference] to [journal].
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{cite}        % [1], [2], [3] becomes [1]-[3]
+
+\title{Conference Paper Title}
+
+\author{
+  \IEEEauthorblockN{First Author}
+  \IEEEauthorblockA{\textit{Department of Electrical Engineering} \\
+    \textit{University Name} \\
+    City, Country \\
+    first@example.edu}
+  \and
+  \IEEEauthorblockN{Second Author}
+  \IEEEauthorblockA{\textit{Research Laboratory} \\
+    \textit{Organisation Name} \\
+    City, Country \\
+    second@example.org}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The abstract is a single paragraph of 150 to 250 words with no citations,
+footnotes or displayed equations.
+\end{abstract}
+
+\begin{IEEEkeywords}
+first keyword, second keyword, third keyword
+\end{IEEEkeywords}
+
+\section{Introduction}
+IEEE style numbers citations in square brackets~\cite{lamport1994}. Spell
+out ``Section'' at the start of a sentence; elsewhere write Section~\ref{sec:method}.
+
+\section{Method}
+\label{sec:method}
+The linear model is
+\begin{equation}
+  \mathbf{y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon},
+  \label{eq:model}
+\end{equation}
+and \eqref{eq:model} is cited by number alone, without ``Eq.''.
+
+\section{Results}
+
+\begin{table}[htbp]
+  \caption{Comparison With a Baseline}
+  \label{tab:results}
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Accuracy (\%) & Runtime (s) \\
+    \midrule
+    Baseline & 91.2 & 14.0 \\
+    Proposed & 94.7 & 9.5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox[c][3.5cm][c]{0.85\linewidth}{\centering Figure placeholder}}
+  \caption{A single-column figure. Use \texttt{figure*} to span both columns.}
+  \label{fig:example}
+\end{figure}
+
+Table~\ref{tab:results} and Fig.~\ref{fig:example} show the results.
+
+\section{Conclusion}
+State the result and its consequence~\cite{einstein1905}.
+
+\section*{Acknowledgment}
+Funding and thanks. IEEE spells this heading without an ``e'' after the ``g''.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

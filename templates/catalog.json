@@ -1,0 +1,117 @@
+{
+  "categories": [
+    { "id": "papers", "title": "Papers" },
+    { "id": "thesis", "title": "Thesis and reports" },
+    { "id": "talks", "title": "Slides and posters" },
+    { "id": "coursework", "title": "Coursework" },
+    { "id": "career", "title": "Career and letters" },
+    { "id": "basics", "title": "Start simple" }
+  ],
+  "templates": [
+    {
+      "id": "article",
+      "title": "Research article",
+      "description": "Single-column paper with abstract, figure, table, equation and bibliography.",
+      "category": "papers",
+      "tags": ["paper", "journal", "bibtex", "article"]
+    },
+    {
+      "id": "preprint",
+      "title": "arXiv preprint",
+      "description": "Wide single column with theorems, natbib citations and cleveref.",
+      "category": "papers",
+      "tags": ["arxiv", "preprint", "theorem", "natbib"]
+    },
+    {
+      "id": "ieee",
+      "title": "IEEE conference paper",
+      "description": "Two-column IEEEtran layout with keywords and IEEE-style references.",
+      "category": "papers",
+      "tags": ["ieee", "conference", "two column", "engineering"]
+    },
+    {
+      "id": "revtex",
+      "title": "Physical Review (APS)",
+      "description": "REVTeX 4.2 manuscript for PRL, PRA to PRX and Rev. Mod. Phys.",
+      "category": "papers",
+      "tags": ["aps", "revtex", "physics", "prl", "physical review"]
+    },
+    {
+      "id": "response-to-reviewers",
+      "title": "Response to reviewers",
+      "description": "Point-by-point reply: each comment, your answer and the change made.",
+      "category": "papers",
+      "tags": ["review", "rebuttal", "revision", "referee"]
+    },
+    {
+      "id": "thesis",
+      "title": "Thesis",
+      "description": "One file per chapter, title page, front matter, lists of figures and tables.",
+      "category": "thesis",
+      "tags": ["phd", "masters", "dissertation", "chapters", "multi-file"]
+    },
+    {
+      "id": "research-proposal",
+      "title": "Research proposal",
+      "description": "Summary, questions, methodology, timeline table and budget.",
+      "category": "thesis",
+      "tags": ["grant", "fellowship", "proposal", "funding"]
+    },
+    {
+      "id": "lab-report",
+      "title": "Lab report",
+      "description": "Aim, theory, data table with units (siunitx), uncertainty analysis.",
+      "category": "coursework",
+      "tags": ["experiment", "physics", "chemistry", "units", "siunitx"]
+    },
+    {
+      "id": "homework",
+      "title": "Problem set",
+      "description": "Numbered problems and solutions with a course header on every page.",
+      "category": "coursework",
+      "tags": ["homework", "assignment", "solutions", "math"]
+    },
+    {
+      "id": "lecture-notes",
+      "title": "Lecture notes",
+      "description": "Numbered definitions, theorems, proofs and examples with a contents page.",
+      "category": "coursework",
+      "tags": ["notes", "theorem", "math", "course"]
+    },
+    {
+      "id": "beamer",
+      "title": "Presentation slides",
+      "description": "16:9 Beamer talk: title, outline, two-column slide, results and takeaway.",
+      "category": "talks",
+      "tags": ["beamer", "slides", "talk", "seminar", "presentation"]
+    },
+    {
+      "id": "poster",
+      "title": "Conference poster",
+      "description": "A0 portrait poster in two columns of blocks (tikzposter).",
+      "category": "talks",
+      "tags": ["poster", "a0", "conference", "tikzposter"]
+    },
+    {
+      "id": "cv",
+      "title": "CV / resume",
+      "description": "One-page CV with education, experience, projects and skills.",
+      "category": "career",
+      "tags": ["cv", "resume", "job", "ats"]
+    },
+    {
+      "id": "cover-letter",
+      "title": "Cover letter",
+      "description": "One-page letter with your details, the recipient and four paragraphs.",
+      "category": "career",
+      "tags": ["letter", "application", "job"]
+    },
+    {
+      "id": "blank",
+      "title": "Blank document",
+      "description": "Title, one section and one equation. The shortest document that compiles.",
+      "category": "basics",
+      "tags": ["empty", "minimal", "start"]
+    }
+  ]
+}
