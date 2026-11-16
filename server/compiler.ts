@@ -1845,6 +1845,10 @@ function executeCommand(
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
+      // The launcher runs the server without a visible console. Without this,
+      // Windows gives every pdflatex/latexmk/biber child its own console
+      // window, which flashes up on each compile.
+      windowsHide: true,
     });
 
     const timer =

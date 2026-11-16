@@ -35,6 +35,7 @@ import { useToast, ToastContainer } from './components/Toast/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useWindowWidth, pxToPanelPercent } from './hooks/useElementWidth';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette/CommandPalette';
+import { QuitConfirmModal, OberleafStoppedScreen, quitOberleaf } from './components/Quit/QuitOberleaf';
 import { ReferencePanel } from './components/Reference/ReferencePanel';
 import { countLatexWords } from './utils/wordCount';
 import { extractMathAtPosition } from './utils/mathDetector';
@@ -232,6 +233,8 @@ export const App: React.FC = () => {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState<boolean>(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
+  const [isQuitOpen, setIsQuitOpen] = useState<boolean>(false);
+  const [isAppStopped, setIsAppStopped] = useState<boolean>(false);
   const { theme, toggleTheme } = useTheme();
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
   const [uploadQueue, setUploadQueue] = useState<UploadFileItem[]>([]);
@@ -298,6 +301,18 @@ export const App: React.FC = () => {
   const [isSyncingBackward, setIsSyncingBackward] = useState<boolean>(false);
   const [highlightLine, setHighlightLine] = useState<{ line: number; timestamp: number } | null>(null);
   const [isResizing, setIsResizing] = useState<boolean>(false);
+  // Dragging the sidebar edge past its minimum snaps it shut. The panel is
+  // only unmounted once the drag ends: removing it (and its handle) mid-drag
+  // would strand the library's drag state and the resize overlay. Dragging
+  // back out before letting go cancels the collapse.
+  const sidebarCollapsePendingRef = useRef(false);
+  const handleSidebarDragging = useCallback((dragging: boolean) => {
+    setIsResizing(dragging);
+    if (!dragging && sidebarCollapsePendingRef.current) {
+      sidebarCollapsePendingRef.current = false;
+      setFileTreeCollapsed(true);
+    }
+  }, []);
 
   // Dependency Doctor State
   const [doctorDeps, setDoctorDeps] = useState<DependencyItem[]>([]);
@@ -317,7 +332,12 @@ export const App: React.FC = () => {
   // takes: a percentage floor alone let the sidebar shrink to under 100 px on
   // a small window, which is what crushed its header controls.
   const windowWidth = useWindowWidth();
-  const panelGroupWidth = Math.max(320, windowWidth - (fileTreeCollapsed ? 40 : 0));
+  // Keyed to the window only. Deriving it from fileTreeCollapsed changed the
+  // editor and PDF minSize in the same commit that unmounts the sidebar
+  // panel; react-resizable-panels then re-checks those constraints against
+  // the old three-panel layout and throws "Panel data not found for index 2",
+  // which blanks the whole app. The 40 px collapsed rail is not worth that.
+  const panelGroupWidth = Math.max(320, windowWidth);
   const sidebarMinSize = pxToPanelPercent(190, panelGroupWidth);
   const sidebarMaxSize = Math.max(sidebarMinSize + 5, Math.min(45, pxToPanelPercent(480, panelGroupWidth, 45)));
   const sidebarDefaultSize = Math.min(sidebarMaxSize, Math.max(sidebarMinSize, pxToPanelPercent(240, panelGroupWidth)));
@@ -906,6 +926,20 @@ export const App: React.FC = () => {
     const live = monacoEditorRef.current?.getValue?.();
     return typeof live === 'string' ? live : editorContent;
   }, [editorContent]);
+
+  // Quit: write the open file if it has pending edits, stop the server, then
+  // swap the whole app for the "stopped" screen. A failed save aborts the quit
+  // so nothing typed is lost.
+  const handleQuitConfirm = useCallback(async () => {
+    if (currentView === 'editor' && activeFilePath && saveStatus !== 'saved') {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      const saved = await saveActiveFile(getLiveContent());
+      if (!saved) throw new Error('Your open file could not be saved, so Oberleaf was left running.');
+    }
+    await quitOberleaf();
+    setIsQuitOpen(false);
+    setIsAppStopped(true);
+  }, [currentView, activeFilePath, saveStatus, saveActiveFile, getLiveContent]);
 
   // Debounced auto-save on editor change (800ms)
   const handleEditorChange = useCallback((newVal: string) => {
@@ -2002,6 +2036,7 @@ export const App: React.FC = () => {
     }
     command('new-project', 'New project from a template', () => setIsNewProjectModalOpen(true), { keywords: 'create thesis paper cv import zip' });
     command('theme', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', () => toggleTheme(), { keywords: 'appearance mode night day' });
+    command('quit', 'Quit Oberleaf', () => setIsQuitOpen(true), { keywords: 'exit stop close shut down server background' });
 
     if (inEditor) {
       const walk = (entries: FileEntry[]) => {
@@ -2088,6 +2123,10 @@ export const App: React.FC = () => {
     onItalic: handleItalic,
   });
 
+  // Everything above keeps running hooks; once the server is gone the app is
+  // unmounted so its polling (doctor, git status, comments) stops too.
+  if (isAppStopped) return <OberleafStoppedScreen />;
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-surface-light dark:bg-surface-dark text-slate-900 dark:text-white">
       {currentView === 'dashboard' ? (
@@ -2103,6 +2142,7 @@ export const App: React.FC = () => {
             onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
             onCheckForUpdates={() => handleCheckForUpdates(true, true)}
             onShowToast={addToast}
+            onQuit={() => setIsQuitOpen(true)}
           />
         </div>
       ) : (
@@ -2159,6 +2199,7 @@ export const App: React.FC = () => {
                   onCheckForUpdates={() => handleCheckForUpdates(true, true)}
                   onShowToast={addToast}
                   onOpenCommandPalette={() => setIsPaletteOpen(true)}
+                  onQuit={() => setIsQuitOpen(true)}
                 />
               </div>
             </div>
@@ -2195,6 +2236,7 @@ export const App: React.FC = () => {
               onCheckForUpdates={() => handleCheckForUpdates(true, true)}
               onShowToast={addToast}
               onOpenCommandPalette={() => setIsPaletteOpen(true)}
+              onQuit={() => setIsQuitOpen(true)}
             />
           )}
 
@@ -2261,7 +2303,10 @@ export const App: React.FC = () => {
                 defaultSize={sidebarDefaultSize}
                 minSize={sidebarMinSize}
                 maxSize={sidebarMaxSize}
-                collapsible={false}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => { sidebarCollapsePendingRef.current = true; }}
+                onExpand={() => { sidebarCollapsePendingRef.current = false; }}
                 className="h-full"
               >
                 {sidebarTab === 'files' ? (
@@ -2302,7 +2347,7 @@ export const App: React.FC = () => {
                 // swallows pointer events inside it, so a wide margin covers
                 // the neighbouring panel's scrollbar. Keep it small.
                 hitAreaMargins={{ coarse: 12, fine: 3 }}
-                onDragging={setIsResizing}
+                onDragging={handleSidebarDragging}
                 className="w-2 shrink-0 bg-stone-200/50 dark:bg-stone-800/50 hover:bg-scholarly/40 dark:hover:bg-scholarly-dark/40 active:bg-scholarly dark:active:bg-scholarly-dark transition-colors cursor-col-resize z-20 relative group"
               >
                 <div className="w-0.5 h-6 bg-stone-300 dark:bg-stone-700 group-hover:bg-scholarly dark:group-hover:bg-scholarly-dark mx-auto rounded-full mt-[45vh]" />
@@ -2788,6 +2833,13 @@ export const App: React.FC = () => {
         updateInfo={updateInfo}
         onCheckAgain={() => handleCheckForUpdates(true, true)}
         isChecking={isCheckingUpdate}
+      />
+
+      <QuitConfirmModal
+        isOpen={isQuitOpen}
+        hasUnsavedChanges={currentView === 'editor' && saveStatus !== 'saved'}
+        onCancel={() => setIsQuitOpen(false)}
+        onConfirm={handleQuitConfirm}
       />
 
       {/* Search and commands (Ctrl+K) */}

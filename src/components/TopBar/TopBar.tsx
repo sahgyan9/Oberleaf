@@ -25,6 +25,7 @@ import {
   Wrench,
   ArrowDownToLine,
   Search,
+  Power,
 } from 'lucide-react';
 import { OverflowBar, OverflowItem } from '../Common/OverflowBar';
 import { useTheme } from '../../context/ThemeContext';
@@ -74,6 +75,7 @@ interface TopBarProps {
   onCheckForUpdates?: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
   onOpenCommandPalette?: () => void;
+  onQuit?: () => void;
 }
 
 const ICON_ACTION =
@@ -122,6 +124,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onCheckForUpdates,
   onShowToast,
   onOpenCommandPalette,
+  onQuit,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
@@ -685,6 +688,22 @@ export const TopBar: React.FC<TopBarProps> = ({
                         </button>
                       )}
                     </div>
+
+                    {/* Quit: stops the background server */}
+                    {onQuit && (
+                      <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">
+                        <button
+                          onClick={() => {
+                            setIsToolsOpen(false);
+                            onQuit();
+                          }}
+                          className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle text-stone-700 dark:text-stone-200 transition text-left"
+                        >
+                          <Power className="w-4 h-4 text-stone-700 dark:text-stone-300" />
+                          <span>Quit Oberleaf</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

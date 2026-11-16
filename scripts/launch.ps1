@@ -160,23 +160,7 @@ function Open-App([string]$Url) {
 }
 
 # ------------------------------------------------------------------
-# STEP 1: Already running? Open it and stop here.
-# ------------------------------------------------------------------
-if (Test-PortOpen "127.0.0.1" $Port 80) {
-    # A server started by this launcher serves the app itself on $Port.
-    if (Test-HttpOk "$AppUrl/" 800) {
-        Open-App $AppUrl
-        exit 0
-    }
-    # A development session (npm start) serves the page from Vite instead.
-    if ((Test-PortOpen "127.0.0.1" 5173 80) -and (Test-HttpOk "$AppUrl/health" 800)) {
-        Open-App $DevUrl
-        exit 0
-    }
-}
-
-# ------------------------------------------------------------------
-# STEP 2: Splash. Same palette as the app: light by default, dark when
+# STEP 1: Splash. Same palette as the app: light by default, dark when
 # Windows apps are set to dark (which is also what the app follows until
 # the user picks a theme in it).
 #
@@ -566,6 +550,32 @@ function Wait-Process-WithSplash($Proc) {
     }
     $Proc.WaitForExit()
     Set-SplashActivity ''
+}
+
+# ------------------------------------------------------------------
+# STEP 2: Already running? Open it and stop here.
+# Closing the browser tab leaves the server running, so this is the usual
+# path after the first launch of a session. It comes after the splash is up
+# so every launch shows it, not only a cold start; the only step left is
+# opening the browser, and that is what the splash says.
+# ------------------------------------------------------------------
+function Open-RunningApp([string]$Url) {
+    Update-Splash 4 "Oberleaf is already running."
+    Open-App $Url
+    if ($script:splashState) {
+        Start-Sleep -Milliseconds 900
+        Update-Splash $StepNames.Count "Oberleaf is already running."
+        Start-Sleep -Milliseconds 600
+    }
+    Close-Splash
+    exit 0
+}
+
+if (Test-PortOpen "127.0.0.1" $Port 80) {
+    # A server started by this launcher serves the app itself on $Port.
+    if (Test-HttpOk "$AppUrl/" 800) { Open-RunningApp $AppUrl }
+    # A development session (npm start) serves the page from Vite instead.
+    if ((Test-PortOpen "127.0.0.1" 5173 80) -and (Test-HttpOk "$AppUrl/health" 800)) { Open-RunningApp $DevUrl }
 }
 
 # ------------------------------------------------------------------

@@ -17,6 +17,7 @@ import {
   ArrowUp,
   FolderOpen,
   RefreshCw,
+  Power,
   MonitorUp,
   Check,
   Loader2,
@@ -45,6 +46,7 @@ interface ProjectsDashboardProps {
   onOpenUpdateModal?: () => void;
   onCheckForUpdates?: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onQuit?: () => void;
 }
 
 export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
@@ -58,6 +60,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
   onOpenUpdateModal,
   onCheckForUpdates,
   onShowToast,
+  onQuit,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -526,6 +529,20 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
                     Reload Projects
                   </button>
                 </div>
+                {onQuit && (
+                  <div className="pt-1 border-t border-surface-lightBorder dark:border-surface-darkBorder">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onQuit();
+                      }}
+                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition flex items-center justify-between"
+                    >
+                      <span>Quit Oberleaf</span>
+                      <Power className="w-3.5 h-3.5 text-stone-400" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

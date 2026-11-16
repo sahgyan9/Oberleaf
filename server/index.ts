@@ -1435,6 +1435,26 @@ app.post('/api/system/apply-update', async (_req, res) => {
   }
 });
 
+// Stops Oberleaf from the page. Closing the browser tab leaves this server
+// running in the background (the launcher starts it hidden), so this is the
+// only way to stop it short of Task Manager. Local-only via /api/system/.
+// The process exits once the response has reached the page; compiles still
+// running finish on their own and the next launch starts a fresh server.
+app.post('/api/system/quit', (_req, res) => {
+  console.log('[Oberleaf] Quit requested from the page; stopping the server.');
+  res.on('finish', () => {
+    setTimeout(() => {
+      try {
+        stopCloudflareTunnel();
+      } catch {
+        // Not running.
+      }
+      process.exit(0);
+    }, 150);
+  });
+  res.json({ success: true });
+});
+
 // 14. Real-Time Collaboration & Tunnel Endpoints
 app.get('/api/collab/network', (_req, res) => {
   try {
