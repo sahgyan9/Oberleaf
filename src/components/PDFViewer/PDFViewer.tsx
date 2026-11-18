@@ -140,6 +140,8 @@ interface PDFViewerProps {
   onApplyFix?: (fix: SuggestedFix, error: CompileErrorItem) => void;
   /** Pages in the PDF just loaded, or null when none loaded. */
   onPageCountChange?: (pages: number | null) => void;
+  /** Page at the top third of the viewer, or null when no PDF is shown. */
+  onCurrentPageChange?: (page: number | null) => void;
   onUndoFix?: () => void;
   fixReceipt?: FixReceipt | null;
   onDismissFixReceipt?: () => void;
@@ -327,6 +329,7 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   downloadFileName,
   onApplyFix,
   onPageCountChange,
+  onCurrentPageChange,
   onUndoFix,
   fixReceipt,
   onDismissFixReceipt,
@@ -727,6 +730,13 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
     const sel = word || window.getSelection()?.toString().trim();
     onSyncTexBackward(pageNumber, xPt, yPt, sel && sel.length > 0 && sel.length < 200 ? sel : undefined);
   };
+
+  // Report the page in view, for the status bar ("Page 7 of 10"). Null when
+  // no PDF is loaded or the viewer is unmounted (code-only view).
+  useEffect(() => {
+    onCurrentPageChange?.(numPages > 0 ? Math.min(currentPage, numPages) : null);
+  }, [currentPage, numPages, onCurrentPageChange]);
+  useEffect(() => () => onCurrentPageChange?.(null), [onCurrentPageChange]);
 
   const handleContainerScroll = () => {
     const container = containerRef.current;

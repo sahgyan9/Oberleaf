@@ -16,6 +16,8 @@ interface StatusBarProps {
   wordCount?: WordCount | null;
   /** Pages in the current PDF; null when there is no PDF or the count is unknown */
   pageCount?: number | null;
+  /** Page in view in the PDF viewer; null when the viewer is closed */
+  currentPage?: number | null;
   onOpenDoctor: () => void;
   onShowToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
@@ -34,6 +36,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   isLoadingFile = false,
   wordCount,
   pageCount = null,
+  currentPage = null,
   onOpenDoctor,
   onShowToast,
 }) => {
@@ -140,11 +143,25 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       <div className="flex items-center gap-2.5 flex-shrink-0">
         {pageCount !== null && (
           <>
-            <span className="flex items-center gap-1" title={`The PDF from the last compile has ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`}>
+            <span
+              className="flex items-center gap-1"
+              title={
+                currentPage !== null && currentPage <= pageCount
+                  ? `Viewing page ${currentPage} of ${pageCount} in the PDF from the last compile.`
+                  : `The PDF from the last compile has ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`
+              }
+            >
               <FileText className="w-3 h-3 text-stone-400" />
-              <span>
-                {pageCount.toLocaleString()} <span className="hidden sm:inline">{pageCount === 1 ? 'page' : 'pages'}</span>
-              </span>
+              {currentPage !== null && currentPage <= pageCount ? (
+                <span>
+                  <span className="hidden sm:inline">Page </span>
+                  {currentPage.toLocaleString()} of {pageCount.toLocaleString()}
+                </span>
+              ) : (
+                <span>
+                  {pageCount.toLocaleString()} <span className="hidden sm:inline">{pageCount === 1 ? 'page' : 'pages'}</span>
+                </span>
+              )}
             </span>
             {SEPARATOR}
           </>

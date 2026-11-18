@@ -2012,6 +2012,8 @@ export const App: React.FC = () => {
   // What the PDF viewer counted, used when the log has no page line (a log
   // cut short, or a PDF made outside Oberleaf). Only known while it is open.
   const [viewerPageCount, setViewerPageCount] = useState<number | null>(null);
+  // Page in view in the PDF viewer; null in code-only view.
+  const [currentPdfPage, setCurrentPdfPage] = useState<number | null>(null);
   useEffect(() => setViewerPageCount(null), [projectId]);
   useEffect(() => {
     if (!projectId || !lastValidPdfUrl) {
@@ -2508,6 +2510,7 @@ export const App: React.FC = () => {
                 ref={pdfViewerRef}
                 pdfUrl={pdfUrl}
                 onPageCountChange={setViewerPageCount}
+                onCurrentPageChange={setCurrentPdfPage}
                 lastValidPdfUrl={lastValidPdfUrl}
                 compileDuration={compileDuration}
                 compileStatus={compileStatus}
@@ -2597,6 +2600,7 @@ export const App: React.FC = () => {
         isLoadingFile={isLoadingFile}
         wordCount={wordCount}
         pageCount={pageCount ?? viewerPageCount}
+        currentPage={currentPdfPage}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onShowToast={addToast}
       />
