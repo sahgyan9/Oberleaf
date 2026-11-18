@@ -19,21 +19,41 @@ param(
     # A comma-separated string: `powershell -File` passes arguments as text.
     [string]$Ports = "3001,5173"
 )
-$Ports = @($Ports -split '[,\s]+' | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
+# A new variable: assigning back to the [string] parameter would turn the
+# list into one string again.
+$PortList = @($Ports -split '[,\s]+' | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
+
+# PIDs listening on the given ports. netstat answers in ~25 ms where
+# Get-NetTCPConnection takes ~500 ms, which made Quit feel slow.
+function Get-ListenerPids([int[]]$OnPorts) {
+    $found = @()
+    foreach ($line in (netstat -ano -p tcp)) {
+        if ($line -match '^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$') {
+            if ($OnPorts -contains [int]$Matches[1] -and [int]$Matches[2] -gt 4) { $found += [int]$Matches[2] }
+        }
+    }
+    foreach ($line in (netstat -ano -p tcpv6)) {
+        if ($line -match '^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$') {
+            if ($OnPorts -contains [int]$Matches[1] -and [int]$Matches[2] -gt 4) { $found += [int]$Matches[2] }
+        }
+    }
+    return @($found | Sort-Object -Unique)
+}
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $ProjectRoot "logs"
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Force $LogDir | Out-Null }
-$LogFile = Join-Path $LogDir "project.log"
+# Its own file: a running server holds project.log open for writing.
+$LogFile = Join-Path $LogDir "stop.log"
 
 function Write-StopLog([string]$Message) {
     $line = "[$(Get-Date -Format 'HH:mm:ss')] [stop] $Message"
     Write-Host $line
-    try { Add-Content -Path $LogFile -Value $line -Encoding utf8 } catch {}
+    try { Add-Content -Path $LogFile -Value $line -Encoding utf8 -ErrorAction Stop } catch {}
 }
 
-# Give the quit request's HTTP reply time to reach the page.
-if ($ServerPid -gt 0) { Start-Sleep -Milliseconds 400 }
+# No wait for the HTTP reply: the server starts this only after the reply
+# has been sent.
 
 $all = @{}
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object { $all[[int]$_.ProcessId] = $_ }
@@ -67,13 +87,7 @@ function Get-TopAncestor([int]$StartPid) {
 
 $starts = @()
 if ($ServerPid -gt 0) { $starts += $ServerPid }
-foreach ($port in $Ports) {
-    try {
-        Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-            Where-Object { $_.OwningProcess -gt 4 } |
-            ForEach-Object { $starts += [int]$_.OwningProcess }
-    } catch {}
-}
+$starts += Get-ListenerPids $PortList
 
 # Fallback, as in launch.ps1: node / cmd processes whose command line names
 # this checkout (the hidden launcher's `cmd /c ... >> logs\project.log`).
@@ -84,7 +98,8 @@ $all.Values | Where-Object {
     $_.CommandLine -match '(?i)server[\\/]index\.ts|logs[\\/]project\.log'
 } | ForEach-Object { $starts += [int]$_.ProcessId }
 
-$roots = $starts | Sort-Object -Unique | ForEach-Object { Get-TopAncestor $_ } | Sort-Object -Unique
+$roots = $starts | Where-Object { $all.ContainsKey([int]$_) } | Sort-Object -Unique |
+    ForEach-Object { Get-TopAncestor $_ } | Sort-Object -Unique
 
 if (-not $roots) {
     Write-StopLog "No Oberleaf processes are running."
@@ -99,14 +114,9 @@ foreach ($rootPid in $roots) {
 }
 
 # Confirm the ports are free.
-$stillHeld = @()
-foreach ($port in $Ports) {
-    if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 4 }) {
-        $stillHeld += $port
-    }
-}
+$stillHeld = Get-ListenerPids $PortList
 if ($stillHeld) {
-    Write-StopLog "Port(s) $($stillHeld -join ', ') are still in use."
+    Write-StopLog "Port(s) $($PortList -join ', ') are still held by PID $($stillHeld -join ', ')."
     exit 1
 }
 Write-StopLog "Oberleaf stopped."

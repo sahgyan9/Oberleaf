@@ -46,7 +46,7 @@ const FETCH_MAIN = 'git fetch --quiet origin +refs/heads/main:refs/remotes/origi
 const REMOTE_MAIN = 'refs/remotes/origin/main';
 
 async function aheadBehind(cwd: string): Promise<{ aheadBy: number; behindBy: number }> {
-  const { stdout } = await execAsync(`git rev-list --left-right --count HEAD...${REMOTE_MAIN}`, { cwd });
+  const { stdout } = await execAsync(`git rev-list --left-right --count HEAD...${REMOTE_MAIN}`, { cwd, windowsHide: true });
   const [ahead, behind] = stdout.trim().split(/\s+/).map((n) => parseInt(n, 10));
   return { aheadBy: ahead || 0, behindBy: behind || 0 };
 }
@@ -64,7 +64,7 @@ export async function checkSoftwareUpdate(force = false, cwd = process.cwd()): P
 
   let currentCommit = 'unknown';
   try {
-    const { stdout: localHead } = await execAsync('git rev-parse HEAD', { cwd });
+    const { stdout: localHead } = await execAsync('git rev-parse HEAD', { cwd, windowsHide: true });
     currentCommit = localHead.trim();
   } catch {
     return {
@@ -77,7 +77,7 @@ export async function checkSoftwareUpdate(force = false, cwd = process.cwd()): P
   }
 
   try {
-    await execAsync(FETCH_MAIN, { cwd, timeout: 15000 });
+    await execAsync(FETCH_MAIN, { cwd, timeout: 15000, windowsHide: true });
   } catch {
     return {
       hasUpdate: false,
@@ -90,14 +90,14 @@ export async function checkSoftwareUpdate(force = false, cwd = process.cwd()): P
   }
 
   try {
-    const { stdout: remoteHead } = await execAsync(`git rev-parse ${REMOTE_MAIN}`, { cwd });
+    const { stdout: remoteHead } = await execAsync(`git rev-parse ${REMOTE_MAIN}`, { cwd, windowsHide: true });
     const { aheadBy, behindBy } = await aheadBehind(cwd);
     const state = classifyUpdate(aheadBy, behindBy);
 
     let commitMessage = '';
     if (state === 'behind') {
       try {
-        const { stdout } = await execAsync(`git log -1 --format=%s ${REMOTE_MAIN}`, { cwd });
+        const { stdout } = await execAsync(`git log -1 --format=%s ${REMOTE_MAIN}`, { cwd, windowsHide: true });
         commitMessage = stdout.trim();
       } catch {
         // The message is decoration; the update itself does not need it
@@ -139,7 +139,7 @@ export async function applySoftwareUpdate(
   rebuildClient = false
 ): Promise<{ success: boolean; message: string; error?: string; restart?: boolean }> {
   try {
-    await execAsync(FETCH_MAIN, { cwd, timeout: 30000 });
+    await execAsync(FETCH_MAIN, { cwd, timeout: 30000, windowsHide: true });
 
     // Re-check here rather than trusting the earlier check: commits can have
     // been made in between, and this is the step that changes files.
@@ -162,14 +162,14 @@ export async function applySoftwareUpdate(
 
     let packageChanged = false;
     try {
-      const { stdout: diffOut } = await execAsync(`git diff --name-only HEAD ${REMOTE_MAIN}`, { cwd });
+      const { stdout: diffOut } = await execAsync(`git diff --name-only HEAD ${REMOTE_MAIN}`, { cwd, windowsHide: true });
       packageChanged = diffOut.split('\n').some((f) => f.trim() === 'package.json');
     } catch {
       // Non-fatal diff check
     }
 
     try {
-      await execAsync(`git merge --ff-only ${REMOTE_MAIN}`, { cwd, timeout: 15000 });
+      await execAsync(`git merge --ff-only ${REMOTE_MAIN}`, { cwd, timeout: 15000, windowsHide: true });
     } catch (err: any) {
       return {
         success: false,
@@ -180,7 +180,7 @@ export async function applySoftwareUpdate(
 
     if (packageChanged) {
       try {
-        await execAsync('npm install --prefer-offline', { cwd, timeout: 60000 });
+        await execAsync('npm install --prefer-offline', { cwd, timeout: 60000, windowsHide: true });
       } catch {
         // Non-fatal if offline
       }
@@ -189,7 +189,7 @@ export async function applySoftwareUpdate(
     cachedStatus = null;
     lastCheckTime = 0;
 
-    const updatedMessage = `Updated ${behindBy} commit${behindBy === 1 ? '' : 's'} to ${(await execAsync('git rev-parse --short HEAD', { cwd })).stdout.trim()}.`;
+    const updatedMessage = `Updated ${behindBy} commit${behindBy === 1 ? '' : 's'} to ${(await execAsync('git rev-parse --short HEAD', { cwd, windowsHide: true })).stdout.trim()}.`;
 
     // When the server serves the built page (--serve-build) nothing watches
     // the files, so the page is rebuilt here and the caller restarts the
@@ -197,7 +197,7 @@ export async function applySoftwareUpdate(
     if (rebuildClient) {
       const viteJs = path.join(cwd, 'node_modules', 'vite', 'bin', 'vite.js');
       try {
-        await execAsync(`"${process.execPath}" "${viteJs}" build`, { cwd, timeout: 180000 });
+        await execAsync(`"${process.execPath}" "${viteJs}" build`, { cwd, timeout: 180000, windowsHide: true });
       } catch (err: any) {
         return {
           success: false,

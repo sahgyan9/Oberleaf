@@ -9,9 +9,12 @@ import { spawn } from 'child_process';
  * port (see the EADDRINUSE retry in index.ts), and this process exits.
  */
 export function relaunchSelf(): never {
+  // Not detached: on Windows a detached process has no console, so every git
+  // or cmd it later runs opened a visible console window. Attached, it keeps
+  // the launcher's hidden console and outlives this process all the same.
   const child = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
     cwd: process.cwd(),
-    detached: true,
+    detached: false,
     stdio: 'inherit',
     windowsHide: true,
     env: { ...process.env, OBERLEAF_RESTARTING: '1' },

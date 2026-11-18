@@ -2862,6 +2862,7 @@ export const App: React.FC = () => {
         updateInfo={updateInfo}
         onCheckAgain={() => handleCheckForUpdates(true, true)}
         isChecking={isCheckingUpdate}
+        onBeforeReload={flushPendingSave}
       />
 
       <QuitConfirmModal

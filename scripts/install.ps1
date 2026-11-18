@@ -32,6 +32,7 @@ $script:LogTextBox = $null
 $script:ProgressBar = $null
 $script:StatusLabel = $null
 $script:InstallTriggered = $false
+$script:InstallRunning = $false
 
 # -------------------------------------------------------------
 # Logging and Progress Helpers
@@ -64,6 +65,21 @@ function Set-ProgressStep {
     [System.Windows.Forms.Application]::DoEvents()
 }
 
+# Waits for a process while keeping the setup window responsive, so it can be
+# moved or minimized during long steps (winget, MiKTeX). Returns $false on
+# timeout. Without a window it is a plain wait.
+function Wait-ProcessResponsive {
+    param([System.Diagnostics.Process]$Process, [int]$TimeoutMs = -1)
+    if (-not $Process) { return $true }
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    while (-not $Process.WaitForExit(100)) {
+        if ($script:LogTextBox) { [System.Windows.Forms.Application]::DoEvents() }
+        if ($TimeoutMs -ge 0 -and $clock.ElapsedMilliseconds -ge $TimeoutMs) { return $false }
+    }
+    $Process.WaitForExit()
+    return $true
+}
+
 function Update-SessionEnvironment {
     foreach ($level in @("Machine", "User")) {
         $p = [Environment]::GetEnvironmentVariable("Path", $level)
@@ -90,8 +106,11 @@ function Install-Package {
     Write-Log "      winget install $Id..." "DarkGray"
     $args = @("install", "--id", $Id, "-e", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity")
     if (-not $IsElevated) { $args += @("--scope", "user") }
-    $p = Start-Process -FilePath "winget.exe" -ArgumentList $args -NoNewWindow -Wait -PassThru -ErrorAction SilentlyContinue
-    if ($p) { return $p.ExitCode }
+    $p = Start-Process -FilePath "winget.exe" -ArgumentList $args -NoNewWindow -PassThru -ErrorAction SilentlyContinue
+    if ($p) {
+        Wait-ProcessResponsive $p | Out-Null
+        return $p.ExitCode
+    }
     return 1
 }
 
@@ -202,7 +221,7 @@ function Initialize-LatexPackages {
                 -WorkingDirectory $work -NoNewWindow -PassThru `
                 -RedirectStandardOutput $out -RedirectStandardError $err
 
-            if (-not $p.WaitForExit(300000)) {
+            if (-not (Wait-ProcessResponsive $p 300000)) {
                 try { $p.Kill() } catch {}
                 Copy-Item $out $warmupLog -Force -ErrorAction SilentlyContinue
                 Write-Log "      Timed out on $name. Log: $warmupLog" "Yellow"
@@ -451,7 +470,19 @@ function Show-SetupWizard {
         $setupForm.StartPosition = "CenterScreen"
         $setupForm.FormBorderStyle = "FixedDialog"
         $setupForm.MaximizeBox = $false
-        $setupForm.MinimizeBox = $false
+        # Minimize stays available: the install can take several minutes.
+        $setupForm.MinimizeBox = $true
+        # The X is refused while installing (a half-finished install is worse
+        # than waiting), but the title bar and its minimize button remain.
+        $setupForm.Add_FormClosing({
+            param($sender, $e)
+            if ($script:InstallRunning) {
+                $e.Cancel = $true
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Oberleaf is still installing. You can minimize this window and keep working; it will finish on its own.",
+                    "Oberleaf Setup", "OK", "Information") | Out-Null
+            }
+        })
 
         # Load Logo Icon from Base64
         $logoImage = $null
@@ -633,7 +664,7 @@ function Show-SetupWizard {
                 $pnlProgress.Visible = $true
                 $btnInstall.Enabled = $false
                 $btnCancel.Enabled = $false
-                $setupForm.ControlBox = $false
+                $script:InstallRunning = $true
 
                 [System.Windows.Forms.Application]::DoEvents()
 
@@ -643,14 +674,14 @@ function Show-SetupWizard {
                     $btnInstall.Enabled = $true
                     $btnCancel.Text = "Close"
                     $btnCancel.Enabled = $true
-                    $setupForm.ControlBox = $true
+                    $script:InstallRunning = $false
                 } catch {
                     Write-Log ("Installation exception: " + $_.ToString()) "Red"
                     $btnInstall.Text = "Close"
                     $btnInstall.Enabled = $true
                     $btnCancel.Text = "Close"
                     $btnCancel.Enabled = $true
-                    $setupForm.ControlBox = $true
+                    $script:InstallRunning = $false
                 }
             } else {
                 $setupForm.Close()

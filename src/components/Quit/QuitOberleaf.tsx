@@ -17,7 +17,7 @@ export async function quitOberleaf(): Promise<void> {
 
   const deadline = Date.now() + 20000;
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 200));
     try {
       const health = await fetch(`/health?alive=${Date.now()}`, { cache: 'no-store' });
       if (!health.ok && !stopsPage) return;

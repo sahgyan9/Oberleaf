@@ -21,6 +21,8 @@ interface UpdateModalProps {
   updateInfo: UpdateInfo | null;
   onCheckAgain: () => Promise<void>;
   isChecking: boolean;
+  /** Saves pending edits before the page reloads onto the new version. */
+  onBeforeReload?: () => Promise<unknown>;
 }
 
 // Gives the old process time to exit, then polls until the new one answers
@@ -45,12 +47,27 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   updateInfo,
   onCheckAgain,
   isChecking,
+  onBeforeReload,
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  // Closing the dialog does not stop an update: it carries on in the
+  // background with this pill in a corner, so the page stays usable.
+  if (!isOpen) {
+    if (!isUpdating && !updateSuccess) return null;
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed bottom-10 right-4 z-50 flex items-center gap-2 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel px-3 py-2 text-xs text-stone-700 dark:text-stone-200 shadow-md"
+      >
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-500" />
+        <span>{updateSuccess ?? 'Updating Oberleaf. You can keep working; the page reloads when it is done.'}</span>
+      </div>
+    );
+  }
 
   const handleApplyUpdate = async () => {
     setIsUpdating(true);
@@ -62,11 +79,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         if (data.restart) {
           // The server restarts itself to load the update; reload once it answers again.
           setUpdateSuccess(`${data.message} Restarting Oberleaf...`);
+          await onBeforeReload?.().catch(() => undefined);
           await waitForServerRestart();
           window.location.reload();
           return;
         }
         setUpdateSuccess(`${data.message} Reloading Oberleaf...`);
+        await onBeforeReload?.().catch(() => undefined);
         setTimeout(() => {
           window.location.reload();
         }, 1500);
@@ -85,13 +104,20 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   const plural = (n: number) => (n === 1 ? '' : 's');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 select-none">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 select-none"
+      // A click on the dimmed area outside the dialog hides it. A running
+      // update carries on, shown in the corner pill.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-2xl shadow-2xl max-w-md w-full p-6 text-stone-900 dark:text-stone-100 relative">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          disabled={isUpdating}
+          aria-label={isUpdating ? 'Hide; the update continues' : 'Close'}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition"
         >
           <X className="w-4 h-4" />
@@ -193,10 +219,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             <>
               <button
                 onClick={onClose}
-                disabled={isUpdating}
                 className="px-3.5 py-2 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-800 text-xs font-medium transition"
               >
-                Later
+                {isUpdating ? 'Keep working' : 'Later'}
               </button>
               <button
                 onClick={handleApplyUpdate}

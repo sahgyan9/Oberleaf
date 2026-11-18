@@ -455,6 +455,13 @@ $SplashScript = {
         $form.TopMost = $false
         $S.Ready = $true
     })
+    # Clicking any other window minimizes the splash to the taskbar, so a long
+    # first-run install or build never sits over the user's work.
+    $form.Add_Deactivate({
+        if ($S.Ready -and -not $S.Close -and $form.WindowState -ne 'Minimized') {
+            $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+        }
+    })
     $form.Add_FormClosed({ $timer.Stop() })
     $timer.Start()
     try {
@@ -560,13 +567,17 @@ function Wait-Process-WithSplash($Proc) {
 # opening the browser, and that is what the splash says.
 # ------------------------------------------------------------------
 function Open-RunningApp([string]$Url) {
+    # Splash first, browser last: opening the browser first put it over the
+    # splash at once, so on this (the usual) path the splash was never seen.
     Update-Splash 4 "Oberleaf is already running."
-    Open-App $Url
     if ($script:splashState) {
+        $until = [DateTime]::UtcNow.AddMilliseconds(1500)
+        while (-not $script:splashState.Ready -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 20 }
         Start-Sleep -Milliseconds 900
         Update-Splash $StepNames.Count "Oberleaf is already running."
-        Start-Sleep -Milliseconds 600
+        Start-Sleep -Milliseconds 400
     }
+    Open-App $Url
     Close-Splash
     exit 0
 }
