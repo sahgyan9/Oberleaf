@@ -2,24 +2,32 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Power, X } from 'lucide-react';
 
 /**
- * Asks the server to exit, then waits until /health stops answering so the
- * "stopped" screen is only shown once that is true.
+ * Asks the server to stop, then waits until it has, so the "stopped" screen is
+ * only shown once that is true.
+ *
+ * On Windows the server runs scripts/stop.ps1, which also ends the Vite dev
+ * server and the npm / cmd processes behind it (`stopsPage`). Then "stopped"
+ * means this page's own origin no longer answers at all. Otherwise only the
+ * API exits, and a failed /health through the dev proxy is enough.
  */
 export async function quitOberleaf(): Promise<void> {
   const res = await fetch('/api/system/quit', { method: 'POST' });
   if (!res.ok) throw new Error(`The server answered ${res.status}.`);
+  const { stopsPage = false } = await res.json().catch(() => ({}));
 
-  const deadline = Date.now() + 6000;
+  const deadline = Date.now() + 20000;
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
     try {
-      const health = await fetch('/health', { cache: 'no-store' });
-      if (!health.ok) return;
+      const health = await fetch(`/health?alive=${Date.now()}`, { cache: 'no-store' });
+      if (!health.ok && !stopsPage) return;
     } catch {
       return;
     }
   }
-  throw new Error('The server is still answering after 6 seconds.');
+  throw new Error(
+    'Oberleaf is still running after 20 seconds. Run Stop-Oberleaf.bat from the Oberleaf folder to stop it.'
+  );
 }
 
 interface QuitConfirmModalProps {

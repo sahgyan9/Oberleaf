@@ -1454,21 +1454,60 @@ app.post('/api/system/apply-update', async (_req, res) => {
 // Stops Oberleaf from the page. Closing the browser tab leaves this server
 // running in the background (the launcher starts it hidden), so this is the
 // only way to stop it short of Task Manager. Local-only via /api/system/.
-// The process exits once the response has reached the page; compiles still
-// running finish on their own and the next launch starts a fresh server.
+//
+// On Windows, exiting this process alone is not enough: under `npm start` the
+// Vite dev server, concurrently, tsx watch and their cmd wrappers keep
+// running. scripts/stop.ps1 ends that whole tree, so it is started outside
+// it (through WMI, whose new process has no parent here and no job object),
+// otherwise taskkill /T would end the stopper too. The reply says which
+// happened so the page knows what "stopped" looks like.
 app.post('/api/system/quit', (_req, res) => {
   console.log('[Oberleaf] Quit requested from the page; stopping the server.');
+  const stopScript = path.join(process.cwd(), 'scripts', 'stop.ps1');
+  const stopsAll = process.platform === 'win32' && fs.existsSync(stopScript);
+
+  const exitSelf = () => {
+    try {
+      stopCloudflareTunnel();
+    } catch {
+      // Not running.
+    }
+    process.exit(0);
+  };
+
   res.on('finish', () => {
-    setTimeout(() => {
-      try {
-        stopCloudflareTunnel();
-      } catch {
-        // Not running.
-      }
-      process.exit(0);
-    }, 150);
+    if (!stopsAll) {
+      setTimeout(exitSelf, 150);
+      return;
+    }
+    try {
+      stopCloudflareTunnel();
+    } catch {
+      // Not running.
+    }
+    const ps = (s: string) => s.replace(/'/g, "''");
+    const inner =
+      `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${stopScript}" ` +
+      `-ServerPid ${process.pid} -Ports ${PORT},5173`;
+    const launcher =
+      `Invoke-CimMethod -ClassName Win32_Process -MethodName Create ` +
+      `-Arguments @{ CommandLine = '${ps(inner)}'; CurrentDirectory = '${ps(process.cwd())}' } | Out-Null`;
+    try {
+      const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', launcher], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      child.on('error', exitSelf);
+      child.unref();
+    } catch {
+      exitSelf();
+      return;
+    }
+    // If the stopper never runs, still stop this server.
+    setTimeout(exitSelf, 15000).unref();
   });
-  res.json({ success: true });
+  res.json({ success: true, stopsPage: stopsAll });
 });
 
 // 14. Real-Time Collaboration & Tunnel Endpoints
