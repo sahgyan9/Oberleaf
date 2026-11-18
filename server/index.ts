@@ -1489,12 +1489,18 @@ app.post('/api/system/quit', (_req, res) => {
     const inner =
       `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${stopScript}" ` +
       `-ServerPid ${process.pid} -Ports ${PORT},5173`;
+    // ShowWindow 0: a process WMI creates gets its own console, which would
+    // flash before -WindowStyle Hidden takes effect.
     const launcher =
+      `$si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }; ` +
       `Invoke-CimMethod -ClassName Win32_Process -MethodName Create ` +
-      `-Arguments @{ CommandLine = '${ps(inner)}'; CurrentDirectory = '${ps(process.cwd())}' } | Out-Null`;
+      `-Arguments @{ CommandLine = '${ps(inner)}'; CurrentDirectory = '${ps(process.cwd())}'; ProcessStartupInformation = $si } | Out-Null`;
     try {
+      // Not detached: a detached process has no console, and Windows
+      // PowerShell then exits at once without running its command, so the
+      // stopper never started and Quit fell through to the 15 s fallback.
+      // WMI already puts the stopper outside this process tree.
       const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', launcher], {
-        detached: true,
         stdio: 'ignore',
         windowsHide: true,
       });
