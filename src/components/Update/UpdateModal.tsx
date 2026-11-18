@@ -112,7 +112,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-2xl shadow-2xl max-w-md w-full p-6 text-stone-900 dark:text-stone-100 relative">
+      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-2xl shadow-2xl max-w-md w-full max-h-full overflow-y-auto p-6 text-stone-900 dark:text-stone-100 relative">
         
         {/* Close Button */}
         <button

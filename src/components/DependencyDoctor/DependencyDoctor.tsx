@@ -179,7 +179,7 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder w-full max-w-xl rounded-xl p-6 shadow-2xl space-y-4">
+      <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder w-full max-w-xl max-h-full flex flex-col rounded-xl p-6 shadow-2xl space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-surface-lightBorder dark:border-surface-darkBorder pb-3">
           <div>
@@ -254,7 +254,7 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
           </div>
         </div>
 
-        <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
+        <div className="space-y-3 max-h-[26rem] min-h-0 overflow-y-auto pr-1">
           {/* Needs attention */}
           {attention.length > 0 && (
             <section className="space-y-2">
@@ -446,7 +446,7 @@ export const DependencyDoctor: React.FC<DependencyDoctorProps> = ({
         )}
 
         {tab === 'document' && (
-          <div className="space-y-2 max-h-[30rem] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[30rem] min-h-0 overflow-y-auto pr-1">
             {!documentFindings ? (
               <p className="text-xs text-stone-500 dark:text-stone-400 p-3">Open a .tex file to check it.</p>
             ) : documentFindings.length === 0 ? (

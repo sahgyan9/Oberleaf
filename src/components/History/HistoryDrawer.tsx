@@ -700,7 +700,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
         {/* Confirmation Modal for Reverting */}
         {showConfirmRevert && selectedCommit && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-            <div className="w-full max-w-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-crimson/40 rounded-xl p-5 shadow-2xl space-y-4">
+            <div className="w-full max-w-md max-h-full overflow-y-auto bg-surface-lightPanel dark:bg-surface-darkPanel border border-crimson/40 rounded-xl p-5 shadow-2xl space-y-4">
               <div className="flex items-center space-x-3 text-crimson dark:text-crimson-dark">
                 <div className="w-10 h-10 rounded-full bg-crimson-subtle dark:bg-crimson-darkSubtle flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-5 h-5" />

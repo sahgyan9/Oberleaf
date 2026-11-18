@@ -892,7 +892,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       {/* Bulk Delete Confirmation Modal */}
       {isBulkDeleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/30 rounded-xl shadow-2xl max-w-md w-full p-6 text-stone-900 dark:text-stone-100">
+          <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/30 rounded-xl shadow-2xl max-w-md w-full max-h-full overflow-y-auto p-6 text-stone-900 dark:text-stone-100">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5" />
@@ -937,7 +937,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       {/* Delete Confirmation Modal */}
       {deleteConfirmProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/30 rounded-xl shadow-2xl max-w-md w-full p-6 text-stone-900 dark:text-stone-100">
+          <div className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-rose-500/30 rounded-xl shadow-2xl max-w-md w-full max-h-full overflow-y-auto p-6 text-stone-900 dark:text-stone-100">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5" />

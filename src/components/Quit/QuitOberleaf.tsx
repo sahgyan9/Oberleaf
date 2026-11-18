@@ -79,7 +79,7 @@ export const QuitConfirmModal: React.FC<QuitConfirmModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="quit-title"
-        className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-2xl shadow-2xl max-w-sm w-full p-6 text-stone-900 dark:text-stone-100 relative"
+        className="bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder rounded-2xl shadow-2xl max-w-sm w-full max-h-full overflow-y-auto p-6 text-stone-900 dark:text-stone-100 relative"
       >
         <button
           type="button"
