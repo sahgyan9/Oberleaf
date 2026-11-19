@@ -25,21 +25,26 @@ interface UpdateModalProps {
   onBeforeReload?: () => Promise<unknown>;
 }
 
-// Gives the old process time to exit, then polls until the new one answers
-// (or 60 s pass; the reload then shows the startup screen's own error state).
-async function waitForServerRestart(): Promise<void> {
+// Gives the old process time to exit, then polls until the new one answers.
+// Returns false after 60 s: reloading then would only show the browser's
+// "site can't be reached" page, since nothing is serving this one.
+async function waitForServerRestart(): Promise<boolean> {
   await new Promise((r) => setTimeout(r, 1500));
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
     try {
       const res = await fetch('/health', { cache: 'no-store' });
-      if (res.ok) return;
+      if (res.ok) return true;
     } catch {
       // Not up yet.
     }
     await new Promise((r) => setTimeout(r, 500));
   }
+  return false;
 }
+
+const RESTART_FAILED =
+  'The update is installed, but Oberleaf did not start again. Open Oberleaf from the Start menu to use the new version.';
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({
   isOpen,
@@ -56,6 +61,25 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   // Closing the dialog does not stop an update: it carries on in the
   // background with this pill in a corner, so the page stays usable.
   if (!isOpen) {
+    // An update that failed after the dialog was hidden still has to be seen.
+    if (updateError && !isUpdating) {
+      return (
+        <div
+          role="alert"
+          className="fixed bottom-10 right-4 z-50 flex max-w-sm items-start gap-2 rounded-lg border border-rose-500/30 bg-surface-lightPanel dark:bg-surface-darkPanel px-3 py-2 text-xs text-rose-600 dark:text-rose-400 shadow-md"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <span className="flex-1">{updateError}</span>
+          <button
+            onClick={() => setUpdateError(null)}
+            aria-label="Dismiss"
+            className="p-0.5 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    }
     if (!isUpdating && !updateSuccess) return null;
     return (
       <div
@@ -80,8 +104,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           // The server restarts itself to load the update; reload once it answers again.
           setUpdateSuccess(`${data.message} Restarting Oberleaf...`);
           await onBeforeReload?.().catch(() => undefined);
-          await waitForServerRestart();
-          window.location.reload();
+          if (await waitForServerRestart()) {
+            window.location.reload();
+            return;
+          }
+          setUpdateSuccess(null);
+          setUpdateError(RESTART_FAILED);
           return;
         }
         setUpdateSuccess(`${data.message} Reloading Oberleaf...`);
