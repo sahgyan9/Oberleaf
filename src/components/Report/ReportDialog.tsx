@@ -232,7 +232,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, pro
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={status?.telemetry === 'on'}
+                  checked={status?.telemetry !== 'off'}
                   onChange={(e) => void toggleSignals(e.target.checked)}
                   className="mt-0.5 accent-[#1B5E20]"
                 />

@@ -265,7 +265,7 @@ export const App: React.FC = () => {
   const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isQuitOpen, setIsQuitOpen] = useState<boolean>(false);
-  // Problem reports and opt-in error signals (docs/ERROR_REPORTING.md)
+  // Problem reports and error signals, on unless turned off (docs/ERROR_REPORTING.md)
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
   const [reportingStatus, setReportingStatus] = useState<ReportingStatus | null>(null);
   const [consentReady, setConsentReady] = useState<boolean>(false);
@@ -2177,7 +2177,7 @@ export const App: React.FC = () => {
     command('theme', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', () => toggleTheme(), { keywords: 'appearance mode night day' });
     command('report', 'Report a problem', () => setIsReportOpen(true), { keywords: 'bug feedback issue error crash send log help' });
     if (reportingStatus?.canSend) {
-      const on = reportingStatus.telemetry === 'on';
+      const on = reportingStatus.telemetry !== 'off';
       command('signals', on ? 'Error signals: turn off' : 'Error signals: turn on', () => {
         void setTelemetry(on ? 'off' : 'on').then(refreshReportingStatus);
       }, { keywords: 'telemetry privacy anonymous crash reports' });

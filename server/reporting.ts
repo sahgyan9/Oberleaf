@@ -58,7 +58,10 @@ export function loadReportingConfig(root = APP_ROOT): ReportingConfig {
 export type TelemetryChoice = 'unset' | 'on' | 'off';
 
 export interface ReportingSettings {
-  /** 'unset' until the user answers the one-time question; signals only flow when 'on' */
+  /**
+   * 'unset' until the user has seen the one-time notice. Signals are on by
+   * default: they flow unless this is 'off'.
+   */
   telemetry: TelemetryChoice;
   /** Random, generated here, not derived from anything about the user or machine */
   installId: string;
@@ -470,7 +473,9 @@ export async function postEvent(
         event,
         distinct_id: distinctId,
         timestamp: new Date().toISOString(),
-        properties: { ...properties, $process_person_profile: false, $lib: 'oberleaf-server' },
+        // No person profile, and no GeoIP lookup: "discard client IP data"
+        // drops the IP only after PostHog has derived country and coordinates.
+        properties: { ...properties, $process_person_profile: false, $geoip_disable: true, $lib: 'oberleaf-server' },
       }),
       signal: controller.signal,
     });
@@ -482,7 +487,7 @@ export async function postEvent(
   }
 }
 
-/** Sends a signal if, and only if, the user turned signals on. */
+/** Sends a signal unless the user turned signals off. */
 export async function sendSignal(
   signal: Signal,
   deps: { config?: ReportingConfig; settings?: ReportingSettings; fetchImpl?: typeof fetch } = {}
@@ -490,7 +495,7 @@ export async function sendSignal(
   const config = deps.config ?? loadReportingConfig();
   const settings = deps.settings ?? readReportingSettings();
   if (!config.posthogKey) return { sent: false, reason: 'not-configured' };
-  if (settings.telemetry !== 'on') return { sent: false, reason: 'opted-out' };
+  if (settings.telemetry === 'off') return { sent: false, reason: 'opted-out' };
 
   const key = `${signal.kind}|${signal.signature}`;
   if (sentThisRun.has(key)) return { sent: false, reason: 'duplicate' };

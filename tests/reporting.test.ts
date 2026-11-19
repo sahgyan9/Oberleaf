@@ -105,13 +105,18 @@ describe('sendSignal', () => {
   const signal = { kind: 'client-crash' as const, signature: 'TypeError: x is undefined' };
   beforeEach(() => resetSignalState());
 
-  it('sends nothing unless the user turned signals on', async () => {
+  it('sends nothing once the user turned signals off', async () => {
     const fetchImpl = vi.fn();
-    for (const telemetry of ['unset', 'off'] as const) {
-      const out = await sendSignal(signal, { config, settings: { telemetry, installId: 'i' }, fetchImpl });
-      expect(out).toEqual({ sent: false, reason: 'opted-out' });
-    }
+    const out = await sendSignal(signal, { config, settings: { telemetry: 'off', installId: 'i' }, fetchImpl });
+    expect(out).toEqual({ sent: false, reason: 'opted-out' });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('is on by default, before the notice has been answered', async () => {
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }));
+    const out = await sendSignal(signal, { config, settings: { telemetry: 'unset', installId: 'i' }, fetchImpl: fetchImpl as any });
+    expect(out).toEqual({ sent: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('sends nothing when no PostHog key is configured', async () => {
@@ -131,7 +136,7 @@ describe('sendSignal', () => {
     expect(url).toBe('https://posthog.invalid/capture/');
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({ api_key: 'phc_test', event: 'oberleaf_error_signal', distinct_id: 'install-1' });
-    expect(body.properties).toMatchObject({ kind: 'client-crash', signature: 'TypeError: x is undefined', $process_person_profile: false });
+    expect(body.properties).toMatchObject({ kind: 'client-crash', signature: 'TypeError: x is undefined', $process_person_profile: false, $geoip_disable: true });
     expect(JSON.stringify(body)).not.toMatch(new RegExp(os.userInfo().username, 'i'));
   });
 });

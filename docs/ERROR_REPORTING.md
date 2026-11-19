@@ -54,9 +54,9 @@ Redaction, applied to every log line and file name: the Windows user name and ev
 
 Ways out: **Send report** (to PostHog, when configured), **GitHub issue** (saves the report file and opens a pre-filled issue on `sahgyan9/Oberleaf`; the user attaches the file; needs a GitHub account), **Save file**, **Copy**.
 
-### 2. Error signals (opt-in)
+### 2. Error signals (on by default)
 
-Asked once, after the app has loaded, and only when a PostHog key is configured. Off until the user says yes; Ctrl+K, "Error signals: turn on/off" changes it. The choice and a random install ID are stored in `%APPDATA%\Oberleaf\reporting.json`.
+On unless the user turns them off (changed from opt-in on 2026-11-19: a question that needs a click to say yes meant almost nobody would). Only when a PostHog key is configured. After the app has loaded, a notice ("Anonymous error reports") is shown once, with an On/Off switch, "What is sent", and "Got it", which stores the choice so the notice does not come back. Ctrl+K, "Error signals: turn on/off" and the checkbox in "Report a problem" change it later. An install that chose "No thanks" under the old question stays off. The choice and a random install ID are stored in `%APPDATA%\Oberleaf\reporting.json`.
 
 Sent only for failures that point at Oberleaf, not the document:
 
@@ -69,14 +69,16 @@ Sent only for failures that point at Oberleaf, not the document:
 | `package-install-failed` | the package manager could not install a package |
 | `client-crash` | an uncaught error in the page |
 
-Each event carries the kind, an error signature (`errorSignature`: paths, user file names, line numbers and e-mails removed; TeX package names kept), the engine, Oberleaf version and commit, Windows and TeX versions, and the install ID. No document text, file or project names, user name. One event per signature per run, at most 50 per day. PostHog person profiles are off (`$process_person_profile: false`).
+Each event carries the kind, an error signature (`errorSignature`: paths, user file names, line numbers and e-mails removed; TeX package names kept), the engine, Oberleaf version and commit, Windows and TeX versions, and the install ID. No document text, file or project names, user name. One event per signature per run, at most 50 per day. PostHog person profiles are off (`$process_person_profile: false`), and so is GeoIP (`$geoip_disable: true`): with only "discard client IP data" on, PostHog still stored country and approximate coordinates, because it looks the IP up before dropping it.
 
 ### Setting up PostHog (once)
 
 1. Create a free PostHog account and a project for Oberleaf. Choose the EU region if testers are mostly in Europe; otherwise US is fine.
 2. Copy the project's API key (starts with `phc_`) into `config/reporting.json` as `posthogKey`, and set `posthogHost` to `https://us.i.posthog.com` or `https://eu.i.posthog.com`. This key can only write events, so it is safe in the public repository; PostHog designs it to be embedded in apps.
 3. In the project settings, turn on discarding client IP data, so testers' IP addresses are not stored.
-4. Commit and push. Testers get it with their next in-app update, and the one-time question appears.
+4. Commit and push. Testers get it with their next in-app update, and the one-time notice appears.
+
+Done on 2026-11-19: PostHog organization "Oberleaf" (separate from friendly-learning's, same login), US region, IP discarding on, session recording off. The developer's personal key and project ID are in `.env`. Test report `bddc11b2` was sent from the app and read back with `fetch-reports.ts`.
 5. For the developer only: create a personal API key with read access, and put it in `.env` (gitignored):
 
 ```

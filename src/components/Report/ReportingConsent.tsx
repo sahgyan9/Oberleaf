@@ -3,21 +3,32 @@ import { ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
 import { setTelemetry } from '../../utils/reporting';
 
 interface ReportingConsentProps {
-  /** Called after the user chose, so the parent can refresh its status */
+  /** Called after the user closed the notice, so the parent can refresh its status */
   onDecided: () => void;
 }
 
 /**
- * Asked once, and only when this copy can send anything at all. Signals stay
- * off until the user says yes; "No thanks" is as prominent as "Turn on".
+ * Shown once, and only when this copy can send anything at all. Error signals
+ * are on by default; the switch turns them off right here, and Ctrl+K,
+ * "Error signals" changes it later.
  */
 export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided }) => {
   const [details, setDetails] = useState(false);
+  const [on, setOn] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const choose = async (choice: 'on' | 'off') => {
+  const toggle = async () => {
+    const next = !on;
+    setOn(next);
     setSaving(true);
-    await setTelemetry(choice);
+    await setTelemetry(next ? 'on' : 'off');
+    setSaving(false);
+  };
+
+  const close = async () => {
+    setSaving(true);
+    // Stores the choice, so the notice is not shown again.
+    await setTelemetry(on ? 'on' : 'off');
     setSaving(false);
     onDecided();
   };
@@ -31,11 +42,11 @@ export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided })
       <div className="flex items-center gap-2 mb-1.5">
         <ShieldCheck className="w-4 h-4 text-scholarly dark:text-scholarly-dark" />
         <h3 id="consent-title" className="font-semibold text-stone-900 dark:text-stone-100">
-          Send anonymous error reports?
+          Anonymous error reports
         </h3>
       </div>
       <p className="leading-relaxed">
-        When Oberleaf itself fails, it can send a short description of the error so it gets fixed. Your documents never leave your
+        When Oberleaf itself fails, it sends a short description of the error so it gets fixed. Your documents never leave your
         computer this way.
       </p>
       <button
@@ -56,20 +67,32 @@ export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided })
           <li>Change it any time: Ctrl+K, then "Error signals".</li>
         </ul>
       )}
-      <div className="mt-3 flex justify-end gap-2">
+      <div className="mt-3 flex items-center justify-between gap-2">
         <button
+          type="button"
+          role="switch"
+          aria-checked={on}
           disabled={saving}
-          onClick={() => void choose('off')}
-          className="px-3 py-1.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder font-medium hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile disabled:opacity-50"
+          onClick={() => void toggle()}
+          className="flex items-center gap-2 disabled:opacity-50"
         >
-          No thanks
+          <span
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+              on ? 'bg-scholarly dark:bg-scholarly-dark' : 'bg-stone-300 dark:bg-stone-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
+            />
+          </span>
+          <span className="font-medium text-stone-800 dark:text-stone-200">{on ? 'On' : 'Off'}</span>
         </button>
         <button
           disabled={saving}
-          onClick={() => void choose('on')}
-          className="px-3 py-1.5 rounded-lg font-medium bg-scholarly hover:bg-scholarly-hover text-white dark:bg-scholarly-dark dark:hover:bg-scholarly-darkHover transition btn-tactile disabled:opacity-50"
+          onClick={() => void close()}
+          className="px-3 py-1.5 rounded-lg border border-surface-lightBorder dark:border-surface-darkBorder font-medium hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle transition btn-tactile disabled:opacity-50"
         >
-          Turn on
+          Got it
         </button>
       </div>
     </div>
