@@ -210,6 +210,10 @@ export const App: React.FC = () => {
 
   // Compiler State
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
+  // Bumped by every compile and every project switch. A compile whose number
+  // is no longer current belongs to a project that is not open, so its result
+  // is dropped instead of landing in the project now on screen.
+  const compileRunRef = useRef(0);
   // 'errors': a PDF was written but TeX reported errors on the way (Overleaf's
   // "try to compile despite errors"); 'failed': no PDF at all.
   const [compileStatus, setCompileStatus] = useState<'idle' | 'compiling' | 'success' | 'errors' | 'failed'>('idle');
@@ -681,6 +685,24 @@ export const App: React.FC = () => {
     }
   }, [projectId, addToast]);
 
+  // Compile results belong to the project that produced them. Opening another
+  // project starts with none: no error card, status, gutter marks or fix
+  // receipt from the last one (its errors on main.tex used to show up on the
+  // new project's main.tex). Reopening the same project keeps them.
+  useEffect(() => {
+    compileRunRef.current++;
+    setIsCompiling(false);
+    setCompileStatus('idle');
+    setCompileDuration(null);
+    setCompileErrors([]);
+    setCompileWarnings([]);
+    setDiagnosticFocus(null);
+    setDetectedMissingPackages([]);
+    setMissingProjectFiles([]);
+    setFixReceipt(null);
+    fixSnapshotRef.current = null;
+  }, [projectId]);
+
   // When active project changes, reload files, citations, git status, comments, main.tex, and existing PDF preview
   useEffect(() => {
     if (!projectId) return;
@@ -1008,6 +1030,8 @@ export const App: React.FC = () => {
   // Compile Handler
   const handleCompile = async () => {
     if (isCompiling) return;
+    const run = ++compileRunRef.current;
+    const isCurrent = () => run === compileRunRef.current;
     setIsCompiling(true);
     setCompileStatus('compiling');
     setCompileErrors([]);
@@ -1036,9 +1060,12 @@ export const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mainFile: mainFilePath, engine: 'pdflatex' }),
       });
+      // The user opened another project while this one compiled.
+      if (!isCurrent()) return;
 
       if (res.ok) {
         const result = await res.json();
+        if (!isCurrent()) return;
         setCompileDuration(result.durationMs);
 
         // A PDF that was produced is always worth showing, even when the log
@@ -1107,6 +1134,7 @@ export const App: React.FC = () => {
         ]);
       }
     } catch {
+      if (!isCurrent()) return;
       setFixReceipt((r) => (r?.status === 'compiling' ? { ...r, status: 'failed', detail: 'applied, but the local server could not be reached to recompile' } : r));
       setCompileStatus('failed');
       setCompileErrors([
@@ -1118,7 +1146,9 @@ export const App: React.FC = () => {
         },
       ]);
     } finally {
-      setIsCompiling(false);
+      // After a project switch the reset already cleared it, and a compile
+      // started in the new project may be running.
+      if (isCurrent()) setIsCompiling(false);
     }
   };
 
