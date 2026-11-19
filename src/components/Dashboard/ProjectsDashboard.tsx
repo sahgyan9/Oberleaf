@@ -234,7 +234,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
     e.stopPropagation();
     try {
       setIsCloning(projectId);
-      const res = await fetch(`/api/projects/${projectId}/clone`, { method: 'POST' });
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/clone`, { method: 'POST' });
       if (res.ok) {
         await onRefreshProjects();
         notify('Project duplicated successfully.', 'success');
@@ -250,13 +250,13 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
 
   const handleDownloadZip = (projectId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    window.location.href = `/api/projects/${projectId}/zip`;
+    window.location.href = `/api/projects/${encodeURIComponent(projectId)}/zip`;
   };
 
   const handleDownloadPdf = async (project: ExtendedProjectInfo, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/projects/${project.id}/download-pdf`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/download-pdf`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         notify(data.error || 'PDF has not been compiled yet for this project.', 'warning');
@@ -280,7 +280,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
     } catch {
-      window.location.href = `/api/projects/${project.id}/download-pdf`;
+      window.location.href = `/api/projects/${encodeURIComponent(project.id)}/download-pdf`;
     }
   };
 
@@ -288,7 +288,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
     if (!deleteConfirmProject) return;
     try {
       setIsDeleting(true);
-      const res = await fetch(`/api/projects/${deleteConfirmProject.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/projects/${encodeURIComponent(deleteConfirmProject.id)}`, { method: 'DELETE' });
       if (res.ok) {
         await onRefreshProjects();
         setSelectedProjectIds((prev) => prev.filter((id) => id !== deleteConfirmProject.id));
@@ -313,7 +313,7 @@ export const ProjectsDashboard: React.FC<ProjectsDashboardProps> = ({
     try {
       for (const id of selectedProjectIds) {
         try {
-          const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+          const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
           if (!res.ok) failed.push(id);
         } catch {
           failed.push(id);

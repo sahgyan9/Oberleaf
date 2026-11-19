@@ -47,7 +47,7 @@ export const GitSyncModal: React.FC<GitSyncModalProps> = ({
     if (!projectId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/status`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/status`);
       if (res.ok) {
         const data: GitSyncStatus = await res.json();
         setStatus(data);
@@ -76,7 +76,7 @@ export const GitSyncModal: React.FC<GitSyncModalProps> = ({
     setIsLoading(true);
     setActionMessage(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/remote`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/remote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ remoteUrl: remoteUrl.trim(), token: token.trim() || undefined }),
@@ -99,7 +99,7 @@ export const GitSyncModal: React.FC<GitSyncModalProps> = ({
     setIsPushing(true);
     setActionMessage(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/push`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: token.trim() || undefined }),
@@ -123,7 +123,7 @@ export const GitSyncModal: React.FC<GitSyncModalProps> = ({
     setIsPulling(true);
     setActionMessage(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/pull`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: token.trim() || undefined }),

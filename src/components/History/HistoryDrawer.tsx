@@ -85,7 +85,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   const fetchSyncStatus = useCallback(async () => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/status`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/status`);
       if (res.ok) {
         const data = await res.json();
         setSyncStatus({
@@ -103,7 +103,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   const fetchSettings = useCallback(async () => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/settings`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/settings`);
       if (res.ok) {
         const data = await res.json();
         if (typeof data.autoCommitOnCompile === 'boolean') {
@@ -120,7 +120,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     if (!projectId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/history`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/history`);
       if (res.ok) {
         const data: HistoryCommit[] = await res.json();
         setCommits(data);
@@ -150,7 +150,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
       setIsLoadingDiff(true);
       try {
         const res = await fetch(
-          `/api/projects/${projectId}/history/${commit.hash}/diff?file=${encodeURIComponent(
+          `/api/projects/${encodeURIComponent(projectId)}/history/${commit.hash}/diff?file=${encodeURIComponent(
             activeFilePath
           )}`
         );
@@ -180,7 +180,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     setIsCommitting(true);
     setCommitStatus(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/commit`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -208,7 +208,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
         } else {
           setIsPushing(true);
           try {
-            const pushRes = await fetch(`/api/projects/${projectId}/git/push`, {
+            const pushRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/push`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({}),
@@ -242,7 +242,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     const nextVal = !autoCommitOnCompile;
     setAutoCommitOnCompile(nextVal);
     try {
-      await fetch(`/api/projects/${projectId}/git/settings`, {
+      await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ autoCommitOnCompile: nextVal }),
@@ -259,7 +259,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     }
     setIsPushing(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/push`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -281,7 +281,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     }
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/git/pull`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/git/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -302,7 +302,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     if (!selectedCommit || isReverting) return;
     setIsReverting(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/history/revert`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/history/revert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash: selectedCommit.hash }),

@@ -271,7 +271,7 @@ export function registerLatexCompletions(
           })
           .map((img, idx) => {
             const previewUrl = context.projectId
-              ? `/api/projects/${context.projectId}/preview-image?path=${encodeURIComponent(img.relativePath)}`
+              ? `/api/projects/${encodeURIComponent(context.projectId)}/preview-image?path=${encodeURIComponent(img.relativePath)}`
               : '';
             const sizeStr = formatBytes(img.size);
             const baseName = img.name.replace(/\.[^/.]+$/, '');
@@ -860,7 +860,7 @@ export function registerLatexCompletions(
 
           const previewPath = matchedImage ? matchedImage.relativePath : imagePath;
           const previewUrl = context.projectId && matchedImage
-            ? `/api/projects/${context.projectId}/preview-image?path=${encodeURIComponent(previewPath)}`
+            ? `/api/projects/${encodeURIComponent(context.projectId)}/preview-image?path=${encodeURIComponent(previewPath)}`
             : '';
           const sizeStr = matchedImage?.size ? formatBytes(matchedImage.size) : '';
 

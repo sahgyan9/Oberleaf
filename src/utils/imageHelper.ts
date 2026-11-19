@@ -38,7 +38,7 @@ export function isImageFile(file: File): boolean {
 }
 
 export function previewImageUrl(projectId: string, relativePath: string): string {
-  return `/api/projects/${projectId}/preview-image?path=${encodeURIComponent(relativePath)}`;
+  return `/api/projects/${encodeURIComponent(projectId)}/preview-image?path=${encodeURIComponent(relativePath)}`;
 }
 
 /**
@@ -120,7 +120,7 @@ export async function uploadProjectImage(projectId: string, file: File, fileName
     reader.readAsDataURL(file);
   });
 
-  const res = await fetch(`/api/projects/${projectId}/upload`, {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/upload`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fileName, base64Data, overwrite: false }),

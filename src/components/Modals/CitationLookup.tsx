@@ -110,7 +110,7 @@ export const CitationLookup: React.FC<CitationLookupProps> = ({ projectId, citat
       const bibtex = key === entry.key ? entry.bibtex : entry.bibtex.replace(`{${entry.key},`, `{${key},`);
       // Add to the bibliography the project already uses, when it has one at the top level.
       const rootBib = citations.map((c) => c.bibFile).find((f) => f && !f.includes('/'));
-      const res = await fetch(`/api/projects/${projectId}/citations`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/citations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rawBibtex: bibtex, bibFile: rootBib || 'references.bib' }),

@@ -74,7 +74,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
     if (!projectId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/citations`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/citations`);
       if (res.ok) {
         const data: CitationItem[] = await res.json();
         setCitations(data);
@@ -140,7 +140,7 @@ export const InsertCitationModal: React.FC<InsertCitationModalProps> = ({
 
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/citations`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/citations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rawBibtex: bibtexToSubmit }),

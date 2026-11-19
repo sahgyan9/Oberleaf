@@ -141,6 +141,19 @@ const DEFAULT_STARTER_DOCUMENT = [
 // content and the project actually being opened cannot disagree.
 const initialProjectId = getInitialProjectId();
 
+// The project id is its folder name, which may hold spaces or accents
+// ("My Thesis"), so the hash carries it encoded: #/project/My%20Thesis.
+const projectHash = (id: string) => `#/project/${encodeURIComponent(id)}`;
+function projectIdFromHash(hash: string): string | null {
+  if (!hash.startsWith('#/project/')) return null;
+  const raw = hash.slice('#/project/'.length).trim();
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export const App: React.FC = () => {
   // Toast notification system (replaces window.alert)
   const { toasts, addToast, removeToast } = useToast();
@@ -450,9 +463,8 @@ export const App: React.FC = () => {
           }
         }
 
-        const hash = window.location.hash;
-        if (hash.startsWith('#/project/')) {
-          const hashId = hash.replace('#/project/', '').trim();
+        const hashId = projectIdFromHash(window.location.hash);
+        if (hashId) {
           const match = data.find((p) => p.id === hashId);
           if (match) {
             setProjectId(match.id);
@@ -493,7 +505,7 @@ export const App: React.FC = () => {
   // Open project from dashboard into editor
   const handleOpenProject = useCallback((id: string) => {
     // Touch on backend to record access time
-    fetch(`/api/projects/${id}/touch`, { method: 'POST' }).catch(() => {});
+    fetch(`/api/projects/${encodeURIComponent(id)}/touch`, { method: 'POST' }).catch(() => {});
 
     // Optimistically update timestamp in local state so Recents updates immediately
     const nowIso = new Date().toISOString();
@@ -509,7 +521,7 @@ export const App: React.FC = () => {
     if (match) {
       setProjectName(match.name);
       if (match.hasPdf) {
-        const initialPdf = `/api/projects/${id}/pdf?t=${Date.now()}`;
+        const initialPdf = `/api/projects/${encodeURIComponent(id)}/pdf?t=${Date.now()}`;
         setPdfUrl(initialPdf);
         setLastValidPdfUrl(initialPdf);
         setCompileStatus('idle');
@@ -524,7 +536,7 @@ export const App: React.FC = () => {
 
     setProjectId(id);
     writeSetting('active-project-id', id);
-    window.location.hash = `#/project/${id}`;
+    window.location.hash = projectHash(id);
     setCurrentView('editor');
   }, [projects]);
 
@@ -540,15 +552,15 @@ export const App: React.FC = () => {
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (hash.startsWith('#/project/')) {
-        const id = hash.replace('#/project/', '').trim();
+        const id = projectIdFromHash(hash);
         if (id) {
-          fetch(`/api/projects/${id}/touch`, { method: 'POST' }).catch(() => {});
+          fetch(`/api/projects/${encodeURIComponent(id)}/touch`, { method: 'POST' }).catch(() => {});
           setProjectId(id);
           const match = projects.find((p) => p.id === id);
           if (match) {
             setProjectName(match.name);
             if (match.hasPdf) {
-              const initialPdf = `/api/projects/${id}/pdf?t=${Date.now()}`;
+              const initialPdf = `/api/projects/${encodeURIComponent(id)}/pdf?t=${Date.now()}`;
               setPdfUrl(initialPdf);
               setLastValidPdfUrl(initialPdf);
               setCompileStatus('idle');
@@ -568,7 +580,7 @@ export const App: React.FC = () => {
   // Load Project Files
   const loadProjectFiles = useCallback(async (pId: string) => {
     try {
-      const res = await fetch(`/api/projects/${pId}/files`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/files`);
       if (res.ok) {
         const data: FileEntry[] = await res.json();
         setFiles(data);
@@ -595,7 +607,7 @@ export const App: React.FC = () => {
     async (pId: string, relPath: string): Promise<boolean> => {
       setIsLoadingFile(true);
       try {
-        const res = await fetch(`/api/projects/${pId}/file?path=${encodeURIComponent(relPath)}`);
+        const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/file?path=${encodeURIComponent(relPath)}`);
         if (res.ok) {
           const content = await res.text();
           const finalContent = content || (relPath === 'main.tex' ? DEFAULT_STARTER_DOCUMENT : '');
@@ -631,7 +643,7 @@ export const App: React.FC = () => {
   // Load Citations
   const loadCitations = useCallback(async (pId: string) => {
     try {
-      const res = await fetch(`/api/projects/${pId}/citations`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/citations`);
       if (res.ok) {
         const data: CitationItem[] = await res.json();
         setCitations(data);
@@ -645,7 +657,7 @@ export const App: React.FC = () => {
   const fetchGitSyncStatus = useCallback(async (pId: string) => {
     if (!pId) return;
     try {
-      const res = await fetch(`/api/projects/${pId}/git/status`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/git/status`);
       if (res.ok) {
         const data = await res.json();
         setGitSyncStatus({
@@ -661,7 +673,7 @@ export const App: React.FC = () => {
   const fetchComments = useCallback(async (pId: string) => {
     if (!pId) return;
     try {
-      const res = await fetch(`/api/projects/${pId}/comments`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/comments`);
       if (res.ok) {
         const data: CommentThread[] = await res.json();
         setComments(data);
@@ -673,7 +685,7 @@ export const App: React.FC = () => {
   const handleCleanBuild = useCallback(async () => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/clean`, { method: 'POST' });
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/clean`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         addToast(data.message || 'Build cache cleared', 'success');
@@ -715,7 +727,7 @@ export const App: React.FC = () => {
     // Open the main document, which is not necessarily main.tex. Set the ref
     // before loading so loadFileContent reads the title from the right file.
     let isMounted = true;
-    fetch(`/api/projects/${projectId}/main-file`)
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/main-file`)
       .then((res) => (res.ok ? res.json() : null))
       .catch(() => null)
       .then((data) => {
@@ -728,11 +740,11 @@ export const App: React.FC = () => {
       });
 
     // Auto-detect existing compiled PDF so the user doesn't have to recompile
-    fetch(`/api/projects/${projectId}/pdf`, { method: 'HEAD' })
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/pdf`, { method: 'HEAD' })
       .then((res) => {
         if (!isMounted) return;
         if (res.ok) {
-          const freshPdf = `/api/projects/${projectId}/pdf?t=${Date.now()}`;
+          const freshPdf = `/api/projects/${encodeURIComponent(projectId)}/pdf?t=${Date.now()}`;
           setPdfUrl(freshPdf);
           setLastValidPdfUrl(freshPdf);
           setCompileStatus('idle');
@@ -767,7 +779,7 @@ export const App: React.FC = () => {
         onPeersChange: (count) => setCollabPeersCount(count),
         onRemoteCompile: (timestamp) => {
           if (projectId) {
-            const freshUrl = `/api/projects/${projectId}/pdf?t=${timestamp}`;
+            const freshUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?t=${timestamp}`;
             setPdfUrl(freshUrl);
             setLastValidPdfUrl(freshUrl);
             addToast('Document recompiled by collaborator. Preview updated.', 'info');
@@ -808,7 +820,7 @@ export const App: React.FC = () => {
       setIsJumpingToPdf(true);
       try {
         const res = await fetch(
-          `/api/projects/${projectId}/synctex/forward?file=${encodeURIComponent(
+          `/api/projects/${encodeURIComponent(projectId)}/synctex/forward?file=${encodeURIComponent(
             activeFilePath
           )}&line=${line}`
         );
@@ -862,7 +874,7 @@ export const App: React.FC = () => {
         }
 
         const res = await fetch(
-          `/api/projects/${projectId}/synctex/backward?${queryParams.toString()}`
+          `/api/projects/${encodeURIComponent(projectId)}/synctex/backward?${queryParams.toString()}`
         );
         if (res.ok) {
           const result = await res.json();
@@ -943,7 +955,7 @@ export const App: React.FC = () => {
       setSaveStatus('saving');
       try {
         const res = await fetch(
-          `/api/projects/${projectId}/file?path=${encodeURIComponent(filePathToSave)}`,
+          `/api/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(filePathToSave)}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1055,7 +1067,7 @@ export const App: React.FC = () => {
       const contentToCompile = getLiveContent();
       await saveActiveFile(contentToCompile);
 
-      const res = await fetch(`/api/projects/${projectId}/compile`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/compile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mainFile: mainFilePath, engine: 'pdflatex' }),
@@ -1386,7 +1398,7 @@ export const App: React.FC = () => {
           undoable: false,
         });
         try {
-          const res = await fetch(`/api/projects/${projectId}/packages/install`, {
+          const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/packages/install`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ packageName: fix.packageName }),
@@ -1647,7 +1659,7 @@ export const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async () => {
         try {
-          const res = await fetch(`/api/projects/${projectId}/upload`, {
+          const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/upload`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1768,7 +1780,7 @@ export const App: React.FC = () => {
         const blob = new Blob([JSON.stringify({ content: getLiveContent() })], {
           type: 'application/json',
         });
-        fetch(`/api/projects/${projectId}/file?path=${encodeURIComponent(activeFilePath)}`, {
+        fetch(`/api/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(activeFilePath)}`, {
           method: 'POST',
           body: blob,
           keepalive: true,
@@ -1800,7 +1812,7 @@ export const App: React.FC = () => {
 
   const handleRenameItem = async (oldPath: string, newName: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/rename`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPath, newName }),
@@ -1812,7 +1824,7 @@ export const App: React.FC = () => {
         }
         // The server moves the main document along with its own rename or
         // its folder's; pick up the new path.
-        const mainRes = await fetch(`/api/projects/${projectId}/main-file`);
+        const mainRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/main-file`);
         if (mainRes.ok) {
           const { mainFile } = await mainRes.json();
           if (typeof mainFile === 'string' && mainFile) setMainFilePath(mainFile);
@@ -1830,7 +1842,7 @@ export const App: React.FC = () => {
   const handleDeleteItem = async (pathToDelete: string) => {
     try {
       const res = await fetch(
-        `/api/projects/${projectId}/file?path=${encodeURIComponent(pathToDelete)}`,
+        `/api/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(pathToDelete)}`,
         { method: 'DELETE' }
       );
       if (res.ok) {
@@ -1850,7 +1862,7 @@ export const App: React.FC = () => {
 
   const handleSetMainFile = async (relPath: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/main-file`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/main-file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mainFile: relPath }),
@@ -1872,7 +1884,7 @@ export const App: React.FC = () => {
 
   const handleDuplicateItem = async (path: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/duplicate`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath: path }),
@@ -1900,7 +1912,7 @@ export const App: React.FC = () => {
     const { mode, parentFolder } = newItemModal;
     const targetPath = parentFolder ? `${parentFolder}/${itemName}` : itemName;
     try {
-      const res = await fetch(`/api/projects/${projectId}/create-file`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/create-file`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPath, type: mode === 'folder' ? 'directory' : 'file' }),
@@ -2938,7 +2950,7 @@ export const App: React.FC = () => {
             onPeersChange: (count) => setCollabPeersCount(count),
             onRemoteCompile: (timestamp) => {
               if (projectId) {
-                const freshUrl = `/api/projects/${projectId}/pdf?t=${timestamp}`;
+                const freshUrl = `/api/projects/${encodeURIComponent(projectId)}/pdf?t=${timestamp}`;
                 setPdfUrl(freshUrl);
                 setLastValidPdfUrl(freshUrl);
                 addToast('Document recompiled by collaborator. Preview updated.', 'info');

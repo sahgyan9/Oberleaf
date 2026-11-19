@@ -69,7 +69,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
     if (!projectId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/comments`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/comments`);
       if (res.ok) {
         const data: CommentThread[] = await res.json();
         setThreads(data);
@@ -97,7 +97,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
     localStorage.setItem('oberleaf_author_name', authorName.trim() || 'Reviewer');
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/comments`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,7 +125,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
     if (!text || !text.trim()) return;
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/comments/${threadId}/replies`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/comments/${threadId}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,7 +147,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
   const handleToggleStatus = async (threadId: string, currentStatus: 'open' | 'resolved') => {
     const nextStatus = currentStatus === 'open' ? 'resolved' : 'open';
     try {
-      const res = await fetch(`/api/projects/${projectId}/comments/${threadId}/status`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/comments/${threadId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
@@ -163,7 +163,7 @@ export const CommentsDrawer: React.FC<CommentsDrawerProps> = ({
   const handleDeleteComment = async (threadId: string) => {
     if (!window.confirm('Delete this comment thread?')) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/comments/${threadId}`, {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/comments/${threadId}`, {
         method: 'DELETE',
       });
       if (res.ok) {

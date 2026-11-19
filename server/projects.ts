@@ -17,14 +17,34 @@ export function isInside(root: string, candidate: string): boolean {
   return normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep);
 }
 
-// A project id is a single directory name, never a path.
-// Express decodes route params, so "..%2F..%2Ffoo" arrives here as "../../foo".
+// A project id is the project's folder name: a single directory name, never a
+// path. Projects made in the app get slugs, but a folder made by hand in File
+// Explorer ("My Thesis", "Notes (2026)", "Résumé") is a project too, so any
+// name Windows allows is accepted except:
+// - path separators and the characters Windows forbids (<>:"/\|?*), control
+//   characters, "." and "..": Express decodes route params, so "..%2F..%2Ffoo"
+//   arrives here as "../../foo";
+// - '#' and '%', which would cut or corrupt a URL that forgot to encode the id;
+// - a leading '.' (hidden folders such as .git) or '-' (read as an option by
+//   git and tar), a trailing '.' (Windows drops it, so it names another
+//   folder), and device names such as CON or NUL.
+const RESERVED_DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+
+export function isValidProjectId(id: string): boolean {
+  return (
+    id.length > 0 &&
+    id.length <= 200 &&
+    id === id.trim() &&
+    !/[<>:"/\\|?*#%\u0000-\u001f\u007f]/.test(id) &&
+    !/^[.\-]/.test(id) &&
+    !id.endsWith('.') &&
+    !RESERVED_DEVICE_NAME.test(id)
+  );
+}
+
 export function sanitizeProjectId(rawId: string): string {
   const id = (rawId || '').trim();
-  if (!id || id === '.' || id === '..') {
-    throw new Error('Invalid project id');
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) {
+  if (!isValidProjectId(id)) {
     throw new Error('Invalid project id');
   }
   return id;
@@ -248,7 +268,9 @@ export function listProjects(): ProjectSummary[] {
   const entries = fs.readdirSync(root, { withFileTypes: true });
 
   const projects = entries
-    .filter((e) => e.isDirectory())
+    // A folder no route would accept (e.g. a '#' in its name) would be listed
+    // but could not be opened.
+    .filter((e) => e.isDirectory() && isValidProjectId(e.name))
     .map((dir) => {
       const pPath = path.join(root, dir.name);
       const stat = fs.statSync(pPath);
