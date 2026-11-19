@@ -1,5 +1,7 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { configDefaults } from 'vitest/config';
 import path from 'path';
 
 // Monaco's package entry registers ~80 built-in languages plus the CSS, HTML,
@@ -27,6 +29,11 @@ function monacoLatexOnly(): Plugin {
 
 export default defineConfig({
   plugins: [react(), monacoLatexOnly()],
+  test: {
+    // Other Claude sessions keep full copies of the repo under
+    // .claude/worktrees; without this `vitest run` runs their tests too.
+    exclude: [...configDefaults.exclude, '.claude/**'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
