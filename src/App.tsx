@@ -6,6 +6,12 @@ import { FileTree, FileEntry } from './components/FileTree/FileTree';
 import { EditorToolbar } from './components/EditorToolbar/EditorToolbar';
 import { Editor, PDFViewer } from './components/Lazy/LazyPanels';
 import type { CompileErrorItem, SyncTexTarget, PDFViewerHandle, SuggestedFix, FixReceipt, MissingProjectFile } from './components/PDFViewer/PDFViewer';
+import {
+  WARNING_HINTS,
+  locateDuplicateLabels,
+  type CompileWarningItem,
+  type EditorDiagnostic,
+} from './utils/compileDiagnostics';
 import { bootStep } from './boot';
 import { EquationPreview } from './components/EquationPreview/EquationPreview';
 import { InsertImageModal } from './components/Modals/InsertImageModal';
@@ -201,11 +207,16 @@ export const App: React.FC = () => {
 
   // Compiler State
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
-  const [compileStatus, setCompileStatus] = useState<'idle' | 'compiling' | 'success' | 'failed'>('idle');
+  // 'errors': a PDF was written but TeX reported errors on the way (Overleaf's
+  // "try to compile despite errors"); 'failed': no PDF at all.
+  const [compileStatus, setCompileStatus] = useState<'idle' | 'compiling' | 'success' | 'errors' | 'failed'>('idle');
   const [compileDuration, setCompileDuration] = useState<number | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [lastValidPdfUrl, setLastValidPdfUrl] = useState<string | null>(null);
   const [compileErrors, setCompileErrors] = useState<CompileErrorItem[]>([]);
+  const [compileWarnings, setCompileWarnings] = useState<CompileWarningItem[]>([]);
+  // A gutter mark the user clicked: the diagnostics panel opens on its card.
+  const [diagnosticFocus, setDiagnosticFocus] = useState<{ line: number; file: string; timestamp: number } | null>(null);
   // Quick-fix state. The receipt is what the user sees; the snapshot ref holds
   // the text on either side of the fix so Undo can refuse to clobber edits
   // made after it.
@@ -983,6 +994,7 @@ export const App: React.FC = () => {
     setIsCompiling(true);
     setCompileStatus('compiling');
     setCompileErrors([]);
+    setCompileWarnings([]);
     setDetectedMissingPackages([]);
     setMissingProjectFiles([]);
 
@@ -1016,7 +1028,11 @@ export const App: React.FC = () => {
         // still carries errors -- the diagnostics panel reports those
         // alongside the updated preview rather than hiding the output.
         const errors = result.errors || [];
+        // Errors TeX had to recover from; a missing .bib file is reported as
+        // severity 'warning' because the PDF is complete apart from [?].
+        const hardErrors = errors.filter((e: CompileErrorItem) => e.severity !== 'warning');
         setCompileErrors(errors);
+        setCompileWarnings(locateDuplicateLabels(result.warningItems || [], activeFilePath, getLiveContent()));
         setMissingProjectFiles(errors.length > 0 ? result.missingProjectFiles || [] : []);
 
         if (errors.length > 0) {
@@ -1029,7 +1045,7 @@ export const App: React.FC = () => {
         // is actually gone, not just that a compile finished.
         setFixReceipt((r) => {
           if (!r || r.status !== 'compiling') return r;
-          const rootErrors = errors.filter((e: CompileErrorItem) => !e.isCascading).length;
+          const rootErrors = hardErrors.filter((e: CompileErrorItem) => !e.isCascading).length;
           if (rootErrors === 0) return { ...r, status: 'resolved' };
           const target = fixSnapshotRef.current?.targetMessage;
           const stillThere = target !== undefined && errors.some((e: CompileErrorItem) => e.message === target);
@@ -1043,11 +1059,15 @@ export const App: React.FC = () => {
           setPdfUrl(freshPdfUrl);
           setLastValidPdfUrl(freshPdfUrl);
           broadcastRemoteCompile(Date.now());
+        } else {
+          // Keep showing the last good PDF, but as the last good PDF: with the
+          // old URL still in pdfUrl the viewer could not tell it was stale.
+          setPdfUrl(null);
         }
         if (result.documentTitle) {
           setDocTitle(result.documentTitle);
         }
-        setCompileStatus(errors.length > 0 ? 'failed' : 'success');
+        setCompileStatus(!result.pdfUrl ? 'failed' : hardErrors.length > 0 ? 'errors' : 'success');
       } else if (res.status === 409) {
         // The server serialises compiles per project. Another tab -- or a
         // collaborator -- is already building this document; that is a wait,
@@ -1061,7 +1081,9 @@ export const App: React.FC = () => {
         setCompileErrors([
           {
             file: mainFilePath,
-            line: 1,
+            // No line: this is not about the document, and a line would put a
+            // mark in the editor gutter.
+            line: 0,
             message: 'Compile failed to reach server.',
             friendlyExplanation: 'Ensure the local server daemon is running with npm start.',
           },
@@ -1073,7 +1095,7 @@ export const App: React.FC = () => {
       setCompileErrors([
         {
           file: mainFilePath,
-          line: 1,
+          line: 0,
           message: 'Local server connection error.',
           friendlyExplanation: 'Start the server daemon on port 3001 using: npm run server.',
         },
@@ -2005,6 +2027,35 @@ export const App: React.FC = () => {
     [deferredContent, activeFilePath]
   );
 
+  // Gutter marks for the open file: errors and warnings from the last compile
+  // whose file is this one. Entries without a line are left to the panel;
+  // Overleaf pins them to line 1, which points at nothing.
+  const editorDiagnostics = useMemo<EditorDiagnostic[]>(() => {
+    const isOpenFile = (f: string) => !!f && findProjectFile(files, f) === activeFilePath;
+    const out: EditorDiagnostic[] = [];
+    for (const e of compileErrors) {
+      if (e.line <= 0 || !isOpenFile(e.file)) continue;
+      out.push({
+        line: e.line,
+        severity: e.severity === 'warning' ? 'warning' : 'error',
+        message: e.message,
+        detail: e.friendlyExplanation,
+        highlight: e.highlight,
+        secondary: e.isCascading,
+      });
+    }
+    for (const w of compileWarnings) {
+      if (w.line <= 0 || !isOpenFile(w.file)) continue;
+      out.push({
+        line: w.line,
+        severity: w.kind === 'badbox' ? 'info' : 'warning',
+        message: w.message,
+        detail: WARNING_HINTS[w.kind],
+      });
+    }
+    return out;
+  }, [compileErrors, compileWarnings, files, activeFilePath]);
+
   // Page count of the current PDF, refreshed whenever a new PDF is shown
   // (project open, compile, a collaborator's compile). Asked of the server
   // so it works in code-only view, where no PDF is loaded in the page.
@@ -2449,6 +2500,13 @@ export const App: React.FC = () => {
                   }}
                   collabSession={collabSession ? { ...collabSession, filePath: activeFilePath } : null}
                   onCursorChange={setCursorPosition}
+                  diagnostics={editorDiagnostics}
+                  structureCheck={/\.(tex|ltx)$/i.test(activeFilePath)}
+                  onDiagnosticClick={(line) => {
+                    if (viewMode === 'code') setViewMode('split');
+                    if (pdfCollapsed) setPdfCollapsed(false);
+                    setDiagnosticFocus({ line, file: activeFilePath, timestamp: Date.now() });
+                  }}
                 />
               </div>
             </Panel>
@@ -2515,6 +2573,9 @@ export const App: React.FC = () => {
                 compileDuration={compileDuration}
                 compileStatus={compileStatus}
                 compileErrors={compileErrors}
+                compileWarnings={compileWarnings}
+                diagnosticFocus={diagnosticFocus}
+                resolveFile={(f) => (f ? findProjectFile(files, f) : undefined)}
                 onApplyFix={handleApplyFix}
                 onUndoFix={handleUndoFix}
                 fixReceipt={fixReceipt}
@@ -2594,6 +2655,7 @@ export const App: React.FC = () => {
         activeFilePath={activeFilePath}
         isCompiling={isCompiling}
         compileDuration={compileDuration}
+        compileStatus={compileStatus}
         cursorLine={cursorPosition.line}
         cursorColumn={cursorPosition.column}
         isDoctorHealthy={isDoctorHealthy}

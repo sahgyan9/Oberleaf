@@ -27,10 +27,21 @@ import {
   FileWarning,
   Upload,
   FolderInput,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  MessageSquareWarning,
 } from 'lucide-react';
 
 import { DetectedMissingPackage } from '../../utils/latexPackages';
 import { buildFixPreview } from '../../utils/fixPreview';
+import {
+  NO_REASON_MESSAGE,
+  UNEXPLAINED_ERROR_TEXT,
+  WARNING_HINTS,
+  WARNING_KIND_LABEL,
+  type CompileWarningItem,
+} from '../../utils/compileDiagnostics';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
@@ -79,6 +90,10 @@ export interface CompileErrorItem {
   isCascading?: boolean;
   cascadingFromLine?: number;
   raw?: string;
+  /** 'warning': the PDF is complete apart from this (a missing .bib file) */
+  severity?: 'error' | 'warning';
+  /** Text the editor underlines on the error's line */
+  highlight?: string;
 }
 
 /**
@@ -127,8 +142,16 @@ interface PDFViewerProps {
   pdfUrl: string | null;
   lastValidPdfUrl: string | null;
   compileDuration: number | null;
-  compileStatus: 'idle' | 'compiling' | 'success' | 'failed';
+  /** 'errors': a PDF was written despite errors; 'failed': no PDF */
+  compileStatus: 'idle' | 'compiling' | 'success' | 'errors' | 'failed';
   compileErrors: CompileErrorItem[];
+  compileWarnings?: CompileWarningItem[];
+  /** A gutter mark the user clicked; the panel opens on that line's card */
+  diagnosticFocus?: { line: number; file: string; timestamp: number } | null;
+  /** Maps a file name from the log to the project path, to match diagnosticFocus */
+  resolveFile?: (file: string) => string | undefined;
+  /** Opens "Report a problem" */
+  onReportProblem?: () => void;
   /** `file` is the error's file as the compiler reported it (absolute, ./main.tex or refs.bib) */
   onSelectErrorLine?: (line: number, file?: string) => void;
   onToggleCollapse?: () => void;
@@ -320,6 +343,10 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   compileDuration,
   compileStatus,
   compileErrors,
+  compileWarnings = [],
+  diagnosticFocus,
+  resolveFile,
+  onReportProblem,
   onSelectErrorLine,
   onToggleCollapse,
   synctexTarget,
@@ -348,6 +375,52 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageDims, setPageDims] = useState<PageDims[]>([]);
+  // null until the user opens or closes the diagnostics panel; their choice
+  // then holds across compiles. A compile with no PDF always opens it.
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState<boolean | null>(null);
+  const [showLayoutWarnings, setShowLayoutWarnings] = useState(false);
+  const diagnosticsRef = useRef<HTMLDivElement>(null);
+  // Visible width of the scroll area. A zoomed-in page is wider than the pane,
+  // and the panel above it used to stretch with the page and push its right
+  // half, buttons included, out of view.
+  const [viewportWidth, setViewportWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setViewportWidth(el.clientWidth));
+    observer.observe(el);
+    setViewportWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  // A gutter mark was clicked: open the panel and bring that line's card or
+  // row into view, with a short outline so the eye finds it.
+  const pendingFocusRef = useRef<{ line: number; file: string } | null>(null);
+  useEffect(() => {
+    if (!diagnosticFocus) return;
+    pendingFocusRef.current = { line: diagnosticFocus.line, file: diagnosticFocus.file };
+    setDiagnosticsOpen(true);
+    if (compileWarnings.some((w) => w.kind === 'badbox' && w.line === diagnosticFocus.line)) setShowLayoutWarnings(true);
+    // compileWarnings is read for the layout group only; focus is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diagnosticFocus]);
+  // Runs after every render until the opened panel contains the target, since
+  // the rows only exist once the expanded panel has rendered.
+  useEffect(() => {
+    const focus = pendingFocusRef.current;
+    if (!focus) return;
+    const nodes = Array.from(diagnosticsRef.current?.querySelectorAll<HTMLElement>('[data-diag-line]') ?? []);
+    const target =
+      nodes.find((n) => Number(n.dataset.diagLine) === focus.line && n.dataset.diagFile === focus.file) ??
+      nodes.find((n) => Number(n.dataset.diagLine) === focus.line);
+    if (!target) return;
+    pendingFocusRef.current = null;
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    target.classList.remove('diagnostic-card-focus');
+    void target.offsetWidth; // restart the animation on a repeat click
+    target.classList.add('diagnostic-card-focus');
+    window.setTimeout(() => target.classList.remove('diagnostic-card-focus'), 1700);
+  });
 
   // Restore zoom from localStorage or default to 80%
   const [zoom, setZoom] = useState<number>(() => {
@@ -1104,18 +1177,40 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
               <span>Compiling...</span>
             </div>
           )}
-          {compileStatus === 'success' && (
-            <div className="flex items-center space-x-1 text-scholarly dark:text-scholarly-dark text-[11px] font-medium">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>
-                Compiled {compileDuration !== null ? `${(compileDuration / 1000).toFixed(1)}s` : ''}
-              </span>
-            </div>
-          )}
+          {compileStatus === 'success' && (() => {
+            const warningCount =
+              compileErrors.filter((e) => e.severity === 'warning').length + compileWarnings.filter((w) => w.kind !== 'badbox').length;
+            return (
+              <div className="flex items-center space-x-1 text-scholarly dark:text-scholarly-dark text-[11px] font-medium">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Compiled {compileDuration !== null ? `${(compileDuration / 1000).toFixed(1)}s` : ''}</span>
+                {warningCount > 0 && (
+                  <span className="text-diagnostic dark:text-diagnostic-dark font-normal">
+                    · {warningCount} warning{warningCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+          {compileStatus === 'errors' && (() => {
+            const n = compileErrors.filter((e) => e.severity !== 'warning' && !e.isCascading).length;
+            return (
+              <div
+                className="flex items-center space-x-1 text-diagnostic dark:text-diagnostic-dark text-[11px] font-medium"
+                title="TeX reported errors but still wrote a PDF. Parts of it may be wrong near the reported lines."
+              >
+                <AlertTriangle className="w-3 h-3" />
+                <span>
+                  Compiled with {n} error{n === 1 ? '' : 's'}
+                  {compileDuration !== null ? ` · ${(compileDuration / 1000).toFixed(1)}s` : ''}
+                </span>
+              </div>
+            );
+          })()}
           {compileStatus === 'failed' && (
             <div className="flex items-center space-x-1 text-crimson dark:text-crimson-dark text-[11px] font-medium">
-              <AlertTriangle className="w-3 h-3" />
-              <span>Compilation failed</span>
+              <XCircle className="w-3 h-3" />
+              <span>No PDF</span>
             </div>
           )}
           {isShowingStalePdf && (
@@ -1251,32 +1346,239 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
           />
         )}
 
-        {/* Error Diagnostics Banner */}
-        {compileErrors.length > 0 && (() => {
-          const rootErrorsCount = compileErrors.filter((e) => !e.isCascading).length;
-          const cascadeErrorsCount = compileErrors.filter((e) => e.isCascading).length;
+        {/* Compile diagnostics: errors, then warnings, then layout notes.
+            Without a PDF the panel opens in full; with one it shows its
+            summary and the first error, so the PDF keeps the space. */}
+        {(compileErrors.length > 0 || compileWarnings.length > 0) && compileStatus !== 'compiling' && (() => {
+          const hardErrors = compileErrors.filter((e) => e.severity !== 'warning');
+          const softWarnings = compileErrors.filter((e) => e.severity === 'warning');
+          const contentWarnings = compileWarnings.filter((w) => w.kind !== 'badbox');
+          const layoutWarnings = compileWarnings.filter((w) => w.kind === 'badbox');
+          const rootErrorsCount = hardErrors.filter((e) => !e.isCascading).length;
+          const cascadeErrorsCount = hardErrors.length - rootErrorsCount;
+          const warningCount = softWarnings.length + contentWarnings.length;
+          const noPdf = compileStatus === 'failed';
+          const hasErrors = hardErrors.length > 0;
+          const open = noPdf || (diagnosticsOpen ?? false);
+          const visibleErrors = open ? hardErrors : hardErrors.filter((e) => !e.isCascading).slice(0, 1);
+          const hiddenCount = open ? 0 : hardErrors.length - visibleErrors.length + warningCount + layoutWarnings.length;
+          const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+          const fileLabel = (f: string) => (f ? f.split(/[/\\]/).pop() : '');
+          // TeX stops at the last error it reports; the earlier ones it got past.
+          const fatal = [...hardErrors].reverse().find((e) => !e.isCascading);
+          const stoppedAt = fatal && fatal.line > 0 ? ` at line ${fatal.line}${fatal.file ? ` of ${fileLabel(fatal.file)}` : ''}` : '';
+          const title = noPdf
+            ? hasErrors
+              ? `No PDF · ${count(rootErrorsCount || hardErrors.length, 'error')}`
+              : 'No PDF was produced'
+            : hasErrors
+            ? `PDF built with ${count(rootErrorsCount, 'error')}${cascadeErrorsCount ? ` (+${cascadeErrorsCount} follow-on)` : ''}`
+            : warningCount
+            ? `PDF built with ${count(warningCount, 'warning')}`
+            : `PDF built · ${count(layoutWarnings.length, 'overfull or underfull box')}`;
+          const subtitle = noPdf
+            ? `TeX stopped${stoppedAt} before writing a PDF.${isShowingStalePdf ? ' The last successful PDF is shown below.' : ''}`
+            : hasErrors
+            ? 'TeX recovered and kept going, so the PDF may be wrong near these lines.'
+            : null;
+          const tone = noPdf || hasErrors ? 'error' : 'warning';
+          // Failures that point at Oberleaf, not the document: worth a report.
+          const suspectApp = hardErrors.some((e) => e.message === NO_REASON_MESSAGE || e.friendlyExplanation === UNEXPLAINED_ERROR_TEXT);
+          const cardFile = (f: string) => resolveFile?.(f) ?? f;
+
+          const renderCard = (err: CompileErrorItem, idx: number) => {
+            const soft = err.severity === 'warning';
+            const isFigureError =
+              err.message.toLowerCase().includes('figure') ||
+              err.message.includes('image') ||
+              err.friendlyExplanation?.includes('Figure');
+            const fileName = err.file ? err.file.split(/[/\\]/).pop() : 'main.tex';
+            return (
+              <div
+                key={`${soft ? 'w' : 'e'}-${idx}`}
+                data-diag-line={err.line}
+                data-diag-file={cardFile(err.file)}
+                onClick={() => err.line && onSelectErrorLine?.(err.line, err.file)}
+                className={`p-2.5 rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border cursor-pointer transition space-y-2 ${
+                  soft
+                    ? 'border-diagnostic/30 dark:border-diagnostic-dark/30 hover:border-diagnostic/60 shadow-xs'
+                    : err.isCascading
+                    ? 'border-stone-200 dark:border-stone-800/80 opacity-85 hover:opacity-100'
+                    : 'border-crimson/30 dark:border-crimson-dark/30 hover:border-crimson/60 shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-1.5 font-medium min-w-0">
+                    {isFigureError && <ImageOff className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />}
+                    <span
+                      className={`font-mono text-xs whitespace-nowrap font-semibold ${
+                        soft ? 'text-diagnostic dark:text-diagnostic-dark' : 'text-crimson dark:text-crimson-dark'
+                      }`}
+                    >
+                      {err.line > 0 ? `Line ${err.line}` : soft ? 'Warning' : 'Compile Error'}
+                    </span>
+                    <span className="text-stone-400 text-[10px] font-mono truncate" title={err.file}>
+                      ({fileName})
+                    </span>
+                    {soft ? (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-diagnostic-subtle dark:bg-diagnostic-darkSubtle text-diagnostic dark:text-diagnostic-dark border border-diagnostic/20 whitespace-nowrap">
+                        Warning
+                      </span>
+                    ) : err.isCascading ? (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-normal bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 whitespace-nowrap">
+                        {err.cascadingFromLine ? `Cascades from Line ${err.cascadingFromLine}` : 'Secondary'}
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-crimson-subtle dark:bg-crimson-darkSubtle text-crimson dark:text-crimson-dark border border-crimson/20 whitespace-nowrap">
+                        Root Cause
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <button
+                      aria-label="Copy error prompt to clipboard"
+                      onClick={(e) => handleCopyAIPrompt(err, idx + (soft ? 10000 : 0), e)}
+                      title="Copy error prompt to clipboard"
+                      className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 transition btn-tactile"
+                    >
+                      {copiedIndex === idx + (soft ? 10000 : 0) ? (
+                        <>
+                          <Check className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
+                          <span className="text-scholarly dark:text-scholarly-dark font-medium">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-stone-500" />
+                          <span>Copy Prompt</span>
+                        </>
+                      )}
+                    </button>
+
+                    {err.line > 0 && <span className="text-stone-400 hover:text-scholarly text-[10px] font-medium">Jump →</span>}
+                  </div>
+                </div>
+
+                <p className="text-stone-800 dark:text-stone-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">{err.message}</p>
+
+                {err.friendlyExplanation && (err.isCascading || !err.suggestedFix || err.suggestedFix.type === 'replace_line') && (
+                  <div className="p-1.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center space-x-1.5">
+                    <Info className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+                    <span>{err.friendlyExplanation}</span>
+                  </div>
+                )}
+
+                {err.suggestedFix && onApplyFix && (
+                  <FixPanel fix={err.suggestedFix} busy={isFixBusy} onApply={() => onApplyFix(err.suggestedFix!, err)} />
+                )}
+              </div>
+            );
+          };
+
+          // One heading and one-sentence explanation per kind, then a compact
+          // row per warning: ten undefined citations need the advice once.
+          const renderWarningGroup = (kind: CompileWarningItem['kind'], rows: CompileWarningItem[]) => (
+            <div key={kind} className="rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border border-surface-lightBorder dark:border-surface-darkBorder overflow-hidden">
+              <div className="px-2.5 pt-2 pb-1 flex items-center gap-1.5">
+                {kind === 'badbox' ? (
+                  <Info className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />
+                )}
+                <span className="text-[11px] font-semibold text-stone-800 dark:text-stone-200">{WARNING_KIND_LABEL[kind]}</span>
+                <span className="text-[10px] text-stone-400">{rows.length}</span>
+              </div>
+              {WARNING_HINTS[kind] && (
+                <p className="px-2.5 pb-1.5 text-[11px] text-stone-600 dark:text-stone-400 leading-snug">{WARNING_HINTS[kind]}</p>
+              )}
+              <div className="divide-y divide-surface-lightBorder dark:divide-surface-darkBorder border-t border-surface-lightBorder dark:border-surface-darkBorder">
+                {rows.map((w, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    data-diag-line={w.line}
+                    data-diag-file={cardFile(w.file)}
+                    disabled={!w.line}
+                    onClick={() => w.line && onSelectErrorLine?.(w.line, w.file || undefined)}
+                    title={w.line ? `Show line ${w.line}` : undefined}
+                    className="w-full flex items-baseline gap-2 px-2.5 py-1 text-left hover:bg-surface-lightSubtle dark:hover:bg-surface-darkSubtle disabled:cursor-default disabled:hover:bg-transparent transition"
+                  >
+                    <span className="w-16 flex-shrink-0 font-mono text-[10px] text-stone-500 dark:text-stone-400 whitespace-nowrap">
+                      {w.line > 0 ? `Line ${w.line}` : ''}
+                    </span>
+                    <span className="flex-1 min-w-0 font-mono text-[11px] text-stone-800 dark:text-stone-200 [overflow-wrap:anywhere]">{w.message}</span>
+                    {fileLabel(w.file) && (
+                      <span className="flex-shrink-0 font-mono text-[10px] text-stone-400 truncate max-w-[9rem]" title={w.file}>
+                        {fileLabel(w.file)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+
+          const WARNING_ORDER: CompileWarningItem['kind'][] = ['file', 'reference', 'citation', 'label', 'font', 'other'];
+
+          // Centred in the visible part of the pane and pinned there while the
+          // page scrolls sideways (32px = the scroll area's p-4 padding).
+          const inner = viewportWidth ? viewportWidth - 32 : 0;
+          const panelWidth = inner ? Math.min(672, inner) : undefined;
+          const panelStyle: React.CSSProperties | undefined = panelWidth
+            ? { width: panelWidth, marginLeft: Math.max(0, (inner - panelWidth) / 2), alignSelf: 'flex-start', position: 'sticky', left: 0 }
+            : undefined;
 
           return (
-            <div className="w-full max-w-2xl mb-4 bg-crimson-subtle/70 dark:bg-crimson-darkSubtle/60 border border-crimson/30 rounded-lg p-3 text-xs space-y-2.5 shadow-md flex-shrink-0 animate-in fade-in duration-150 font-sans">
-              <div className="flex items-center justify-between font-semibold text-crimson dark:text-crimson-dark">
-                <span className="flex items-center space-x-1.5">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>
-                    Compilation Diagnostics ({rootErrorsCount} root issue{rootErrorsCount === 1 ? '' : 's'}
-                    {cascadeErrorsCount > 0 ? `, ${cascadeErrorsCount} secondary` : ''})
-                  </span>
-                </span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-stone-500 font-normal">
-                    {isShowingStalePdf ? 'Showing last valid PDF below' : 'Fix errors to generate PDF'}
-                  </span>
+            <div
+              ref={diagnosticsRef}
+              style={panelStyle}
+              className={`w-full max-w-2xl mb-4 rounded-lg p-3 text-xs space-y-2.5 flex-shrink-0 animate-in fade-in duration-150 font-sans border ${
+                tone === 'error'
+                  ? 'bg-crimson-subtle/70 dark:bg-crimson-darkSubtle/60 border-crimson/30 shadow-md'
+                  : 'bg-diagnostic-subtle/40 dark:bg-diagnostic-darkSubtle/30 border-diagnostic/30 shadow-sm'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div
+                    className={`flex items-center gap-1.5 font-semibold ${
+                      tone === 'error' ? 'text-crimson dark:text-crimson-dark' : 'text-diagnostic dark:text-diagnostic-dark'
+                    }`}
+                  >
+                    {noPdf ? <XCircle className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+                    <span>{title}</span>
+                  </div>
+                  {subtitle && <p className="mt-0.5 pl-[22px] text-[11px] text-stone-600 dark:text-stone-400 leading-snug">{subtitle}</p>}
                 </div>
+                {suspectApp && onReportProblem && (
+                  <button
+                    type="button"
+                    onClick={onReportProblem}
+                    title="Oberleaf could not explain this. Sending a report helps fix it."
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 hover:bg-stone-200/60 dark:hover:bg-stone-800 transition btn-tactile"
+                  >
+                    <MessageSquareWarning className="w-3 h-3" />
+                    <span>Report problem</span>
+                  </button>
+                )}
+                {!noPdf && (open || hiddenCount > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setDiagnosticsOpen(!open)}
+                    aria-expanded={open}
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-200/60 dark:hover:bg-stone-800 transition btn-tactile"
+                  >
+                    {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <span>{open ? 'Hide details' : `Show all${hiddenCount ? ` (${hiddenCount} more)` : ''}`}</span>
+                  </button>
+                )}
               </div>
 
               {/* Files a pasted document needs from its original project. With one
                   file the error card already says it; the list earns its place
                   when TeX would otherwise reveal them one compile at a time. */}
-              {missingProjectFiles && missingProjectFiles.length > 1 && (
+              {open && missingProjectFiles && missingProjectFiles.length > 1 && (
                 <div className="rounded-md bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-diagnostic/30 font-sans overflow-hidden">
                   <div className="px-2.5 pt-2 pb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
                     <FileWarning className="w-3 h-3 text-diagnostic dark:text-diagnostic-dark" />
@@ -1356,7 +1658,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
               )}
 
               {/* Proactive Batch Fix Banner: when multiple missing packages are detected */}
-              {detectedMissingPackages && detectedMissingPackages.length > 1 && onApplyBatchFix && (
+              {open && hasErrors && detectedMissingPackages && detectedMissingPackages.length > 1 && onApplyBatchFix && (
                 <div className="rounded-md bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-scholarly/25 dark:border-scholarly-dark/30 font-sans overflow-hidden">
                   <div className="px-2.5 pt-2 pb-1.5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
                     <span className="flex items-center gap-1">
@@ -1398,95 +1700,45 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                 </div>
               )}
 
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {compileErrors.map((err, idx) => {
-                  const isFigureError =
-                    err.message.toLowerCase().includes('figure') ||
-                    err.message.includes('image') ||
-                    err.friendlyExplanation?.includes('Figure');
-                  const fileName = err.file ? err.file.split(/[/\\]/).pop() : 'main.tex';
+              <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
+                {visibleErrors.map((err, idx) => renderCard(err, idx))}
 
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => err.line && onSelectErrorLine?.(err.line, err.file)}
-                      className={`p-2.5 rounded-md bg-surface-lightPanel dark:bg-surface-darkPanel border cursor-pointer transition space-y-2 ${
-                        err.isCascading
-                          ? 'border-stone-200 dark:border-stone-800/80 opacity-85 hover:opacity-100'
-                          : 'border-crimson/30 dark:border-crimson-dark/30 hover:border-crimson/60 shadow-xs'
-                      }`}
+                {open && warningCount > 0 && (
+                  <div className="space-y-2 pt-0.5">
+                    {hasErrors && (
+                      <div className="pt-1 text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-400">Warnings</div>
+                    )}
+                    {softWarnings.map((err, idx) => renderCard(err, idx))}
+                    {WARNING_ORDER.map((kind) => {
+                      const rows = contentWarnings.filter((w) => w.kind === kind);
+                      return rows.length ? renderWarningGroup(kind, rows) : null;
+                    })}
+                  </div>
+                )}
+
+                {open && layoutWarnings.length > 0 && (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLayoutWarnings((v) => !v)}
+                      aria-expanded={showLayoutWarnings}
+                      className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 transition"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center space-x-1.5 font-medium min-w-0">
-                          {isFigureError && <ImageOff className="w-3.5 h-3.5 text-diagnostic dark:text-diagnostic-dark flex-shrink-0" />}
-                          <span className="font-mono text-crimson dark:text-crimson-dark text-xs whitespace-nowrap font-semibold">
-                            {err.line > 0 ? `Line ${err.line}` : 'Compile Error'}
-                          </span>
-                          <span className="text-stone-400 text-[10px] font-mono truncate" title={err.file}>
-                            ({fileName})
-                          </span>
-                          {err.isCascading ? (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-normal bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 whitespace-nowrap">
-                              {err.cascadingFromLine ? `Cascades from Line ${err.cascadingFromLine}` : 'Secondary'}
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium bg-crimson-subtle dark:bg-crimson-darkSubtle text-crimson dark:text-crimson-dark border border-crimson/20 whitespace-nowrap">
-                              Root Cause
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center space-x-2 flex-shrink-0">
-                          {/* 1-Click Copy Prompt Button */}
-                          <button
-                            aria-label="Copy error prompt to clipboard"
-                            onClick={(e) => handleCopyAIPrompt(err, idx, e)}
-                            title="Copy error prompt to clipboard"
-                            className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-700 transition btn-tactile"
-                          >
-                            {copiedIndex === idx ? (
-                              <>
-                                <Check className="w-3 h-3 text-scholarly dark:text-scholarly-dark" />
-                                <span className="text-scholarly dark:text-scholarly-dark font-medium">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3 text-stone-500" />
-                                <span>Copy Prompt</span>
-                              </>
-                            )}
-                          </button>
-
-                          {err.line > 0 && (
-                            <span className="text-stone-400 hover:text-scholarly text-[10px] font-medium">
-                              Jump →
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-stone-800 dark:text-stone-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {err.message}
-                      </p>
-
-                      {err.friendlyExplanation && (err.isCascading || !err.suggestedFix || err.suggestedFix.type === 'replace_line') && (
-                        <div className="p-1.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder text-stone-700 dark:text-stone-300 text-[11px] font-sans flex items-center space-x-1.5">
-                          <Info className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-                          <span>{err.friendlyExplanation}</span>
-                        </div>
-                      )}
-
-                      {err.suggestedFix && onApplyFix && (
-                        <FixPanel
-                          fix={err.suggestedFix}
-                          busy={isFixBusy}
-                          onApply={() => onApplyFix(err.suggestedFix!, err)}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                      {showLayoutWarnings ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      <span>{count(layoutWarnings.length, 'overfull or underfull box')}</span>
+                    </button>
+                    {showLayoutWarnings && renderWarningGroup('badbox', layoutWarnings)}
+                  </div>
+                )}
               </div>
+              {open && !suspectApp && onReportProblem && (
+                <div className="pt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
+                  Diagnosis wrong or unclear?{' '}
+                  <button type="button" onClick={onReportProblem} className="underline underline-offset-2 hover:text-stone-800 dark:hover:text-stone-200">
+                    Report it
+                  </button>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1559,7 +1811,18 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
               <FileText className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200 font-serif">No PDF Generated Yet</h3>
+              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200 font-serif">
+                {compileStatus === 'failed' ? 'No PDF yet' : 'No PDF Generated Yet'}
+              </h3>
+              {compileStatus === 'failed' ? (
+                <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mt-1">
+                  The last compile stopped before writing a PDF. The message above says where; fix it and press{' '}
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder font-mono text-xs text-stone-700 dark:text-stone-300">
+                    Ctrl+Enter
+                  </kbd>
+                  .
+                </p>
+              ) : (
               <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mt-1">
                 Click <span className="text-scholarly dark:text-scholarly-dark font-medium">Recompile</span> or press{' '}
                 <kbd className="px-1.5 py-0.5 rounded bg-surface-lightSubtle dark:bg-surface-darkSubtle border border-surface-lightBorder dark:border-surface-darkBorder font-mono text-xs text-stone-700 dark:text-stone-300">
@@ -1567,6 +1830,7 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                 </kbd>{' '}
                 to compile your local document without cloud quotas.
               </p>
+              )}
             </div>
           </div>
         )}

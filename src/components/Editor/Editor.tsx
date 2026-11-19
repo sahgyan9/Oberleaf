@@ -21,6 +21,8 @@ import { wrapOrToggleFormatting, BOLD_FORMAT, ITALIC_FORMAT } from '../../utils/
 import { useEditorMode } from '../../utils/editorMode';
 import { VisualModeController } from './visualMode';
 import { defineEditorThemes, editorThemeName } from '../../utils/monacoThemes';
+import type { EditorDiagnostic } from '../../utils/compileDiagnostics';
+import { checkLatexStructure, visibleStructureFindings, type StructureFinding } from '../../utils/latexStructure';
 
 interface EditorProps {
   content: string;
@@ -41,6 +43,76 @@ interface EditorProps {
   onOpenCommentAtCursor?: (line: number, selectedText: string) => void;
   collabSession?: CollabSessionConfig | null;
   onCursorChange?: (pos: { line: number; column: number }) => void;
+  /** Errors and warnings from the last compile for this file, shown in the gutter */
+  diagnostics?: EditorDiagnostic[];
+  /** A gutter mark was clicked */
+  onDiagnosticClick?: (line: number) => void;
+  /** Check braces, environments and math delimiters while typing (a .tex file is open) */
+  structureCheck?: boolean;
+}
+
+const SEVERITY_RANK: Record<EditorDiagnostic['severity'], number> = { error: 3, warning: 2, info: 1 };
+const SEVERITY_LABEL: Record<EditorDiagnostic['severity'], string> = { error: 'Error', warning: 'Warning', info: 'Layout' };
+// Same colours as the crimson / diagnostic tokens in tailwind.config.ts.
+const RULER_COLOR: Record<EditorDiagnostic['severity'], string> = { error: '#DC2626', warning: '#D97706', info: '#94A3B8' };
+
+// Monaco renders hovers as Markdown. TeX messages are full of characters that
+// mean something there (\, `, _, *, [), so escape all of them.
+const escapeMarkdown = (s: string) => s.replace(/[\\`*_{}[\]()#+\-.!|<>~]/g, '\\$&');
+
+function hoverFor(d: EditorDiagnostic): { value: string } {
+  const head = `**${SEVERITY_LABEL[d.severity]}${d.secondary ? ' (follows from an earlier error)' : ''}:** ${escapeMarkdown(d.message)}`;
+  return { value: d.detail ? `${head}\n\n${escapeMarkdown(d.detail)}` : head };
+}
+
+// Time after the last edit before the structure check runs, so it never
+// works on the keystroke itself.
+const STRUCTURE_CHECK_DELAY_MS = 300;
+
+function structureHoverFor(d: StructureFinding): { value: string } {
+  const head = `**Code check${d.severity === 'warning' ? ' (warning)' : ''}:** ${escapeMarkdown(d.message)}`;
+  return { value: d.detail ? `${head}\n\n${escapeMarkdown(d.detail)}` : head };
+}
+
+/**
+ * Gutter mark, scrollbar mark and a wavy underline under the exact character
+ * for each structure finding. No error band: these appear while typing, and
+ * a red line background there would be too loud.
+ */
+function structureDecorations(monaco: any, findings: StructureFinding[]): any[] {
+  const byLine = new Map<number, StructureFinding[]>();
+  for (const f of findings) byLine.set(f.line, [...(byLine.get(f.line) ?? []), f]);
+  const stickiness = monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges;
+  const out: any[] = [];
+  for (const [line, items] of byLine) {
+    items.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || Number(!!a.secondary) - Number(!!b.secondary));
+    const top = items[0];
+    const allSecondary = items.every((d) => d.secondary);
+    out.push({
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        stickiness,
+        // Below a compile mark on the same line: Monaco draws one glyph per
+        // line and z-index, so the clickable compile mark wins. The hover
+        // still lists both.
+        zIndex: -1,
+        glyphMarginClassName: `oberleaf-glyph oberleaf-glyph-${top.severity} is-live${allSecondary ? ' is-secondary' : ''}`,
+        glyphMarginHoverMessage: items.map(structureHoverFor),
+        overviewRuler: { color: RULER_COLOR[top.severity], position: monaco.editor.OverviewRulerLane.Left },
+      },
+    });
+    for (const d of items) {
+      out.push({
+        range: new monaco.Range(line, d.column, line, d.endColumn),
+        options: {
+          stickiness,
+          inlineClassName: `oberleaf-underline-${d.severity}${d.secondary ? ' is-secondary' : ''}`,
+          hoverMessage: structureHoverFor(d),
+        },
+      });
+    }
+  }
+  return out;
 }
 
 export interface ImageDrop {
@@ -65,7 +137,8 @@ const EDITOR_OPTIONS = {
   fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
   lineNumbers: 'on',
   lineNumbersMinChars: 3,
-  glyphMargin: false,
+  // Always on, so the text does not shift sideways when a compile adds marks.
+  glyphMargin: true,
   folding: true,
   showFoldingControls: 'mouseover',
   lineDecorationsWidth: 4,
@@ -145,12 +218,24 @@ export const Editor: React.FC<EditorProps> = ({
   onOpenCommentAtCursor,
   collabSession,
   onCursorChange,
+  diagnostics,
+  onDiagnosticClick,
+  structureCheck = false,
 }) => {
   const { theme } = useTheme();
   const editorInstance = useRef<any>(null);
   const monacoInstance = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const commentDecorationsRef = useRef<string[]>([]);
+  const diagnosticDecorationsRef = useRef<string[]>([]);
+  // The live structure check's own set: a compile replacing its marks never
+  // removes these, and the reverse.
+  const structureDecorationsRef = useRef<string[]>([]);
+  const diagnosticOriginRef = useRef<Map<string, number>>(new Map());
+  const onDiagnosticClickRef = useRef(onDiagnosticClick);
+  // Bumped once Monaco has mounted, so the diagnostics effect runs again for
+  // marks that arrived before the editor did.
+  const [editorReady, setEditorReady] = useState(0);
 
   const onCompileRef = useRef(onCompile);
   const onJumpToPdfRef = useRef(onJumpToPdf);
@@ -204,7 +289,137 @@ export const Editor: React.FC<EditorProps> = ({
     getProjectContextRef.current = getProjectContext;
     onOpenCommentAtCursorRef.current = onOpenCommentAtCursor;
     onCursorChangeRef.current = onCursorChange;
+    onDiagnosticClickRef.current = onDiagnosticClick;
   });
+
+  // Compile diagnostics: an icon in the gutter per line (the most severe one
+  // wins), the message on hovering it, a mark in the scrollbar, a faint band
+  // on error lines and a wavy underline under an undefined command. They are
+  // decorations, so they move with the text while the user edits and are
+  // replaced by the next compile.
+  useEffect(() => {
+    const editor = editorInstance.current;
+    const monaco = monacoInstance.current;
+    if (!editor || !monaco) return;
+    const model = editor.getModel();
+    const list = diagnostics ?? [];
+    const byLine = new Map<number, EditorDiagnostic[]>();
+    const lineCount = model?.getLineCount() ?? 0;
+    for (const d of list) {
+      if (d.line < 1 || d.line > lineCount) continue;
+      byLine.set(d.line, [...(byLine.get(d.line) ?? []), d]);
+    }
+
+    const decorations: any[] = [];
+    for (const [line, items] of byLine) {
+      items.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || Number(!!a.secondary) - Number(!!b.secondary));
+      const top = items[0];
+      const allSecondary = items.every((d) => d.secondary || d.severity !== 'error') && top.secondary;
+      // Not isWholeLine: with word wrap that repeats the icon on every
+      // screen row of a long line. An empty range at column 1 marks only
+      // the first row; the error band is a separate whole-line decoration.
+      decorations.push({
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          glyphMarginClassName: `oberleaf-glyph oberleaf-glyph-${top.severity}${allSecondary ? ' is-secondary' : ''}`,
+          glyphMarginHoverMessage: items.map(hoverFor),
+          overviewRuler: { color: RULER_COLOR[top.severity], position: monaco.editor.OverviewRulerLane.Left },
+        },
+      });
+      if (top.severity === 'error' && !allSecondary) {
+        decorations.push({
+          range: new monaco.Range(line, 1, line, 1),
+          options: {
+            isWholeLine: true,
+            className: 'oberleaf-line-error',
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
+        });
+      }
+      for (const d of items) {
+        if (!d.highlight || !model) continue;
+        const text: string = model.getLineContent(line);
+        // The command itself, not a longer one it prefixes (\foo in \foobar).
+        const re = new RegExp(`${d.highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z@])`);
+        const m = re.exec(text);
+        if (!m) continue;
+        decorations.push({
+          range: new monaco.Range(line, m.index + 1, line, m.index + 1 + m[0].length),
+          options: {
+            inlineClassName: `oberleaf-underline-${d.severity}`,
+            hoverMessage: hoverFor(d),
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
+        });
+      }
+    }
+    const ids: string[] = editor.deltaDecorations(diagnosticDecorationsRef.current, decorations);
+    diagnosticDecorationsRef.current = ids;
+    // The line each gutter mark had at compile time. After edits move it, a
+    // click must still open the card the compile reported.
+    const origin = new Map<string, number>();
+    ids.forEach((id, i) => {
+      if (decorations[i].options.glyphMarginClassName) origin.set(id, decorations[i].range.startLineNumber);
+    });
+    diagnosticOriginRef.current = origin;
+  }, [diagnostics, editorReady]);
+
+  // Live structure check: unbalanced braces, \begin/\end, \end{document} and
+  // math delimiters, marked before any compile. It runs 300 ms after the last
+  // edit, off the typing path. Between runs the marks are decorations and move
+  // with the text. A cursor move only re-filters: an opener the cursor is
+  // still right after on its line (just typed \textbf{) stays hidden.
+  useEffect(() => {
+    const editor = editorInstance.current;
+    const monaco = monacoInstance.current;
+    if (!editor || !monaco) return;
+    if (!structureCheck) {
+      structureDecorationsRef.current = editor.deltaDecorations(structureDecorationsRef.current, []);
+      return;
+    }
+    let findings: StructureFinding[] = [];
+    let checkedVersion = -1;
+    let shown: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const render = () => {
+      const model = editor.getModel();
+      // Findings for older text would land on the wrong columns.
+      if (!model || model.getVersionId() !== checkedVersion) return;
+      const pos = editor.getPosition();
+      const visible = visibleStructureFindings(findings, pos ? { line: pos.lineNumber, column: pos.column } : null);
+      const key = visible.map((f) => `${f.line}:${f.column}:${f.message}`).join('\n');
+      if (key === shown) return;
+      shown = key;
+      structureDecorationsRef.current = editor.deltaDecorations(structureDecorationsRef.current, structureDecorations(monaco, visible));
+    };
+    const run = () => {
+      timer = null;
+      const model = editor.getModel();
+      if (!model) return;
+      findings = checkLatexStructure(model.getValue());
+      checkedVersion = model.getVersionId();
+      shown = null;
+      render();
+    };
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(run, STRUCTURE_CHECK_DELAY_MS);
+    };
+
+    run();
+    const subscriptions = [
+      editor.onDidChangeModelContent(schedule),
+      editor.onDidChangeCursorPosition(render),
+      editor.onDidChangeModel(run),
+    ];
+    return () => {
+      if (timer) clearTimeout(timer);
+      subscriptions.forEach((s: { dispose: () => void }) => s.dispose());
+      structureDecorationsRef.current = editor.deltaDecorations(structureDecorationsRef.current, []);
+    };
+  }, [structureCheck, editorReady]);
 
   // Dynamically sync Monaco theme when user toggles light/dark mode
   useEffect(() => {
@@ -413,6 +628,16 @@ export const Editor: React.FC<EditorProps> = ({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onCompileRef.current();
     });
+
+    // Clicking a compile mark in the gutter opens its card in the PDF panel.
+    editor.onMouseDown((e: any) => {
+      if (e.target?.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+      const line = e.target.position?.lineNumber;
+      if (!line) return;
+      const hit = (editor.getModel()?.getLineDecorations(line) ?? []).find((d: any) => diagnosticOriginRef.current.has(d.id));
+      if (hit) onDiagnosticClickRef.current?.(diagnosticOriginRef.current.get(hit.id)!);
+    });
+    setEditorReady((n) => n + 1);
 
     // Add Keybinding: Ctrl+Alt+J to Jump to PDF location (SyncTeX Forward)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyJ, () => {

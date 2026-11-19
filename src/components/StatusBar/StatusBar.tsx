@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FolderOpen, Activity, CheckCircle2, Loader2, Cpu, FileCode, Type, FileText } from 'lucide-react';
+import { FolderOpen, Activity, CheckCircle2, Loader2, Cpu, FileCode, Type, FileText, AlertTriangle, XCircle } from 'lucide-react';
 import { describeWordCount, type WordCount } from '../../utils/wordCount';
 
 interface StatusBarProps {
@@ -8,6 +8,8 @@ interface StatusBarProps {
   activeFilePath?: string;
   isCompiling: boolean;
   compileDuration: number | null;
+  /** How the last compile ended; 'failed' wrote no PDF, 'errors' wrote one despite errors */
+  compileStatus?: 'idle' | 'compiling' | 'success' | 'errors' | 'failed';
   cursorLine?: number;
   cursorColumn?: number;
   isDoctorHealthy: boolean | null;
@@ -30,6 +32,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   activeFilePath,
   isCompiling,
   compileDuration,
+  compileStatus,
   cursorLine,
   cursorColumn,
   isDoctorHealthy,
@@ -110,6 +113,16 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             <span className="flex items-center gap-1.5 text-scholarly dark:text-scholarly-dark">
               <Loader2 className="w-3 h-3 animate-spin" />
               <span>Compiling {(elapsedMs / 1000).toFixed(1)}s</span>
+            </span>
+          ) : compileStatus === 'failed' ? (
+            <span className="flex items-center gap-1 text-crimson dark:text-crimson-dark">
+              <XCircle className="w-3 h-3" />
+              <span>No PDF</span>
+            </span>
+          ) : compileDuration !== null && compileStatus === 'errors' ? (
+            <span className="flex items-center gap-1 text-diagnostic dark:text-diagnostic-dark">
+              <AlertTriangle className="w-3 h-3" />
+              <span>Built with errors in {(compileDuration / 1000).toFixed(2)}s</span>
             </span>
           ) : compileDuration !== null ? (
             <span className="flex items-center gap-1 text-scholarly dark:text-scholarly-dark">

@@ -127,6 +127,80 @@ body {
   font-weight: 600;
 }
 
+/* Compile diagnostics in the editor gutter. Icons are Lucide's circle-x,
+   triangle-alert and info, filled so they read at 14px; colours match the
+   crimson / diagnostic tokens. */
+.monaco-editor .oberleaf-glyph {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 14px 14px;
+  cursor: pointer;
+}
+.monaco-editor .oberleaf-glyph-error {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23DC2626'/%3E%3Cpath d='m15 9-6 6M9 9l6 6' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.monaco-editor .oberleaf-glyph-warning {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z' fill='%23D97706'/%3E%3Cpath d='M12 9v4M12 17h.01' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.monaco-editor .oberleaf-glyph-info {
+  background-size: 12px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%2394A3B8'/%3E%3Cpath d='M12 16v-4M12 8h.01' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.monaco-editor .oberleaf-glyph.is-secondary {
+  opacity: 0.5;
+}
+/* Live code-check marks have nothing to open on click */
+.monaco-editor .oberleaf-glyph.is-live {
+  cursor: default;
+}
+.monaco-editor .oberleaf-underline-error.is-secondary {
+  text-decoration-color: rgba(220, 38, 38, 0.45);
+}
+.dark .monaco-editor .oberleaf-underline-error.is-secondary {
+  text-decoration-color: rgba(239, 68, 68, 0.45);
+}
+.dark .monaco-editor .oberleaf-glyph-error {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23EF4444'/%3E%3Cpath d='m15 9-6 6M9 9l6 6' stroke='%231C1C1F' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.dark .monaco-editor .oberleaf-glyph-warning {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z' fill='%23F59E0B'/%3E%3Cpath d='M12 9v4M12 17h.01' stroke='%231C1C1F' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.dark .monaco-editor .oberleaf-glyph-info {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%2364748B'/%3E%3Cpath d='M12 16v-4M12 8h.01' stroke='%231C1C1F' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.monaco-editor .oberleaf-line-error {
+  background: rgba(220, 38, 38, 0.06);
+}
+.dark .monaco-editor .oberleaf-line-error {
+  background: rgba(239, 68, 68, 0.1);
+}
+.monaco-editor .oberleaf-underline-error {
+  text-decoration: underline wavy #DC2626;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.monaco-editor .oberleaf-underline-warning {
+  text-decoration: underline wavy #D97706;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.dark .monaco-editor .oberleaf-underline-error {
+  text-decoration-color: #EF4444;
+}
+
+/* Diagnostics card a gutter click opened: a short outline pulse */
+.diagnostic-card-focus {
+  animation: diagnostic-focus 1.6s ease-out;
+}
+@keyframes diagnostic-focus {
+  0% {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0);
+  }
+}
+
 /* Commented Line Highlights */
 .comment-highlight-line {
   background: rgba(73, 164, 187, 0.12) !important;
