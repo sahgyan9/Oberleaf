@@ -17,7 +17,7 @@
 // (MiKTeX, 2026-11-19): every command in SHORT_ARGUMENT stops with "Paragraph
 // ended before ... was complete"; \title, \url, \footnote and \mbox accept one.
 
-import { analyze, VERBATIM_ENVS } from './latexLint';
+import { analyze, VERBATIM_ENVS, type LineInfo } from './latexLint';
 import type { EditorDiagnostic } from './compileDiagnostics';
 
 export type StructureRule =
@@ -32,7 +32,8 @@ export type StructureRule =
   | 'extra-end'
   | 'missing-end-document'
   | 'duplicate-begin-document'
-  | 'duplicate-end-document';
+  | 'duplicate-end-document'
+  | 'missing-image';
 
 export interface StructureFinding extends EditorDiagnostic {
   rule: StructureRule;
@@ -42,6 +43,10 @@ export interface StructureFinding extends EditorDiagnostic {
   endColumn: number;
   /** Something opened and not closed. Hidden while the cursor is after it on its line: the user may still be typing it. */
   opener?: boolean;
+  /** Hidden while the cursor is between these 1-based columns (inclusive) on the finding's line: a path being typed. */
+  hideWhileCursorIn?: { startColumn: number; endColumn: number };
+  /** missing-image: the project file the user most likely meant */
+  suggestion?: string;
 }
 
 interface Frame {
@@ -122,8 +127,8 @@ const ENV_NAME = /\s*\{([^{}\\%]+)\}/y;
 const DELIMITER = /\s*(\\[A-Za-z]+|\\[^A-Za-z\s]|[^\s{}$%\\])/y;
 const AFTER_DEFINITION = /\s*\*?\s*(\S)/y;
 
-export function checkLatexStructure(source: string): StructureFinding[] {
-  const lines = analyze(source);
+/** `lines` may be passed when the caller already ran analyze(source) for another check. */
+export function checkLatexStructure(source: string, lines: LineInfo[] = analyze(source)): StructureFinding[] {
   const findings: StructureFinding[] = [];
   const stack: Frame[] = [];
   let arg: ArgState = { owner: null, depth: 0, optional: false };
@@ -607,5 +612,10 @@ export function visibleStructureFindings(
   cursor: { line: number; column: number } | null
 ): StructureFinding[] {
   if (!cursor) return findings;
-  return findings.filter((f) => !(f.opener && f.line === cursor.line && cursor.column > f.column));
+  return findings.filter((f) => {
+    if (f.line !== cursor.line) return true;
+    if (f.opener && cursor.column > f.column) return false;
+    const range = f.hideWhileCursorIn;
+    return !(range && cursor.column >= range.startColumn && cursor.column <= range.endColumn);
+  });
 }

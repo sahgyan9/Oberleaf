@@ -161,18 +161,7 @@ describe('citations', () => {
   });
 });
 
-describe('missing-image', () => {
-  const files = ['main.tex', 'figures/plot.png', 'logo.pdf'];
-  it('resolves names without extension and inside subfolders', () => {
-    const src = doc('\\includegraphics{plot}\n\\includegraphics{figures/plot.png}\n\\includegraphics[width=1cm]{logo}');
-    expect(rules(lintLatex(src, { projectFiles: files }))).not.toContain('missing-image');
-  });
-  it('flags a missing image and suggests the close file', () => {
-    const f = only(lintLatex(doc('\\includegraphics{plott.png}'), { projectFiles: files }), 'missing-image');
-    expect(f).toHaveLength(1);
-    expect(f[0].fix?.replace).toContain('{figures/plot.png}');
-  });
-});
+// Missing images are checked live in the editor: tests/imageCheck.test.ts.
 
 describe('obsolete-package', () => {
   it('flags epsfig and a4wide inside a package list', () => {

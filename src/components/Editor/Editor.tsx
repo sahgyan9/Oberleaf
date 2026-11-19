@@ -10,8 +10,10 @@ import {
   ImageAtCursor,
   isImageFile,
   PROJECT_IMAGE_DRAG_TYPE,
-  resolveProjectImage,
 } from '../../utils/imageHelper';
+import { checkImagePath, imageFileList, type ImageFileList } from '../../../server/imagePaths';
+import { checkImagePaths, graphicsPathsFor } from '../../utils/imageCheck';
+import { analyze } from '../../utils/latexLint';
 import { figureTarget } from '../../utils/figureInsertion';
 import type { ImagePickerKey } from '../Modals/ImageQuickPicker';
 import { registerLatexCompletions, ProjectContext } from '../../utils/latexCompletions';
@@ -49,6 +51,13 @@ interface EditorProps {
   onDiagnosticClick?: (line: number) => void;
   /** Check braces, environments and math delimiters while typing (a .tex file is open) */
   structureCheck?: boolean;
+  /**
+   * The open project's files, for the missing-image check. Null until the
+   * list for this project has loaded: no image marks are shown before then.
+   */
+  imageFiles?: ImageFileList | null;
+  /** The main document's \graphicspath entries ([] for none); null while unknown, so chapters are not checked yet */
+  mainGraphicsPaths?: string[] | null;
 }
 
 const SEVERITY_RANK: Record<EditorDiagnostic['severity'], number> = { error: 3, warning: 2, info: 1 };
@@ -221,6 +230,8 @@ export const Editor: React.FC<EditorProps> = ({
   diagnostics,
   onDiagnosticClick,
   structureCheck = false,
+  imageFiles = null,
+  mainGraphicsPaths = null,
 }) => {
   const { theme } = useTheme();
   const editorInstance = useRef<any>(null);
@@ -231,6 +242,11 @@ export const Editor: React.FC<EditorProps> = ({
   // The live structure check's own set: a compile replacing its marks never
   // removes these, and the reverse.
   const structureDecorationsRef = useRef<string[]>([]);
+  // For the image picker's open rule: the files and \graphicspath the last
+  // check used.
+  const imageFilesRef = useRef(imageFiles);
+  imageFilesRef.current = imageFiles;
+  const graphicsPathsRef = useRef<string[]>([]);
   const diagnosticOriginRef = useRef<Map<string, number>>(new Map());
   const onDiagnosticClickRef = useRef(onDiagnosticClick);
   // Bumped once Monaco has mounted, so the diagnostics effect runs again for
@@ -398,7 +414,11 @@ export const Editor: React.FC<EditorProps> = ({
       timer = null;
       const model = editor.getModel();
       if (!model) return;
-      findings = checkLatexStructure(model.getValue());
+      const text = model.getValue();
+      const lines = analyze(text);
+      findings = checkLatexStructure(text, lines);
+      if (imageFiles) findings = findings.concat(checkImagePaths(lines, imageFiles, mainGraphicsPaths));
+      graphicsPathsRef.current = graphicsPathsFor(lines, mainGraphicsPaths) ?? [];
       checkedVersion = model.getVersionId();
       shown = null;
       render();
@@ -419,7 +439,9 @@ export const Editor: React.FC<EditorProps> = ({
       subscriptions.forEach((s: { dispose: () => void }) => s.dispose());
       structureDecorationsRef.current = editor.deltaDecorations(structureDecorationsRef.current, []);
     };
-  }, [structureCheck, editorReady]);
+    // A new file list (upload, rename, delete, another project) or main
+    // \graphicspath re-runs the check without waiting for an edit.
+  }, [structureCheck, editorReady, imageFiles, mainGraphicsPaths]);
 
   // Dynamically sync Monaco theme when user toggles light/dark mode
   useEffect(() => {
@@ -829,13 +851,18 @@ export const Editor: React.FC<EditorProps> = ({
       if (braceKey === dismissedBraceKey) return;
 
       const alreadyOpen = pickerBraceKey === braceKey;
-      if (!alreadyOpen && reason === 'cursor' && ctx.currentPath.trim()) {
-        const images = findProjectImages(getProjectContextRef.current?.().files ?? []);
-        if (resolveProjectImage(images, ctx.currentPath)) {
-          closeImagePicker(false);
-          return;
-        }
+      // Same resolver as the live mark and the compile: a valid path, even a
+      // bare name in a subfolder, does not open the picker when the caret
+      // walks through it. An unresolved one carries its closest match.
+      const files =
+        imageFilesRef.current ??
+        imageFileList(findProjectImages(getProjectContextRef.current?.().files ?? []).map((img) => img.relativePath));
+      const resolved = ctx.currentPath.trim() ? checkImagePath(ctx.currentPath, files, graphicsPathsRef.current) : null;
+      if (!alreadyOpen && reason === 'cursor' && resolved && (resolved.status === 'found' || resolved.status === 'skip')) {
+        closeImagePicker(false);
+        return;
       }
+      if (resolved?.status === 'missing' && resolved.suggestion) ctx.suggestion = resolved.suggestion;
 
       const coords = pickerCoordinates(position);
       if (!coords) {

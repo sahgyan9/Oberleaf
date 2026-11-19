@@ -1,5 +1,5 @@
 import type * as Monaco from 'monaco-editor';
-import { findProjectImages, formatBytes } from './imageHelper';
+import { findProjectImages, formatBytes, resolveProjectImage } from './imageHelper';
 import { FileEntry } from '../components/FileTree/FileTree';
 
 export interface ProjectContext {
@@ -850,23 +850,21 @@ export function registerLatexCompletions(
 
         if (position.column >= pathStartCol && position.column <= pathEndCol) {
           const context = getContext();
-          const allImages = findProjectImages(context.files);
-          const matchedImage = allImages.find(
-            (img) =>
-              img.relativePath.toLowerCase() === imagePath.toLowerCase() ||
-              img.name.toLowerCase() === imagePath.toLowerCase() ||
-              img.relativePath.replace(/\.[^/.]+$/, '').toLowerCase() === imagePath.toLowerCase()
-          );
+          // Same resolver as the compile (a bare name in a subfolder counts).
+          // An unresolved path gets no preview hover: the code check's mark
+          // already says what is wrong, with the closest match.
+          const matchedImage = resolveProjectImage(findProjectImages(context.files), imagePath);
+          if (!matchedImage) return null;
 
-          const previewPath = matchedImage ? matchedImage.relativePath : imagePath;
-          const previewUrl = context.projectId && matchedImage
+          const previewPath = matchedImage.relativePath;
+          const previewUrl = context.projectId
             ? `/api/projects/${encodeURIComponent(context.projectId)}/preview-image?path=${encodeURIComponent(previewPath)}`
             : '';
-          const sizeStr = matchedImage?.size ? formatBytes(matchedImage.size) : '';
+          const sizeStr = matchedImage.size ? formatBytes(matchedImage.size) : '';
 
           const contents: Monaco.IMarkdownString[] = [
             {
-              value: `**${matchedImage ? matchedImage.name : imagePath}**${matchedImage ? '' : ' (not found in project)'}\n\n` +
+              value: `**${matchedImage.name}**\n\n` +
                 (sizeStr ? `**Size:** ${sizeStr}  \n` : '') +
                 `**Path:** \`${previewPath}\`\n\n` +
                 (previewUrl ? `![${imagePath}](${previewUrl})` : ''),

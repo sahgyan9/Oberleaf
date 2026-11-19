@@ -1,4 +1,5 @@
 import type { FileEntry } from '../components/FileTree/FileTree';
+import { checkImagePath, imageFileList } from '../../server/imagePaths';
 
 export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.pdf', '.gif', '.eps'];
 
@@ -18,6 +19,8 @@ export interface ImageAtCursor {
   };
   hasClosingBrace: boolean;
   position?: { top: number; left: number };
+  /** The project file the code check thinks an unresolved path meant */
+  suggestion?: string;
 }
 
 function extensionOf(name: string): string {
@@ -62,16 +65,13 @@ export function findProjectImages(entries: FileEntry[]): FileEntry[] {
 }
 
 /**
- * Resolve what LaTeX would load for an \includegraphics argument. graphicx
- * accepts the path with or without its extension, so both must match.
+ * The project image LaTeX would load for an \includegraphics argument, by the
+ * same rules as the compile (server/imagePaths.ts): with or without extension,
+ * and a bare name found in any subfolder.
  */
-export function resolveProjectImage(images: FileEntry[], texPath: string): FileEntry | undefined {
-  const wanted = texPath.trim().replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
-  if (!wanted) return undefined;
-  return images.find((img) => {
-    const rel = img.relativePath.toLowerCase();
-    return rel === wanted || rel.replace(/\.[^/.]+$/, '') === wanted;
-  });
+export function resolveProjectImage(images: FileEntry[], texPath: string, graphicsPaths: string[] = []): FileEntry | undefined {
+  const result = checkImagePath(texPath, imageFileList(images.map((img) => img.relativePath)), graphicsPaths);
+  return result.status === 'found' ? images.find((img) => img.relativePath.replace(/\\/g, '/') === result.path) : undefined;
 }
 
 /**

@@ -58,7 +58,11 @@ import {
   isPackageLoaded,
 } from './utils/latexPackages';
 import { minimalReplacement, setMagicEngine } from './utils/fixPreview';
-import { lintLatex, type LintFinding } from './utils/latexLint';
+import { analyze, lintLatex, type LintFinding } from './utils/latexLint';
+import { graphicsPathsIn, imageFileList } from '../server/imagePaths';
+
+// The main document itself never waits for its own \graphicspath to be fetched.
+const NO_GRAPHICS_PATHS: string[] = [];
 import {
   wrapOrToggleFormatting,
   wrapOrToggleSelection,
@@ -178,6 +182,13 @@ export const App: React.FC = () => {
   const [projectId, setProjectId] = useState<string>(initialProjectId);
   const [projectName, setProjectName] = useState<string>('');
   const [files, setFiles] = useState<FileEntry[]>([]);
+  // Which project `files` belongs to. Null until a real list has loaded, so
+  // the missing-image check never runs against another project's files.
+  const [filesProjectId, setFilesProjectId] = useState<string | null>(null);
+  const filesProjectIdRef = useRef<string | null>(null);
+  filesProjectIdRef.current = filesProjectId;
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
   const [activeFilePath, setActiveFilePath] = useState<string>('main.tex');
   // The project's main document: the .tex file Compile builds. Stored per
   // project in .meta.json; the ref serves callbacks memoised without it.
@@ -578,18 +589,22 @@ export const App: React.FC = () => {
   }, [projects, loadProjects]);
 
   // Load Project Files
+  // A reply for a project that is no longer open is dropped. On a failed
+  // fetch the list stays as it was if it belongs to this project, and is
+  // emptied if it belongs to another; no placeholder tree is invented, since
+  // the image check would mark every figure against it.
   const loadProjectFiles = useCallback(async (pId: string) => {
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(pId)}/files`);
-      if (res.ok) {
-        const data: FileEntry[] = await res.json();
-        setFiles(data);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: FileEntry[] = await res.json();
+      if (pId !== projectIdRef.current) return;
+      setFiles(data);
+      setFilesProjectId(pId);
     } catch {
-      setFiles([
-        { name: 'main.tex', path: 'main.tex', relativePath: 'main.tex', type: 'file', extension: '.tex' },
-        { name: 'figures', path: 'figures', relativePath: 'figures', type: 'directory', children: [] },
-      ]);
+      if (pId !== projectIdRef.current || filesProjectIdRef.current === pId) return;
+      setFiles([]);
+      setFilesProjectId(null);
     }
   }, []);
 
@@ -911,6 +926,42 @@ export const App: React.FC = () => {
       files,
     };
   }, [projectId, citations, files]);
+
+  // Missing-image check: the open project's files, once loaded for it.
+  const imageFiles = useMemo(() => {
+    if (!projectId || filesProjectId !== projectId) return null;
+    const paths: string[] = [];
+    const walk = (list: FileEntry[]) =>
+      list.forEach((e) => (e.type === 'directory' ? walk(e.children ?? []) : paths.push(e.relativePath)));
+    walk(files);
+    return imageFileList(paths);
+  }, [files, filesProjectId, projectId]);
+
+  // A chapter's images resolve with the main document's \graphicspath. Read
+  // it from disk whenever a chapter is opened: switching files saves the
+  // outgoing one first, so an edit to main's \graphicspath is on disk.
+  const [mainGraphics, setMainGraphics] = useState<{ projectId: string; mainFile: string; paths: string[] } | null>(null);
+  useEffect(() => {
+    if (!projectId || activeFilePath === mainFilePath || !/\.(tex|ltx)$/i.test(activeFilePath)) return;
+    let cancelled = false;
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(mainFilePath)}`)
+      .then((res) => (res.ok ? res.text() : null))
+      .catch(() => null)
+      .then((text) => {
+        if (cancelled || text === null) return;
+        const paths = graphicsPathsIn(analyze(text).map((l) => l.code)) ?? [];
+        setMainGraphics({ projectId, mainFile: mainFilePath, paths });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, activeFilePath, mainFilePath]);
+  const mainGraphicsPaths =
+    activeFilePath === mainFilePath
+      ? NO_GRAPHICS_PATHS
+      : mainGraphics && mainGraphics.projectId === projectId && mainGraphics.mainFile === mainFilePath
+        ? mainGraphics.paths
+        : null;
 
   // Revert Success Handler
   const handleRevertSuccess = useCallback(async () => {
@@ -1271,12 +1322,8 @@ export const App: React.FC = () => {
       setLintFindings(undefined);
       return;
     }
-    const projectFiles: string[] = [];
-    const walk = (list: FileEntry[]) =>
-      list.forEach((e) => (e.type === 'directory' ? walk(e.children ?? []) : projectFiles.push(e.relativePath.replace(/\\/g, '/'))));
-    walk(files);
-    setLintFindings(lintLatex(getLiveContent(), { bibKeys: citations.map((c) => c.key), projectFiles }));
-  }, [activeFilePath, files, citations, getLiveContent]);
+    setLintFindings(lintLatex(getLiveContent(), { bibKeys: citations.map((c) => c.key) }));
+  }, [activeFilePath, citations, getLiveContent]);
 
   useEffect(() => {
     if (isDoctorOpen) runDocumentLint();
@@ -2568,6 +2615,8 @@ export const App: React.FC = () => {
                   onCursorChange={setCursorPosition}
                   diagnostics={editorDiagnostics}
                   structureCheck={/\.(tex|ltx)$/i.test(activeFilePath)}
+                  imageFiles={imageFiles}
+                  mainGraphicsPaths={mainGraphicsPaths}
                   onDiagnosticClick={(line) => {
                     if (viewMode === 'code') setViewMode('split');
                     if (pdfCollapsed) setPdfCollapsed(false);

@@ -91,7 +91,12 @@ export const ImageQuickPicker = forwardRef<ImageQuickPickerHandle, ImageQuickPic
     const matches = useMemo(() => rankImages(allImages, query), [allImages, query]);
     // An unmatched query (e.g. a stale "figure" placeholder) should not leave the user at a dead end.
     const noMatch = query.trim() !== '' && matches.length === 0;
-    const shown = noMatch ? allImages : matches;
+    // A path the code check could not resolve, with one file it most likely
+    // meant: that file comes first, selected, labelled. A typo such as
+    // "plott.png" matches nothing by substring, so this is its only fix here.
+    const suggested = imageContext?.suggestion ? allImages.find((img) => img.relativePath === imageContext.suggestion) : undefined;
+    const ranked = noMatch ? allImages : matches;
+    const shown = suggested ? [suggested, ...ranked.filter((img) => img !== suggested)] : ranked;
 
     useEffect(() => {
       setActiveIndex(0);
@@ -194,7 +199,7 @@ export const ImageQuickPicker = forwardRef<ImageQuickPickerHandle, ImageQuickPic
           </button>
         ) : (
           <>
-            {noMatch && (
+            {noMatch && !suggested && (
               <div className="px-3 pt-2 text-[11px] text-stone-500">
                 No image matches <span className="font-mono">{query.trim()}</span>. Showing all images.
               </div>
@@ -224,7 +229,14 @@ export const ImageQuickPicker = forwardRef<ImageQuickPickerHandle, ImageQuickPic
                         className="w-9 h-9 flex-shrink-0 rounded border border-surface-lightBorder dark:border-surface-darkBorder bg-white dark:bg-stone-900"
                       />
                       <div className="min-w-0">
-                        <div className="text-xs font-medium truncate">{img.name}</div>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-medium truncate">{img.name}</span>
+                          {index === 0 && suggested && (
+                            <span className="flex-shrink-0 px-1 rounded text-[9px] font-medium uppercase tracking-wide text-scholarly dark:text-scholarly-dark border border-scholarly/40 dark:border-scholarly-dark/40">
+                              Closest match
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] font-mono text-stone-400 truncate">{img.relativePath}</div>
                       </div>
                     </div>

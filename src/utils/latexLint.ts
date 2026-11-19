@@ -30,8 +30,6 @@ export interface LintFinding {
 export interface LintContext {
   /** Citation keys from the project's .bib files */
   bibKeys?: string[];
-  /** Project-relative paths of every file, forward slashes */
-  projectFiles?: string[];
 }
 
 export interface LineInfo {
@@ -249,8 +247,6 @@ const OBSOLETE_PACKAGES: Record<string, string> = {
   isolatin1: 'inputenc',
   t1enc: 'fontenc (\\usepackage[T1]{fontenc})',
 };
-
-const IMAGE_EXTENSIONS = ['', '.pdf', '.png', '.jpg', '.jpeg', '.eps'];
 
 export function lintLatex(source: string, context: LintContext = {}): LintFinding[] {
   const lines = analyze(source);
@@ -485,39 +481,6 @@ export function lintLatex(source: string, context: LintContext = {}): LintFindin
       for (const key of m[2].split(',')) cites.push({ key: key.trim(), line: n, command: m[1] });
     }
     for (const m of matchesIn(code, /\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/)) bibitems.add(m[1].trim());
-
-    // Images
-    if (context.projectFiles) {
-      for (const m of matchesIn(code, /\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/)) {
-        const target = m[1].trim().replace(/\\/g, '/').replace(/^\.\//, '');
-        const files = context.projectFiles.map((f) => f.replace(/\\/g, '/'));
-        const lower = files.map((f) => f.toLowerCase());
-        // The compiler puts every project folder on TeX's search path, so a
-        // bare name resolves anywhere in the project.
-        const hit = IMAGE_EXTENSIONS.some((ext) => {
-          const want = (target + ext).toLowerCase();
-          return lower.some((f) => f === want || f.endsWith(`/${want}`));
-        });
-        if (!hit) {
-          const base = target.split('/').pop()!;
-          const imageFiles = files.filter((f) => /\.(pdf|png|jpe?g|eps)$/i.test(f));
-          const guess = closestMatch(base, imageFiles.map((f) => f.split('/').pop()!));
-          const guessPath = guess ? imageFiles.find((f) => f.split('/').pop() === guess) : undefined;
-          add({
-            rule: 'missing-image',
-            line: n,
-            title: `Image "${target}" not in the project`,
-            explanation: guessPath
-              ? `No file named ${target} exists in the project. ${guessPath} is the closest match.`
-              : `No file named ${target} (with or without .pdf, .png, .jpg or .eps) exists in the project. Upload it or fix the path.`,
-            source: 'Oberleaf',
-            fix: guessPath
-              ? { label: `Use ${guessPath}`, find: raw, replace: raw.replace(`{${m[1]}}`, `{${guessPath}}`) }
-              : undefined,
-          });
-        }
-      }
-    }
   });
 
   // \ref to a label that does not exist. Skipped for multi-file documents,
