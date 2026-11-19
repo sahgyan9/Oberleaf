@@ -37,7 +37,9 @@ import {
 } from './projects.js';
 import { ZipImportError } from './zipImport.js';
 import {
+  buildDiagnosisFeedback,
   buildReport,
+  documentErrorsFromCompile,
   errorSignature,
   githubIssueUrl,
   loadReportingConfig,
@@ -45,6 +47,9 @@ import {
   rememberClientError,
   rememberCompile,
   renderReport,
+  sendDiagnosisFeedback,
+  sendDiagnosisNote,
+  sendDocumentError,
   sendReport,
   sendSignal,
   signalsFromCompile,
@@ -900,9 +905,11 @@ app.post('/api/projects/:id/compile', async (req, res) => {
 
     touchProject(req.params.id);
     // Kept for "Report a problem", and checked for failures that point at
-    // Oberleaf itself. Signals only leave the machine if the user opted in.
+    // Oberleaf itself and for the mistakes it explained. Nothing is sent if
+    // the user turned signals off.
     rememberCompile(req.params.id, projectDir, mainFile, result);
     for (const signal of signalsFromCompile(result)) void sendSignal(signal);
+    for (const documentError of documentErrorsFromCompile(result)) void sendDocumentError(documentError);
     res.json(result);
   } catch (error: any) {
     void sendSignal({ kind: 'compile-crash', signature: errorSignature(String(error?.message ?? error)) });
@@ -966,8 +973,32 @@ app.post('/api/system/report/send', async (req, res) => {
   }
 });
 
-// Crashes in the page. Always kept for the next report; sent as a signal only
-// when the user turned signals on.
+// "Diagnosis wrong or unclear? Report it": one click, no dialog. Sends the last
+// compile's error signatures and explanations, never its log or the document.
+app.post('/api/system/report/diagnosis', async (req, res) => {
+  try {
+    const projectId = typeof req.body?.projectId === 'string' ? sanitizeProjectId(req.body.projectId) : '';
+    const feedback = projectId ? buildDiagnosisFeedback(projectId) : null;
+    if (!feedback) return res.status(404).json({ error: 'Compile the project first.' });
+    const outcome = await sendDiagnosisFeedback(feedback);
+    if (!outcome.sent) return res.status(outcome.reason === 'not-configured' ? 409 : 502).json({ error: 'Could not send. Check the internet connection.' });
+    res.json({ id: feedback.id });
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+app.post('/api/system/report/diagnosis-note', async (req, res) => {
+  const id = String(req.body?.id ?? '');
+  const note = String(req.body?.note ?? '').trim();
+  if (!/^[0-9a-f]{8}$/.test(id) || !note) return res.status(400).json({ error: 'id and note required' });
+  const outcome = await sendDiagnosisNote(id, note);
+  if (!outcome.sent) return res.status(outcome.reason === 'not-configured' ? 409 : 502).json({ error: 'Could not send. Check the internet connection.' });
+  res.json({ ok: true });
+});
+
+// Crashes in the page. Always kept for the next report; sent as a signal
+// unless the user turned signals off.
 app.post('/api/system/report/client-error', (req, res) => {
   const message = String(req.body?.message ?? '').slice(0, 500);
   if (!message) return res.status(400).json({ error: 'message required' });

@@ -69,6 +69,28 @@ export async function sendProblemReport(req: ReportRequest): Promise<string> {
   return data.id;
 }
 
+/** "Diagnosis wrong or unclear?": sends the last compile's diagnoses, no log. Returns the feedback ID. */
+export async function sendDiagnosisFeedback(projectId: string): Promise<string> {
+  const res = await fetch('/api/system/report/diagnosis', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Could not send.');
+  return data.id;
+}
+
+/** The optional sentence added after the one-click feedback. */
+export async function sendDiagnosisNote(id: string, note: string): Promise<void> {
+  const res = await fetch('/api/system/report/diagnosis-note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, note }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not send.');
+}
+
 /** Downloads text as a file through a temporary link. */
 export function saveTextFile(name: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));

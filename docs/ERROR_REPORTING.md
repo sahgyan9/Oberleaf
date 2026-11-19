@@ -46,17 +46,23 @@ Code: `server/reporting.ts` (report builder, redaction, signals, PostHog), route
 
 ### 1. "Report a problem" (user-initiated)
 
-Opened from Ctrl+K ("Report a problem") and from the diagnostics panel ("Report problem" when Oberleaf could not explain a failure, otherwise "Diagnosis wrong or unclear? Report it").
+Opened from Ctrl+K ("Report a problem") and from the diagnostics panel's "Report problem" button, shown when Oberleaf could not explain a failure (the log is what is needed then).
 
-The report holds: the user's description, optional contact, Oberleaf version and commit, Windows, Node, pdfTeX and latexmk versions, the last compile's errors, warnings and log, and page crashes from this session. The main `.tex` file only when the user ticks "Include my document's main file". The user can read the whole report in the dialog before doing anything with it.
+The report holds: the user's description, optional contact, Oberleaf version and commit, Windows, Node, pdfTeX and latexmk versions, the last compile's errors, warnings and log, and page crashes from this session. The main `.tex` file only when the user ticks "Include my document's main file".
+
+The dialog (simplified 2026-11-19): a description box, an optional e-mail line, one sentence saying what is sent with it and a **View** link that shows the whole report, the main-file checkbox, and **Send report** with **More** (Copy, Save file, GitHub issue) beside it. When this copy cannot send, Copy, GitHub issue and Save file are the buttons. It closes on Esc and on a click outside, except while sending.
 
 Redaction, applied to every log line and file name: the Windows user name and every project folder name below the home folder (the project's own name, "OneDrive - <organisation>") become same-length filler, so a saved log still wraps where TeX wrapped it and parses the same way. E-mail addresses are masked.
 
 Ways out: **Send report** (to PostHog, when configured), **GitHub issue** (saves the report file and opens a pre-filled issue on `sahgyan9/Oberleaf`; the user attaches the file; needs a GitHub account), **Save file**, **Copy**.
 
-### 2. Error signals (on by default)
+### 2. "Diagnosis wrong or unclear? Report it" (one click)
 
-On unless the user turns them off (changed from opt-in on 2026-11-19: a question that needs a click to say yes meant almost nobody would). Only when a PostHog key is configured. After the app has loaded, a notice ("Anonymous error reports") is shown once, with an On/Off switch, "What is sent", and "Got it", which stores the choice so the notice does not come back. Ctrl+K, "Error signals: turn on/off" and the checkbox in "Report a problem" change it later. An install that chose "No thanks" under the old question stays off. The choice and a random install ID are stored in `%APPDATA%\Oberleaf\reporting.json`.
+Under the error cards, when this copy can send. One click sends event `oberleaf_diagnosis_feedback`: a feedback ID and, for up to 10 errors of the last compile, the error signature, the undefined command if any, the explanation Oberleaf showed (through `errorSignature`, so file names are removed) and the fix it offered. No log and no document text, so there is nothing to preview. The link then turns into "Reported. What was wrong? (optional)" with a one-line box; a note is sent as `oberleaf_diagnosis_note` with the same feedback ID. Without a PostHog key the link opens the dialog instead.
+
+### 3. Error signals and document-error counts (on by default)
+
+On unless the user turns them off (changed from opt-in on 2026-11-19: a question that needs a click to say yes meant almost nobody would). Only when a PostHog key is configured. After the app has loaded, a notice ("Anonymous error reports") is shown once, with an On/Off switch, "What is sent", and "Got it", which stores the choice so the notice does not come back. A click outside it or Esc hides it for this session only. Ctrl+K, "Error signals: turn on/off" changes it later. An install that chose "No thanks" under the old question stays off. The choice and a random install ID are stored in `%APPDATA%\Oberleaf\reporting.json`.
 
 Sent only for failures that point at Oberleaf, not the document:
 
@@ -71,14 +77,14 @@ Sent only for failures that point at Oberleaf, not the document:
 
 Each event carries the kind, an error signature (`errorSignature`: paths, user file names, line numbers and e-mails removed; TeX package names kept), the engine, Oberleaf version and commit, Windows and TeX versions, and the install ID. No document text, file or project names, user name. One event per signature per run, at most 50 per day. PostHog person profiles are off (`$process_person_profile: false`), and so is GeoIP (`$geoip_disable: true`): with only "discard client IP data" on, PostHog still stored country and approximate coordinates, because it looks the IP up before dropping it.
 
+**Document errors** (event `oberleaf_document_error`, added 2026-11-19): the ordinary mistakes Oberleaf did explain, so the most common ones can get an automatic fix. After each compile, one event per distinct mistake: the error signature, the undefined command when there is one (`\beign`; kept only if it looks like a command name, at most 40 letters), the kind of fix the card offered (`none`, `replace_line`, `install_package`, ...), severity, engine, versions. Not sent for unexplained errors (already a signal), cascading errors or the "no PDF" summary lines. Same switch as signals, own limit of 100 per day, one per mistake per run. `fetch-reports.ts` prints them by count; rows with fix `none` are the candidates for a new automatic fix.
+
 ### Setting up PostHog (once)
 
 1. Create a free PostHog account and a project for Oberleaf. Choose the EU region if testers are mostly in Europe; otherwise US is fine.
 2. Copy the project's API key (starts with `phc_`) into `config/reporting.json` as `posthogKey`, and set `posthogHost` to `https://us.i.posthog.com` or `https://eu.i.posthog.com`. This key can only write events, so it is safe in the public repository; PostHog designs it to be embedded in apps.
 3. In the project settings, turn on discarding client IP data, so testers' IP addresses are not stored.
 4. Commit and push. Testers get it with their next in-app update, and the one-time notice appears.
-
-Done on 2026-11-19: PostHog organization "Oberleaf" (separate from friendly-learning's, same login), US region, IP discarding on, session recording off. The developer's personal key and project ID are in `.env`. Test report `bddc11b2` was sent from the app and read back with `fetch-reports.ts`.
 5. For the developer only: create a personal API key with read access, and put it in `.env` (gitignored):
 
 ```
@@ -87,14 +93,16 @@ POSTHOG_PROJECT_ID=12345
 POSTHOG_API_HOST=https://us.posthog.com
 ```
 
-`OBERLEAF_POSTHOG_KEY` and `OBERLEAF_POSTHOG_HOST` override the config file; that is how the feature was tested against a local stand-in endpoint.
+Done on 2026-11-19: PostHog organization "Oberleaf" (separate from friendly-learning's, same login), US region, IP discarding on, session recording off. The developer's personal key and project ID are in `.env`. Test report `bddc11b2` was sent from the app and read back with `fetch-reports.ts`.
 
-### 3. Turning reports into tests (developer routine)
+`OBERLEAF_POSTHOG_KEY` and `OBERLEAF_POSTHOG_HOST` override the config file. Pointing `OBERLEAF_POSTHOG_HOST` at a local stand-in (a small HTTP server that writes each request body to a file) is how to test the app without sending real events.
+
+### 4. Turning reports into tests (developer routine)
 
 Weekly, or when a tester says something broke:
 
 ```
-npx tsx scripts/fetch-reports.ts            new reports to .tmp/reports/, signal counts printed
+npx tsx scripts/fetch-reports.ts            new reports to .tmp/reports/; signal counts, document-error counts and diagnosis feedback printed
 npx tsx scripts/import-report.ts .tmp/reports/<id>.txt
 ```
 

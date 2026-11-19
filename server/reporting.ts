@@ -1,14 +1,18 @@
-// Problem reports and opt-in error signals.
+// Problem reports, diagnosis feedback and error signals.
 //
-// Two ways information can leave this machine, both described in
+// The ways information can leave this machine, all described in
 // docs/ERROR_REPORTING.md:
 //
-//  1. A problem report. The user opens "Report a problem", sees the whole
+//  1. A problem report. The user opens "Report a problem", can read the whole
 //     report as text, and sends it, opens a GitHub issue with it, or saves it.
 //     Nothing goes anywhere without that click.
-//  2. Error signals. Off until the user turns them on. When Oberleaf itself
-//     fails (a crash, a compile that fails with no reason, a TeX message the
-//     parser cannot explain), a short anonymous signature is sent.
+//  2. Diagnosis feedback. One click on "Diagnosis wrong or unclear? Report
+//     it" sends the error signatures and Oberleaf's explanations, no log.
+//  3. Error signals and document-error counts. On unless the user turns them
+//     off. When Oberleaf itself fails (a crash, a compile that fails with no
+//     reason, a TeX message the parser cannot explain), a short anonymous
+//     signature is sent; for mistakes Oberleaf explained, the kind of error
+//     and the command involved are counted.
 //
 // Both go to the PostHog project named in config/reporting.json (or the
 // OBERLEAF_POSTHOG_KEY / OBERLEAF_POSTHOG_HOST environment variables). With no
@@ -444,9 +448,59 @@ export function signalsFromCompile(result: CompileResult): Signal[] {
   return out.filter((s, i) => out.findIndex((x) => x.kind === s.kind && x.signature === s.signature) === i);
 }
 
+// ─── Document errors ────────────────────────────────────────────────────────
+//
+// The ordinary LaTeX mistakes Oberleaf did explain (a typo in a command, a
+// missing package). Counted so the most common ones can get an automatic fix.
+// Sent under the same switch as signals, but as their own event with their
+// own daily cap, so a busy day of typos cannot crowd out a real bug.
+
+// A command name is kept (\includegraphics, \beign): it is what says which
+// mistake it was. Anything longer or odder is dropped.
+const COMMAND_NAME = /^\\[A-Za-z@]{1,40}\*?$/;
+
+const NON_ERRORS = new Set(['No PDF was produced.', 'No pages of output.']);
+
+export interface DocumentError {
+  /** The message with paths, user file names and line numbers removed */
+  signature: string;
+  /** The undefined command, when there is one */
+  command?: string;
+  /** The kind of fix the card offered, or 'none' */
+  fix: string;
+  severity: 'error' | 'warning';
+  engine?: string;
+}
+
+function documentErrorOf(e: CompileResult['errors'][number], engine?: string): DocumentError {
+  return {
+    signature: errorSignature(e.message),
+    ...(e.highlight && COMMAND_NAME.test(e.highlight) ? { command: e.highlight } : {}),
+    fix: e.suggestedFix?.type ?? 'none',
+    severity: e.severity === 'warning' ? 'warning' : 'error',
+    engine,
+  };
+}
+
+/**
+ * The explained mistakes in a compile. Left out: errors no rule explains (an
+ * 'unexplained-error' signal already covers them), the "no PDF" summary
+ * lines, and errors that are only fallout of an earlier one.
+ */
+export function documentErrorsFromCompile(result: CompileResult): DocumentError[] {
+  const out: DocumentError[] = [];
+  for (const e of result.errors) {
+    if (e.isCascading || NON_ERRORS.has(e.message) || e.friendlyExplanation === GENERIC_EXPLANATION) continue;
+    out.push(documentErrorOf(e, result.engine));
+  }
+  return out.filter((d, i) => out.findIndex((x) => x.signature === d.signature && x.command === d.command) === i);
+}
+
 const sentThisRun = new Set<string>();
 let sentToday = { day: '', count: 0 };
 const DAILY_LIMIT = 50;
+let documentErrorsToday = { day: '', count: 0 };
+const DOCUMENT_ERROR_DAILY_LIMIT = 100;
 
 export interface SendOutcome {
   sent: boolean;
@@ -525,10 +579,115 @@ export async function sendSignal(
   return ok ? { sent: true } : { sent: false, reason: 'network' };
 }
 
+/** Counts an explained document mistake, unless the user turned signals off. */
+export async function sendDocumentError(
+  d: DocumentError,
+  deps: { config?: ReportingConfig; settings?: ReportingSettings; fetchImpl?: typeof fetch } = {}
+): Promise<SendOutcome> {
+  const config = deps.config ?? loadReportingConfig();
+  const settings = deps.settings ?? readReportingSettings();
+  if (!config.posthogKey) return { sent: false, reason: 'not-configured' };
+  if (settings.telemetry === 'off') return { sent: false, reason: 'opted-out' };
+
+  const key = `document|${d.signature}|${d.command ?? ''}`;
+  if (sentThisRun.has(key)) return { sent: false, reason: 'duplicate' };
+  const day = new Date().toISOString().slice(0, 10);
+  if (documentErrorsToday.day !== day) documentErrorsToday = { day, count: 0 };
+  if (documentErrorsToday.count >= DOCUMENT_ERROR_DAILY_LIMIT) return { sent: false, reason: 'rate-limited' };
+  sentThisRun.add(key);
+  documentErrorsToday.count++;
+
+  const system = await collectSystemInfo();
+  const ok = await postEvent(
+    'oberleaf_document_error',
+    {
+      signature: d.signature,
+      command: d.command,
+      fix: d.fix,
+      severity: d.severity,
+      engine: d.engine,
+      app_version: system.appVersion,
+      app_commit: system.commit,
+      tex: system.tex.pdflatex,
+    },
+    config,
+    settings.installId,
+    deps.fetchImpl
+  );
+  return ok ? { sent: true } : { sent: false, reason: 'network' };
+}
+
 /** For tests: forget what was sent in this process. */
 export function resetSignalState(): void {
   sentThisRun.clear();
   sentToday = { day: '', count: 0 };
+  documentErrorsToday = { day: '', count: 0 };
+}
+
+// ─── "Diagnosis wrong or unclear?" ──────────────────────────────────────────
+//
+// One click on the error panel sends which diagnoses the user found wrong:
+// each error's signature, command, the explanation Oberleaf gave and the fix
+// it offered. No log and no document text, so it needs no preview. The user
+// may add a sentence afterwards, sent as a second event with the same ID.
+
+export interface DiagnosisFeedback {
+  id: string;
+  engine?: string;
+  errors: Array<DocumentError & { explanation: string }>;
+}
+
+export function buildDiagnosisFeedback(projectId: string): DiagnosisFeedback | null {
+  const last = lastCompiles.get(projectId);
+  if (!last) return null;
+  const errors = last.result.errors
+    .filter((e) => !e.isCascading && !NON_ERRORS.has(e.message))
+    .slice(0, 10)
+    .map((e) => ({ ...documentErrorOf(e, last.result.engine), explanation: errorSignature(e.friendlyExplanation ?? '') }));
+  return { id: crypto.randomBytes(4).toString('hex'), engine: last.result.engine, errors };
+}
+
+export async function sendDiagnosisFeedback(
+  f: DiagnosisFeedback,
+  deps: { config?: ReportingConfig; fetchImpl?: typeof fetch } = {}
+): Promise<SendOutcome> {
+  const config = deps.config ?? loadReportingConfig();
+  if (!config.posthogKey) return { sent: false, reason: 'not-configured' };
+  const system = await collectSystemInfo();
+  const ok = await postEvent(
+    'oberleaf_diagnosis_feedback',
+    {
+      feedback_id: f.id,
+      errors: f.errors,
+      first_signature: f.errors[0]?.signature,
+      engine: f.engine,
+      app_version: system.appVersion,
+      app_commit: system.commit,
+      tex: system.tex.pdflatex,
+    },
+    config,
+    readReportingSettings().installId,
+    deps.fetchImpl
+  );
+  return ok ? { sent: true } : { sent: false, reason: 'network' };
+}
+
+/** The sentence a user adds after the one-click feedback. */
+export async function sendDiagnosisNote(
+  feedbackId: string,
+  note: string,
+  deps: { config?: ReportingConfig; fetchImpl?: typeof fetch } = {}
+): Promise<SendOutcome> {
+  const config = deps.config ?? loadReportingConfig();
+  if (!config.posthogKey) return { sent: false, reason: 'not-configured' };
+  const ok = await postEvent(
+    'oberleaf_diagnosis_note',
+    { feedback_id: feedbackId, note: redact(note.slice(0, 1000), defaultRedactionContext()) },
+    config,
+    readReportingSettings().installId,
+    deps.fetchImpl
+  );
+  return ok ? { sent: true } : { sent: false, reason: 'network' };
 }
 
 /** Sends a report the user chose to send. */

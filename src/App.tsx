@@ -2643,6 +2643,7 @@ export const App: React.FC = () => {
                 diagnosticFocus={diagnosticFocus}
                 resolveFile={(f) => (f ? findProjectFile(files, f) : undefined)}
                 onReportProblem={() => setIsReportOpen(true)}
+                diagnosisProjectId={reportingStatus?.canSend ? projectId : undefined}
                 onApplyFix={handleApplyFix}
                 onUndoFix={handleUndoFix}
                 fixReceipt={fixReceipt}
@@ -3013,10 +3014,9 @@ export const App: React.FC = () => {
         projectId={currentView === 'editor' ? projectId : undefined}
         hasCompile={currentView === 'editor' && compileDuration !== null}
         status={reportingStatus}
-        onStatusChange={refreshReportingStatus}
       />
       {consentReady && reportingStatus?.canSend && reportingStatus.telemetry === 'unset' && (
-        <ReportingConsent onDecided={refreshReportingStatus} />
+        <ReportingConsent onDecided={refreshReportingStatus} onDismiss={() => setConsentReady(false)} />
       )}
 
       {/* Symbols and LaTeX reference (Ctrl+Shift+M); stays open beside the editor */}

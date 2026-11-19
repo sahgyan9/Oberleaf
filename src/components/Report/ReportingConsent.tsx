@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
 import { setTelemetry } from '../../utils/reporting';
 
 interface ReportingConsentProps {
   /** Called after the user closed the notice, so the parent can refresh its status */
   onDecided: () => void;
+  /**
+   * A click outside or Esc: hides the notice for this session without storing
+   * anything, so it comes back next launch until "Got it".
+   */
+  onDismiss: () => void;
 }
 
 /**
@@ -12,10 +17,26 @@ interface ReportingConsentProps {
  * are on by default; the switch turns them off right here, and Ctrl+K,
  * "Error signals" changes it later.
  */
-export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided }) => {
+export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided, onDismiss }) => {
   const [details, setDetails] = useState(false);
   const [on, setOn] = useState(true);
   const [saving, setSaving] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!panelRef.current?.contains(e.target as Node)) onDismiss();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onDismiss]);
 
   const toggle = async () => {
     const next = !on;
@@ -35,6 +56,7 @@ export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided })
 
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-labelledby="consent-title"
       className="fixed bottom-10 left-4 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl border border-surface-lightBorder dark:border-surface-darkBorder bg-surface-lightPanel dark:bg-surface-darkPanel shadow-lg p-4 text-xs text-stone-700 dark:text-stone-300 animate-in fade-in slide-in-from-bottom-2 duration-200"
@@ -60,10 +82,14 @@ export const ReportingConsent: React.FC<ReportingConsentProps> = ({ onDecided })
       </button>
       {details && (
         <ul className="mt-1.5 list-disc pl-4 space-y-0.5 text-stone-600 dark:text-stone-400">
-          <li>Sent only for a crash, a compile that fails with no reason, or a TeX message Oberleaf cannot explain.</li>
+          <li>Sent for a crash, a compile that fails with no reason, or a TeX message Oberleaf cannot explain.</li>
+          <li>
+            For LaTeX mistakes Oberleaf does explain, the kind of mistake and the command involved (such as \includegraphics), so the
+            common ones can get automatic fixes.
+          </li>
           <li>The error message with paths and file names removed, the engine, and the Oberleaf, Windows and TeX versions.</li>
           <li>A random ID for this installation, so repeated reports can be counted. Not linked to you.</li>
-          <li>Never document text, file or project names, or your user name.</li>
+          <li>Never your document's text, file or project names, or your user name.</li>
           <li>Change it any time: Ctrl+K, then "Error signals".</li>
         </ul>
       )}

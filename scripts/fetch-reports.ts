@@ -49,7 +49,9 @@ async function hogql(o: FetchOptions, query: string): Promise<any[][]> {
   return (await res.json()).results ?? [];
 }
 
-export async function fetchReports(o: FetchOptions): Promise<{ saved: string[]; signals: any[][] }> {
+export async function fetchReports(
+  o: FetchOptions
+): Promise<{ saved: string[]; signals: any[][]; documentErrors: any[][]; feedback: any[][] }> {
   const days = Math.max(1, Math.min(365, Math.floor(o.days)));
   const reports = await hogql(
     o,
@@ -72,7 +74,22 @@ export async function fetchReports(o: FetchOptions): Promise<{ saved: string[]; 
       `FROM events WHERE event = 'oberleaf_error_signal' AND timestamp > now() - INTERVAL ${days} DAY ` +
       `GROUP BY properties.kind, properties.signature ORDER BY n DESC LIMIT 100`
   );
-  return { saved, signals };
+  // The mistakes users make most, and whether a fix was offered for them.
+  const documentErrors = await hogql(
+    o,
+    `SELECT properties.signature, properties.command, properties.fix, count() AS n, count(DISTINCT distinct_id) AS installs ` +
+      `FROM events WHERE event = 'oberleaf_document_error' AND timestamp > now() - INTERVAL ${days} DAY ` +
+      `GROUP BY properties.signature, properties.command, properties.fix ORDER BY n DESC LIMIT 100`
+  );
+  // "Diagnosis wrong or unclear?" clicks, each with the note the user added, if any.
+  const feedback = await hogql(
+    o,
+    `SELECT f.properties.feedback_id, f.timestamp, f.properties.first_signature, toString(f.properties.errors), n.note ` +
+      `FROM events AS f LEFT JOIN (SELECT properties.feedback_id AS id, properties.note AS note FROM events ` +
+      `WHERE event = 'oberleaf_diagnosis_note' AND timestamp > now() - INTERVAL ${days} DAY) AS n ON n.id = f.properties.feedback_id ` +
+      `WHERE f.event = 'oberleaf_diagnosis_feedback' AND f.timestamp > now() - INTERVAL ${days} DAY ORDER BY f.timestamp DESC LIMIT 100`
+  );
+  return { saved, signals, documentErrors, feedback };
 }
 
 async function main() {
@@ -85,7 +102,7 @@ async function main() {
     return;
   }
   const daysArg = process.argv.indexOf('--days');
-  const { saved, signals } = await fetchReports({
+  const { saved, signals, documentErrors, feedback } = await fetchReports({
     days: daysArg > 0 ? Number(process.argv[daysArg + 1]) || 14 : 14,
     apiHost: env.POSTHOG_API_HOST || 'https://us.posthog.com',
     projectId: env.POSTHOG_PROJECT_ID,
@@ -96,6 +113,14 @@ async function main() {
   console.log('\nError signals (count, installations, kind, signature):');
   if (!signals.length) console.log('  none');
   for (const [kind, signature, n, installs] of signals) console.log(`  ${String(n).padStart(4)} ${String(installs).padStart(4)}  ${kind}  ${signature}`);
+  console.log('\nDocument mistakes Oberleaf explained (count, installations, fix offered, command, message):');
+  if (!documentErrors.length) console.log('  none');
+  for (const [signature, command, fix, n, installs] of documentErrors) {
+    console.log(`  ${String(n).padStart(4)} ${String(installs).padStart(4)}  ${String(fix ?? 'none').padEnd(15)} ${command ?? '-'}  ${signature}`);
+  }
+  console.log('\n"Diagnosis wrong or unclear?" (id, time, first error, note):');
+  if (!feedback.length) console.log('  none');
+  for (const [id, at, first, , note] of feedback) console.log(`  ${id}  ${String(at).slice(0, 16)}  ${first ?? '-'}${note ? `\n           note: ${note}` : ''}`);
   if (saved.length) console.log('\nNext: npx tsx scripts/import-report.ts <file>');
 }
 

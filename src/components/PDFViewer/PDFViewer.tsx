@@ -35,6 +35,7 @@ import {
 
 import { DetectedMissingPackage } from '../../utils/latexPackages';
 import { buildFixPreview } from '../../utils/fixPreview';
+import { DiagnosisFeedback } from '../Report/DiagnosisFeedback';
 import {
   NO_REASON_MESSAGE,
   UNEXPLAINED_ERROR_TEXT,
@@ -152,6 +153,11 @@ interface PDFViewerProps {
   resolveFile?: (file: string) => string | undefined;
   /** Opens "Report a problem" */
   onReportProblem?: () => void;
+  /**
+   * Set when reports can be sent: "Diagnosis wrong or unclear? Report it"
+   * then sends in one click instead of opening the dialog.
+   */
+  diagnosisProjectId?: string;
   /** `file` is the error's file as the compiler reported it (absolute, ./main.tex or refs.bib) */
   onSelectErrorLine?: (line: number, file?: string) => void;
   onToggleCollapse?: () => void;
@@ -347,6 +353,7 @@ export const PDFViewer = React.forwardRef<PDFViewerHandle, PDFViewerProps>(({
   diagnosticFocus,
   resolveFile,
   onReportProblem,
+  diagnosisProjectId,
   onSelectErrorLine,
   onToggleCollapse,
   synctexTarget,
@@ -1731,7 +1738,14 @@ How do I resolve this LaTeX error? Please explain the exact cause and provide th
                   </div>
                 )}
               </div>
-              {open && !suspectApp && onReportProblem && (
+              {open && !suspectApp && diagnosisProjectId && (
+                // A new set of errors gets a fresh link.
+                <DiagnosisFeedback
+                  key={`${diagnosisProjectId}|${compileErrors.length}|${compileErrors[0]?.message ?? ''}|${compileErrors[0]?.line ?? ''}`}
+                  projectId={diagnosisProjectId}
+                />
+              )}
+              {open && !suspectApp && !diagnosisProjectId && onReportProblem && (
                 <div className="pt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
                   Diagnosis wrong or unclear?{' '}
                   <button type="button" onClick={onReportProblem} className="underline underline-offset-2 hover:text-stone-800 dark:hover:text-stone-200">

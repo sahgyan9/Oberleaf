@@ -4,7 +4,11 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GENERIC_EXPLANATION, type CompileResult } from '../server/compiler.js';
 import {
+  buildDiagnosisFeedback,
   buildReport,
+  documentErrorsFromCompile,
+  sendDiagnosisFeedback,
+  sendDocumentError,
   errorSignature,
   githubIssueUrl,
   identifyingSegments,
@@ -97,6 +101,104 @@ describe('signalsFromCompile', () => {
     );
     expect(unexplained).toEqual([{ kind: 'unexplained-error', signature: 'Weird new error at line N', engine: 'pdflatex' }]);
     expect(signalsFromCompile(result({ rawLog: 'x\n! Something unknown.\n' }))[0]).toMatchObject({ kind: 'parser-missed', signature: 'Something unknown.' });
+  });
+});
+
+describe('document errors (mistakes Oberleaf explained)', () => {
+  const undefinedCmd = {
+    file: 'main.tex',
+    line: 3,
+    message: 'Undefined control sequence.',
+    friendlyExplanation: '\\beign is not defined',
+    highlight: '\\beign',
+    raw: 'l.3 Hello \\beign world',
+  };
+  const missingSty = {
+    file: 'main.tex',
+    line: 2,
+    message: "LaTeX Error: File `siunitx.sty' not found.",
+    friendlyExplanation: 'The package "siunitx" is not installed.',
+    suggestedFix: { type: 'install_package' as const, packageName: 'siunitx', codeSnippet: '', label: 'Install', description: '' },
+    raw: '',
+  };
+
+  it('keeps the kind of mistake, the command and the fix offered, never the line text', () => {
+    const out = documentErrorsFromCompile(result({ errors: [undefinedCmd, missingSty] }));
+    expect(out).toEqual([
+      { signature: 'Undefined control sequence.', command: '\\beign', fix: 'none', severity: 'error', engine: 'pdflatex' },
+      { signature: "LaTeX Error: File `siunitx.sty' not found.", fix: 'install_package', severity: 'error', engine: 'pdflatex' },
+    ]);
+    expect(JSON.stringify(out)).not.toContain('Hello');
+  });
+
+  it('leaves out unexplained errors, fallout, summary lines, odd highlights and repeats', () => {
+    const out = documentErrorsFromCompile(
+      result({
+        errors: [
+          { file: 'main.tex', line: 4, message: 'Weird', friendlyExplanation: GENERIC_EXPLANATION, raw: '' },
+          { ...undefinedCmd, line: 9, isCascading: true },
+          { file: '', line: 0, message: 'No PDF was produced.', raw: '' },
+          { ...undefinedCmd, line: 5, highlight: 'my secret phrase' },
+          { ...undefinedCmd, line: 7, highlight: 'my secret phrase' },
+        ],
+      })
+    );
+    expect(out).toEqual([{ signature: 'Undefined control sequence.', fix: 'none', severity: 'error', engine: 'pdflatex' }]);
+  });
+
+  it('follows the signals switch and sends its own event', async () => {
+    resetSignalState();
+    const config: ReportingConfig = { posthogKey: 'phc_test', posthogHost: 'https://posthog.invalid', githubRepo: 'o/r' };
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }));
+    const d = documentErrorsFromCompile(result({ errors: [undefinedCmd] }))[0];
+    expect(await sendDocumentError(d, { config, settings: { telemetry: 'off', installId: 'i' }, fetchImpl: fetchImpl as any })).toEqual({
+      sent: false,
+      reason: 'opted-out',
+    });
+    expect(await sendDocumentError(d, { config, settings: { telemetry: 'unset', installId: 'i' }, fetchImpl: fetchImpl as any })).toEqual({ sent: true });
+    expect(await sendDocumentError(d, { config, settings: { telemetry: 'on', installId: 'i' }, fetchImpl: fetchImpl as any })).toEqual({
+      sent: false,
+      reason: 'duplicate',
+    });
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as any)[1].body));
+    expect(body.event).toBe('oberleaf_document_error');
+    expect(body.properties).toMatchObject({ command: '\\beign', fix: 'none', $geoip_disable: true });
+  });
+});
+
+describe('diagnosis feedback', () => {
+  it('sends the diagnoses of the last compile without its log', async () => {
+    const projectDir = 'C:\\Users\\gyan\\Documents\\Oberleaf Projects\\thesis-gyan';
+    rememberCompile(
+      'thesis-gyan',
+      projectDir,
+      'main.tex',
+      result({
+        rawLog: 'l.3 Hello \\beign world\nsecret document text',
+        errors: [
+          { file: 'main.tex', line: 3, message: 'Undefined control sequence.', friendlyExplanation: '\\beign is not defined', highlight: '\\beign', raw: '' },
+          {
+            file: 'main.tex',
+            line: 8,
+            message: "LaTeX Error: File `figures/holiday.png' not found.",
+            friendlyExplanation: 'Figure could not be found.\nExpected: figures/holiday.png',
+            raw: '',
+          },
+        ],
+      })
+    );
+    const f = buildDiagnosisFeedback('thesis-gyan')!;
+    expect(f.id).toMatch(/^[0-9a-f]{8}$/);
+    expect(f.errors.map((e) => e.signature)).toEqual(['Undefined control sequence.', "LaTeX Error: File `<path>' not found."]);
+    expect(f.errors[0].explanation).toBe('\\beign is not defined');
+    expect(buildDiagnosisFeedback('never-compiled')).toBeNull();
+
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }));
+    const config: ReportingConfig = { posthogKey: 'phc_test', posthogHost: 'https://posthog.invalid', githubRepo: 'o/r' };
+    expect(await sendDiagnosisFeedback(f, { config, fetchImpl: fetchImpl as any })).toEqual({ sent: true });
+    const sent = String((fetchImpl.mock.calls[0] as any)[1].body);
+    expect(JSON.parse(sent).event).toBe('oberleaf_diagnosis_feedback');
+    expect(sent).not.toMatch(/secret document text|holiday|gyan/);
   });
 });
 
