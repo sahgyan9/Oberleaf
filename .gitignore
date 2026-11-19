@@ -21,3 +21,5 @@ CV_*
 # Recorded TeX logs the error-corpus tests replay (scripts/record-error-logs.ts)
 !tests/fixtures/logs/*.log
 !tests/fixtures/logs-texlive/*.log
+# Whole-compile cases (scripts/compare-error-cases.ts) and imported problem reports
+!tests/fixtures/diagnostics/*.log

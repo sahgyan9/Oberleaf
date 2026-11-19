@@ -1,0 +1,1058 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.5) (preloaded format=pdflatex 2026.6.25)  19 NOV 2026 07:44
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.te
+x
+
+(C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex
+LaTeX2e <2025-11-01>
+L3 programming layer <2026-04-28>
+(C:\Users\uuuuu\AppData\Local\Programs\MiKTeX\tex/latex/base\article.cls
+Document Class: article 2025/01/22 v1.4n Standard LaTeX document class
+(C:\Users\uuuuu\AppData\Local\Programs\MiKTeX\tex/latex/base\size10.clo
+File: size10.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
+)
+\c@part=\count276
+\c@section=\count277
+\c@subsection=\count278
+\c@subsubsection=\count279
+\c@paragraph=\count280
+\c@subparagraph=\count281
+\c@figure=\count282
+\c@table=\count283
+\abovecaptionskip=\skip49
+\belowcaptionskip=\skip50
+\bibindent=\dimen150
+)
+(C:\Users\uuuuu\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3backend-pdf
+tex.def
+File: l3backend-pdftex.def 2026-02-18 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count284
+)
+(C:\Users\uuuuu\AppData\Local\Temp\oberleaf-diag-hundred-errors-OnDVxS\.build\m
+ain.aux)
+\openout1 = `main.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 2.
+LaTeX Font Info:    ... okay on input line 2.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+3: Undefined control sequence.
+l.3 Line 1 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+4: Undefined control sequence.
+l.4 Line 2 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+5: Undefined control sequence.
+l.5 Line 3 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+6: Undefined control sequence.
+l.6 Line 4 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+7: Undefined control sequence.
+l.7 Line 5 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+8: Undefined control sequence.
+l.8 Line 6 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+9: Undefined control sequence.
+l.9 Line 7 \undefinedmacro
+                          
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+10: Undefined control sequence.
+l.10 Line 8 \undefinedmacro
+                           
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+11: Undefined control sequence.
+l.11 Line 9 \undefinedmacro
+                           
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+12: Undefined control sequence.
+l.12 Line 10 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+13: Undefined control sequence.
+l.13 Line 11 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+14: Undefined control sequence.
+l.14 Line 12 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+15: Undefined control sequence.
+l.15 Line 13 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+16: Undefined control sequence.
+l.16 Line 14 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+17: Undefined control sequence.
+l.17 Line 15 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+18: Undefined control sequence.
+l.18 Line 16 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+19: Undefined control sequence.
+l.19 Line 17 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+20: Undefined control sequence.
+l.20 Line 18 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+21: Undefined control sequence.
+l.21 Line 19 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+22: Undefined control sequence.
+l.22 Line 20 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+23: Undefined control sequence.
+l.23 Line 21 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+24: Undefined control sequence.
+l.24 Line 22 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+25: Undefined control sequence.
+l.25 Line 23 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+26: Undefined control sequence.
+l.26 Line 24 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+27: Undefined control sequence.
+l.27 Line 25 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+28: Undefined control sequence.
+l.28 Line 26 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+29: Undefined control sequence.
+l.29 Line 27 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+30: Undefined control sequence.
+l.30 Line 28 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+31: Undefined control sequence.
+l.31 Line 29 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+32: Undefined control sequence.
+l.32 Line 30 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+33: Undefined control sequence.
+l.33 Line 31 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+34: Undefined control sequence.
+l.34 Line 32 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+35: Undefined control sequence.
+l.35 Line 33 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+36: Undefined control sequence.
+l.36 Line 34 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+37: Undefined control sequence.
+l.37 Line 35 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+38: Undefined control sequence.
+l.38 Line 36 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+39: Undefined control sequence.
+l.39 Line 37 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+40: Undefined control sequence.
+l.40 Line 38 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+41: Undefined control sequence.
+l.41 Line 39 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+42: Undefined control sequence.
+l.42 Line 40 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+43: Undefined control sequence.
+l.43 Line 41 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+44: Undefined control sequence.
+l.44 Line 42 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+45: Undefined control sequence.
+l.45 Line 43 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+46: Undefined control sequence.
+l.46 Line 44 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+47: Undefined control sequence.
+l.47 Line 45 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+48: Undefined control sequence.
+l.48 Line 46 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+49: Undefined control sequence.
+l.49 Line 47 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+50: Undefined control sequence.
+l.50 Line 48 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+51: Undefined control sequence.
+l.51 Line 49 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+52: Undefined control sequence.
+l.52 Line 50 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+53: Undefined control sequence.
+l.53 Line 51 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+54: Undefined control sequence.
+l.54 Line 52 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+55: Undefined control sequence.
+l.55 Line 53 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+56: Undefined control sequence.
+l.56 Line 54 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+57: Undefined control sequence.
+l.57 Line 55 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+58: Undefined control sequence.
+l.58 Line 56 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+59: Undefined control sequence.
+l.59 Line 57 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+60: Undefined control sequence.
+l.60 Line 58 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+61: Undefined control sequence.
+l.61 Line 59 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+62: Undefined control sequence.
+l.62 Line 60 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+63: Undefined control sequence.
+l.63 Line 61 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+64: Undefined control sequence.
+l.64 Line 62 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+65: Undefined control sequence.
+l.65 Line 63 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+66: Undefined control sequence.
+l.66 Line 64 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+67: Undefined control sequence.
+l.67 Line 65 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+68: Undefined control sequence.
+l.68 Line 66 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+69: Undefined control sequence.
+l.69 Line 67 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+70: Undefined control sequence.
+l.70 Line 68 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+71: Undefined control sequence.
+l.71 Line 69 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+72: Undefined control sequence.
+l.72 Line 70 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+73: Undefined control sequence.
+l.73 Line 71 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+74: Undefined control sequence.
+l.74 Line 72 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+75: Undefined control sequence.
+l.75 Line 73 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+76: Undefined control sequence.
+l.76 Line 74 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+77: Undefined control sequence.
+l.77 Line 75 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+78: Undefined control sequence.
+l.78 Line 76 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+79: Undefined control sequence.
+l.79 Line 77 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+80: Undefined control sequence.
+l.80 Line 78 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+81: Undefined control sequence.
+l.81 Line 79 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+82: Undefined control sequence.
+l.82 Line 80 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+83: Undefined control sequence.
+l.83 Line 81 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+84: Undefined control sequence.
+l.84 Line 82 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+85: Undefined control sequence.
+l.85 Line 83 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+86: Undefined control sequence.
+l.86 Line 84 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+87: Undefined control sequence.
+l.87 Line 85 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+88: Undefined control sequence.
+l.88 Line 86 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+89: Undefined control sequence.
+l.89 Line 87 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+90: Undefined control sequence.
+l.90 Line 88 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+91: Undefined control sequence.
+l.91 Line 89 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+92: Undefined control sequence.
+l.92 Line 90 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+93: Undefined control sequence.
+l.93 Line 91 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+94: Undefined control sequence.
+l.94 Line 92 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+95: Undefined control sequence.
+l.95 Line 93 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+96: Undefined control sequence.
+l.96 Line 94 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+97: Undefined control sequence.
+l.97 Line 95 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+98: Undefined control sequence.
+l.98 Line 96 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+99: Undefined control sequence.
+l.99 Line 97 \undefinedmacro
+                            
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+100: Undefined control sequence.
+l.100 Line 98 \undefinedmacro
+                             
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+101: Undefined control sequence.
+l.101 Line 99 \undefinedmacro
+                             
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+102: Undefined control sequence.
+l.102 Line 100 \undefinedmacro
+                              
+(That makes 100 errors; please try again.) 
+Here is how much of TeX's memory you used:
+ 420 strings out of 467682
+ 8361 string characters out of 5414700
+ 436244 words of memory out of 5000000
+ 29573 multiletter control sequences out of 15000+600000
+ 627721 words of font info for 40 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 35i,0n,38p,215b,37s stack positions out of 10000i,1000n,20000p,200000b,200000s
+
+C:/Users/uuuuu/AppData/Local/Temp/oberleaf-diag-hundred-errors-OnDVxS/main.tex:
+102:  ==> Fatal error occurred, no output PDF file produced!

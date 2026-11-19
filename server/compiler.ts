@@ -4,6 +4,7 @@ import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 import { ENVIRONMENT_SOURCES, KNOWN_COMMANDS, XCOLOR_BASE_COLORS, closestMatch } from './texKnowledge.js';
 import { findMissingProjectFiles, type MissingProjectFile } from './projectFiles.js';
+import { parseLatexWarnings, type CompileWarning } from './logWarnings.js';
 
 export interface SuggestedFix {
   type: 'add_preamble' | 'install_package' | 'wrap_math_mode' | 'replace_line' | 'set_engine' | 'open_doctor';
@@ -37,7 +38,17 @@ export interface CompileError {
   isCascading?: boolean;
   cascadingFromLine?: number;
   raw: string;
+  /**
+   * 'warning' for problems that leave the PDF complete but wrong in places
+   * (a missing .bib file: citations print as [?]). TeX did not stop for them,
+   * so they must not turn the compile status into "errors". Default 'error'.
+   */
+  severity?: 'error' | 'warning';
+  /** Text on the error's line the editor should underline (the undefined command) */
+  highlight?: string;
 }
+
+export type { CompileWarning, CompileWarningKind } from './logWarnings.js';
 
 export interface CompileResult {
   success: boolean;
@@ -45,6 +56,8 @@ export interface CompileResult {
   durationMs: number;
   errors: CompileError[];
   warnings: string[];
+  /** LaTeX and package warnings with the file and line they belong to */
+  warningItems: CompileWarning[];
   rawLog: string;
   documentTitle?: string;
   pdfDownloadFilename?: string;
@@ -916,6 +929,8 @@ export function parseBibtexLog(blg: string, sourceLines: string[] = []): Compile
       message,
       friendlyExplanation: explainBibtexError(message, file),
       raw: lines.slice(i, i + 4).join('\n'),
+      // An uncited bibliography prints nothing; the rest of the PDF is intact.
+      ...(/found no \\citation commands/.test(message) ? { severity: 'warning' as const } : {}),
     });
   }
   return errors;
@@ -961,6 +976,9 @@ export function findMissingBibFiles(sourceLines: string[], projectDir: string): 
           message,
           friendlyExplanation: explainBibtexError(message, withExt),
           raw: line,
+          // The PDF still builds; citations print as [?]. Overleaf files
+          // this under warnings too.
+          severity: 'warning',
         });
       }
     }
@@ -1000,6 +1018,18 @@ function dedupeErrors(errors: CompileError[]): CompileError[] {
   return unique;
 }
 
+// TeX's fallout stays in the file being read: an undefined command in
+// chapters/intro.tex is its own mistake, not the echo of one in main.tex.
+// 'main.tex' is also the parser's placeholder for "the document", so it
+// matches anything rather than splitting what used to be one cascade.
+function sameSourceFile(a: string, b: string): boolean {
+  const norm = (f: string) => f.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+  const x = norm(a);
+  const y = norm(b);
+  if (x === y || x === 'main.tex' || y === 'main.tex') return true;
+  return x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
+}
+
 // Identifies secondary errors cascading from the primary root error
 function markCascadingErrors(errors: CompileError[]): CompileError[] {
   if (errors.length <= 1) return errors;
@@ -1024,7 +1054,12 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
     // graphicx is also "Undefined control sequence") is actionable by itself
     // and stays a root cause.
     if (err.isCascading) return err;
-    if (isCascadePattern && !err.suggestedFix && (rootError.suggestedFix || rootError.line > 0)) {
+    if (
+      isCascadePattern &&
+      !err.suggestedFix &&
+      (rootError.suggestedFix || rootError.line > 0) &&
+      sameSourceFile(err.file, rootError.file)
+    ) {
       return {
         ...err,
         isCascading: true,
@@ -1040,6 +1075,95 @@ function markCascadingErrors(errors: CompileError[]): CompileError[] {
     rootError = err;
     return err;
   });
+}
+
+const lastCodeLine = (sourceLines: string[]): number => {
+  for (let i = sourceLines.length - 1; i >= 0; i--) if (stripTexComment(sourceLines[i]).trim()) return i + 1;
+  return 0;
+};
+
+/**
+ * TeX's last words after a fatal error are not problems of their own.
+ * "==> Fatal error occurred, no output PDF file produced!" restates that there
+ * is no PDF, which the viewer already says, and "Emergency stop" follows the
+ * error that caused it (a missing file, an argument never closed). Listing
+ * both turned one missing package into "3 errors"; Overleaf shows one.
+ *
+ * An Emergency stop with nothing before it is the only report there is, so it
+ * stays, with the reason TeX printed after it ("*** (job aborted, ...)").
+ * parseLatexLog keeps the full list; this runs on the final result only.
+ */
+export function collapseFatalTail(errors: CompileError[], log: string, sourceLines: string[]): CompileError[] {
+  const out: CompileError[] = [];
+  for (const err of errors) {
+    if (/Fatal error occurred, no output PDF/i.test(err.message)) continue;
+    if (/^Emergency stop\.?$/i.test(err.message.trim())) {
+      const prev = out[out.length - 1];
+      // A missing \input file is reported before TeX reads the rest of the
+      // line, so only the Emergency stop carries "l.4". Hand that line to the
+      // error it follows, unless the stop happened inside an installed .sty
+      // or .cls, whose line numbers mean nothing in the document.
+      if (prev && prev.line <= 0 && err.line > 0 && !/\.(sty|cls)$/i.test(err.file)) {
+        out[out.length - 1] = { ...prev, line: err.line, file: err.file };
+      }
+      if (out.some((e) => e.severity !== 'warning')) continue;
+      out.push(explainEmergencyStop(err, log, sourceLines));
+      continue;
+    }
+    out.push(err);
+  }
+  return out;
+}
+
+function explainEmergencyStop(err: CompileError, log: string, sourceLines: string[]): CompileError {
+  const reason = log.match(/^\*\*\* \(([^)]*)\)/m)?.[1];
+  const root = { ...err, isCascading: false, cascadingFromLine: undefined };
+  if (reason && /no legal \\end found/.test(reason)) {
+    return {
+      ...root,
+      message: `Emergency stop. (${reason})`,
+      file: 'main.tex',
+      line: lastCodeLine(sourceLines) || err.line,
+      friendlyExplanation:
+        'The file ended before \\end{document}. Add \\end{document} as the last line. If it is already there, an environment or a { earlier in the document was never closed and swallowed it.',
+    };
+  }
+  if (reason && /cannot \\read from terminal/.test(reason)) {
+    return {
+      ...root,
+      message: `Emergency stop. (${reason})`,
+      friendlyExplanation:
+        'TeX stopped to ask a question it cannot ask in this mode, usually for a file name it could not find. Check \\input, \\include and \\usepackage names on the line shown.',
+    };
+  }
+  if (reason) return { ...root, message: `Emergency stop. (${reason})` };
+  return root;
+}
+
+/**
+ * A compile that wrote no PDF and reported no error used to show only
+ * "Compilation failed" over an empty panel. Say why.
+ */
+export function explainMissingPdf(log: string, sourceLines: string[]): CompileError {
+  if (/No pages of output/.test(log)) {
+    const end = sourceLines.findIndex((l) => /\\end\s*\{document\}/.test(stripTexComment(l)));
+    return {
+      file: 'main.tex',
+      line: end >= 0 ? end + 1 : 0,
+      message: 'No pages of output.',
+      friendlyExplanation:
+        'The document compiled but printed nothing, so there is no PDF. Put some text between \\begin{document} and \\end{document}.',
+      raw: 'No pages of output.',
+    };
+  }
+  return {
+    file: 'main.tex',
+    line: 0,
+    message: 'No PDF was produced.',
+    friendlyExplanation:
+      'The compiler finished without reporting a LaTeX error but did not write a PDF. The raw log below says what it did; the cause is often a crashed helper (latexmk, Perl, BibTeX) rather than the document.',
+    raw: log.slice(-2000),
+  };
 }
 
 // Characters pdfLaTeX's utf8 input does not define, mapped to commands that
@@ -1937,6 +2061,98 @@ export function readMagicEngine(source: string): SupportedEngine | undefined {
   return undefined;
 }
 
+/**
+ * Everything the UI is told about a finished compile, from the files the
+ * compile left behind. Pure apart from findMissingBibFiles reading the project
+ * folder, so tests can run it on recorded logs.
+ */
+export function analyzeCompileOutput(o: {
+  log: string;
+  blg: string;
+  auxText: string;
+  sourceLines: string[];
+  projectDir: string;
+  pdfGenerated: boolean;
+  /** The root document, relative to the project ('main.tex' when omitted) */
+  mainFile?: string;
+}): { errors: CompileError[]; warnings: string[]; warningItems: CompileWarning[] } {
+  const rootName = (o.mainFile ?? 'main.tex').replace(/\\/g, '/');
+  const parsed = parseLatexLog(o.log, o.sourceLines, o.projectDir);
+  // A .blg survives in .build after the document stops using BibTeX; only
+  // trust it while the aux file still declares a bibliography.
+  const bibErrors = [
+    ...findMissingBibFiles(o.sourceLines, o.projectDir),
+    ...(/\\bibdata\{/.test(o.auxText) ? parseBibtexLog(o.blg, o.sourceLines) : []),
+  ].filter((e, i, all) => all.findIndex((x) => x.message === e.message) === i);
+
+  const collapsed = collapseFatalTail([...parsed.errors, ...bibErrors], o.log, o.sourceLines).map((e) => {
+    // The editor underlines the undefined command itself, not the whole line.
+    if (e.isCascading || !/Undefined control sequence/.test(e.message)) return e;
+    const macro = undefinedMacroName(e.raw);
+    return macro ? { ...e, highlight: `\\${macro}` } : e;
+  });
+  const errors =
+    !o.pdfGenerated && !collapsed.some((e) => e.severity !== 'warning')
+      ? [...collapsed, explainMissingPdf(o.log, o.sourceLines)]
+      : collapsed;
+
+  const warningItems = parseLatexWarnings(o.log).map((w) => {
+    const file = projectRelative(w.file, o.projectDir);
+    // \include skips a file it cannot find. The log says only "No file
+    // ch2.tex."; the line is where the document asks for it.
+    if (w.kind === 'file' && !w.line) {
+      const name = w.message.match(/^No file (.+?)\.tex\.$/)?.[1];
+      const idx = name
+        ? findCodeLine(o.sourceLines, new RegExp(`\\\\(?:include|input)\\s*\\{\\s*${escapeRegExp(name)}(?:\\.tex)?\\s*\\}`))
+        : -1;
+      if (idx >= 0) return { ...w, file: rootName, line: idx + 1 };
+    }
+    return { ...w, file };
+  });
+
+  // The log parsers file errors they attribute to the document itself under
+  // the placeholder 'main.tex' (they only see its lines, not its name). Real
+  // log paths always carry a directory, so a bare 'main.tex' is that
+  // placeholder: give it the real root's name, or "Jump to line" opens the
+  // wrong file when the main document is something else. Then name project
+  // files the way the file tree does, so the editor can mark their lines.
+  const namedErrors = errors.map((e) => ({
+    ...e,
+    file: e.file === 'main.tex' ? rootName : projectRelative(e.file, o.projectDir),
+  }));
+  return { errors: namedErrors, warnings: parsed.warnings, warningItems };
+}
+
+/**
+ * latexmk's command line. `-f` keeps latexmk going after a pass that reported
+ * errors: without it latexmk stops after the first pdflatex run, so a single
+ * stray typo left every \ref as ?? and every \cite as [?] and never ran
+ * BibTeX. Overleaf passes -f unless "Stop on first error" is on.
+ */
+export function buildLatexmkArgs(o: {
+  engine: SupportedEngine;
+  miktex: boolean;
+  buildDir: string;
+  mainPath: string;
+  shellEscape: boolean;
+}): string[] {
+  const installerFlag = o.miktex ? ' -enable-installer' : '';
+  return [
+    '-pdf',
+    '-g',
+    '-f',
+    `-pdflatex=${o.engine}${installerFlag}`,
+    // latexmk runs BibTeX on its own; a template's .bst can need a package too.
+    ...(o.miktex ? ['-e', '$bibtex = q/bibtex -enable-installer %O %S/'] : []),
+    '-interaction=nonstopmode',
+    '-synctex=1',
+    '-file-line-error',
+    `-outdir=${o.buildDir}`,
+    ...(o.shellEscape ? ['-shell-escape'] : []),
+    o.mainPath,
+  ];
+}
+
 export async function compileDocument(
   projectDir: string,
   mainFile: string = 'main.tex',
@@ -2001,20 +2217,13 @@ export async function compileDocument(
   // bibtex/biber on its own. The availability check is cached after the first
   // compile so we don't pay the probe overhead on every subsequent keypress.
   const miktex = await isMiktex();
-  const installerFlag = miktex ? ' -enable-installer' : '';
-  const latexmkArgs = [
-    '-pdf',
-    '-g',
-    `-pdflatex=${engine}${installerFlag}`,
-    // latexmk runs BibTeX on its own; a template's .bst can need a package too.
-    ...(miktex ? ['-e', '$bibtex = q/bibtex -enable-installer %O %S/'] : []),
-    '-interaction=nonstopmode',
-    '-synctex=1',
-    '-file-line-error',
-    `-outdir=${buildDir}`,
-    ...(options.shellEscape ? ['-shell-escape'] : []),
-    path.join(projectDir, mainFile),
-  ];
+  const latexmkArgs = buildLatexmkArgs({
+    engine,
+    miktex,
+    buildDir,
+    mainPath: path.join(projectDir, mainFile),
+    shellEscape: !!options.shellEscape,
+  });
 
   // Remove stale log file so previous compile errors cannot bleed into this run
   const buildLogFile = path.join(buildDir, `${baseName}.log`);
@@ -2075,18 +2284,17 @@ export async function compileDocument(
   const pdfDownloadFilename = documentTitle ? `${documentTitle}.pdf` : `${baseName}.pdf`;
   const detectedMissingPackages = scanMissingPackages(mainSource);
 
-  const parsed = parseLatexLog(fullLog, sourceLines, projectDir);
-  const warnings = parsed.warnings;
-  // A .blg survives in .build after the document stops using BibTeX; only
-  // trust it while the aux file still declares a bibliography.
-  const auxText = readSafe(path.join(buildDir, `${baseName}.aux`));
-  const bibErrors = [
-    ...findMissingBibFiles(sourceLines, projectDir),
-    ...(/\\bibdata\{/.test(auxText) ? parseBibtexLog(readSafe(path.join(buildDir, `${baseName}.blg`)), sourceLines) : []),
-  ].filter((e, i, all) => all.findIndex((o) => o.message === e.message) === i);
-  const errors = [...parsed.errors, ...bibErrors];
-  const missingProjectFiles = await findMissingProjectFiles(sourceLines, projectDir, errors);
   const pdfGenerated = fs.existsSync(generatedPdf);
+  const { errors, warnings, warningItems } = analyzeCompileOutput({
+    log: fullLog,
+    blg: readSafe(path.join(buildDir, `${baseName}.blg`)),
+    auxText: readSafe(path.join(buildDir, `${baseName}.aux`)),
+    sourceLines,
+    projectDir,
+    pdfGenerated,
+    mainFile: relMainFile,
+  });
+  const missingProjectFiles = await findMissingProjectFiles(sourceLines, projectDir, errors);
 
   // A PDF that exists is worth showing even when the log carries errors, which
   // is how Overleaf behaves: the diagnostics panel reports the problems while
@@ -2100,21 +2308,13 @@ export async function compileDocument(
     }
   }
 
-  // The log parsers file errors they attribute to the document itself under
-  // the placeholder 'main.tex' (they only see its lines, not its name). Real
-  // log paths always carry a directory, so a bare 'main.tex' is that
-  // placeholder: give it the real root's name, or "Jump to line" opens the
-  // wrong file when the main document is something else.
-  const rootName = relMainFile.replace(/\\/g, '/');
-  const namedErrors =
-    rootName === 'main.tex' ? errors : errors.map((e) => (e.file === 'main.tex' ? { ...e, file: rootName } : e));
-
   return {
     success: pdfGenerated,
     pdfUrl: pdfGenerated ? `/api/pdf?file=${encodeURIComponent(outputPdf)}` : undefined,
     durationMs,
-    errors: namedErrors,
+    errors,
     warnings,
+    warningItems,
     rawLog: fullLog + (res.stderr ? `\n${res.stderr}` : ''),
     documentTitle,
     pdfDownloadFilename,
@@ -2122,6 +2322,17 @@ export async function compileDocument(
     missingProjectFiles,
     engine,
   };
+}
+
+// The log names files the way TeX opened them: absolute when latexmk was given
+// an absolute main file ("C:/Users/me/proj/ch1.tex"), relative otherwise.
+// Project files come back relative with forward slashes, the way the file
+// tree names them; anything outside the project (a .sty) stays as it was.
+function projectRelative(file: string, projectDir: string): string {
+  if (!file || !path.isAbsolute(file)) return file.replace(/\\/g, '/');
+  const rel = path.relative(path.resolve(projectDir), path.resolve(file));
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return file;
+  return rel.replace(/\\/g, '/');
 }
 
 function readSafe(filePath: string): string {

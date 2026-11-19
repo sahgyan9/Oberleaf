@@ -1,0 +1,56 @@
+{
+  "refs-despite-error": {
+    "pdf": true
+  },
+  "missing-input": {
+    "pdf": false
+  },
+  "missing-sty": {
+    "pdf": false
+  },
+  "missing-image": {
+    "pdf": true
+  },
+  "unclosed-brace-paragraph": {
+    "pdf": false
+  },
+  "no-end-document": {
+    "pdf": false
+  },
+  "env-mismatch-pdf": {
+    "pdf": true
+  },
+  "math-errors": {
+    "pdf": true
+  },
+  "missing-bib-warning": {
+    "pdf": true
+  },
+  "hundred-errors": {
+    "pdf": false
+  },
+  "undefined-ref-only": {
+    "pdf": true
+  },
+  "chapter-warning-and-error": {
+    "pdf": true
+  },
+  "overfull-box": {
+    "pdf": true
+  },
+  "empty-document": {
+    "pdf": false
+  },
+  "duplicate-label": {
+    "pdf": true
+  },
+  "font-shape": {
+    "pdf": true
+  },
+  "natbib-citation": {
+    "pdf": true
+  },
+  "missing-include": {
+    "pdf": true
+  }
+}
