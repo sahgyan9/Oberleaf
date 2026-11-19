@@ -3,7 +3,17 @@ import path from 'path';
 import fs from 'fs';
 import { extractLatexTitle } from './latexTitle.js';
 import { ENVIRONMENT_SOURCES, KNOWN_COMMANDS, XCOLOR_BASE_COLORS, closestMatch } from './texKnowledge.js';
-import { findMissingProjectFiles, type MissingProjectFile } from './projectFiles.js';
+import { executableLines, findMissingProjectFiles, listProjectFilePaths, type MissingProjectFile } from './projectFiles.js';
+import {
+  checkImagePath,
+  findIncludegraphics,
+  graphicsPathsIn,
+  imageFileList,
+  normalizeImageName,
+  type ImageFileList,
+  type ImagePathResult,
+  type IncludegraphicsCall,
+} from './imagePaths.js';
 import { parseLatexWarnings, type CompileWarning } from './logWarnings.js';
 
 export interface SuggestedFix {
@@ -1212,11 +1222,142 @@ const UNICODE_TO_LATEX: Record<number, string> = (() => {
  * Inspects source code to remap misleading errors to their true source line,
  * provides clear plain-English explanations, and attaches 1-click Quick Fixes.
  */
+interface MissingImageContext {
+  files: ImageFileList;
+  /** Main document's last \graphicspath ([] for none) */
+  graphicsPaths: string[];
+  /** Executable \includegraphics calls in the main document, by 0-based line */
+  calls: ImageCall[];
+}
+
+type ImageCall = { lineIdx: number; call: IncludegraphicsCall };
+
+/** A line with its % comment replaced by spaces, so columns stay put. */
+function blankComment(line: string): string {
+  const m = line.match(/(^|[^\\])%/);
+  if (!m || m.index === undefined) return line;
+  const start = m.index + m[1].length;
+  return line.slice(0, start) + ' '.repeat(line.length - start);
+}
+
+/** Executable \includegraphics calls and the last \graphicspath of one file. */
+function imageCallsIn(lines: string[]): { calls: ImageCall[]; graphicsPaths: string[] | null } {
+  const code = executableLines(lines);
+  const calls: ImageCall[] = [];
+  code.forEach(({ text }, lineIdx) => {
+    if (!text.includes('\\includegraphics')) return;
+    const raw = lines[lineIdx];
+    for (const call of findIncludegraphics(blankComment(raw), raw)) calls.push({ lineIdx, call });
+  });
+  return { calls, graphicsPaths: graphicsPathsIn(code.map((c) => c.text)) };
+}
+
+/**
+ * The project-relative .tex file a log error points at, or undefined when it
+ * is outside the project. Log paths are "./chapters/intro.tex" or absolute.
+ */
+function errorFileInProject(file: string, projectDir: string): string | undefined {
+  const normalized = file.replace(/\\/g, '/');
+  if (!/\.(tex|ltx)$/i.test(normalized)) return undefined;
+  const rel = /^([A-Za-z]:)?\//.test(normalized)
+    ? path.relative(projectDir, normalized).replace(/\\/g, '/')
+    : normalized.replace(/^(\.\/)+/, '');
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return undefined;
+  return rel;
+}
+
+function missingImageText(shown: string, result: ImagePathResult): string | undefined {
+  if (result.status === 'unloadable') return `pdfLaTeX cannot read ${result.path}. Export it as PDF or PNG and upload that.`;
+  if (result.status !== 'missing') return undefined;
+  return result.suggestion
+    ? `No file named ${shown} in the project. ${result.suggestion} is the closest match.`
+    : `No file named ${shown} in the project. Upload it, or fix the path.`;
+}
+
+/**
+ * Error card for "File `x' not found" when x is an \includegraphics path:
+ * what is wrong, and a fix when one project file is clearly meant. Undefined
+ * when x is not an image path (a missing \input says the same thing). The
+ * project is listed once per compile, on the first such error.
+ */
+function explainMissingImage(
+  missing: string,
+  err: CompileError,
+  sourceLines: string[],
+  projectDir: string,
+  cache: { value?: MissingImageContext }
+): CompileError | undefined {
+  if (!cache.value) {
+    const main = imageCallsIn(sourceLines);
+    cache.value = {
+      files: imageFileList(listProjectFilePaths(projectDir)),
+      graphicsPaths: main.graphicsPaths ?? [],
+      calls: main.calls,
+    };
+  }
+  const { files, graphicsPaths, calls } = cache.value;
+
+  const key = (s: string) => (normalizeImageName(s) ?? s.trim()).toLowerCase();
+  const wanted = key(missing);
+  const matching = calls.filter((c) => key(c.call.name) === wanted);
+
+  // Raised in a file in a subfolder (a chapter), or a path main.tex does not
+  // use: read the file the error names. Explanation only; the fix applies to
+  // main.tex alone.
+  const reported = errorFileInProject(err.file, projectDir);
+  if (matching.length === 0 || (reported && reported.includes('/'))) {
+    if (!reported) return undefined;
+    let lines: string[];
+    try {
+      lines = fs.readFileSync(path.join(projectDir, reported), 'utf8').split('\n').map((l) => l.replace(/\r$/, ''));
+    } catch {
+      return undefined;
+    }
+    const own = imageCallsIn(lines);
+    const hit = own.calls.find((c) => key(c.call.name) === wanted);
+    if (!hit) return undefined;
+    const text = missingImageText(hit.call.name.trim(), checkImagePath(hit.call.name, files, own.graphicsPaths ?? graphicsPaths));
+    return text ? { ...err, friendlyExplanation: text } : undefined;
+  }
+
+  const result = checkImagePath(matching[0].call.name, files, graphicsPaths);
+  const explanation = missingImageText(matching[0].call.name.trim(), result);
+  if (!explanation) return undefined;
+  if (result.status !== 'missing' || !result.suggestion) return { ...err, friendlyExplanation: explanation };
+
+  // The fix edits main.tex, so it is offered only when the error's own line in
+  // main.tex holds exactly one \includegraphics with this path. (Absolute log
+  // paths are not compared with the project folder: recorded logs carry the
+  // recording machine's folder.)
+  const onErrorLine = matching.filter((c) => c.lineIdx === err.line - 1);
+  const target = onErrorLine.length === 1 ? onErrorLine[0] : undefined;
+  if (!target) return { ...err, friendlyExplanation: explanation };
+
+  const srcLine = sourceLines[target.lineIdx];
+  const fixedLine = srcLine.slice(0, target.call.argOpen + 1) + result.suggestion + srcLine.slice(target.call.argClose);
+  return {
+    ...err,
+    file: 'main.tex',
+    line: target.lineIdx + 1,
+    friendlyExplanation: explanation,
+    suggestedFix: {
+      type: 'replace_line' as const,
+      codeSnippet: fixedLine,
+      label: `Use ${result.suggestion}`,
+      description: `Changes the \\includegraphics path on line ${target.lineIdx + 1} to ${result.suggestion}.`,
+      line: target.lineIdx + 1,
+      find: srcLine,
+      replace: fixedLine,
+    },
+  };
+}
+
 function enrichErrorsWithSourceContext(
   rawErrors: CompileError[],
   sourceLines: string[],
   projectDir?: string
 ): CompileError[] {
+  const imageContext: { value?: MissingImageContext } = {};
   // An error raised inside an installed package reports the package's own
   // file and line (fontspec.sty:101), so "Jump" would land on line 101 of the
   // user's document. Point it at the \usepackage line that loaded the package.
@@ -1493,57 +1634,14 @@ function enrichErrorsWithSourceContext(
       };
     }
 
-    const fileNotFoundMatch = err.message.match(
-      /File [`']?([^`'\s:]+\.(?:png|jpe?g|pdf|eps))[`']?\s+not found/i
-    );
-    if (fileNotFoundMatch && projectDir) {
-      const missingFile = fileNotFoundMatch[1].trim();
-      const candidateDirs = ['figures', 'images', 'img', 'assets', 'graphics', 'photos'];
-      let foundSubdir: string | null = null;
-
-      for (const dir of candidateDirs) {
-        const candidatePath = path.join(projectDir, dir, missingFile);
-        if (fs.existsSync(candidatePath)) {
-          foundSubdir = dir;
-          break;
-        }
-      }
-
-      if (foundSubdir) {
-        const relativePath = `${foundSubdir}/${missingFile}`;
-        let imgLineIdx = lineIdx;
-        if (
-          imgLineIdx < 0 ||
-          imgLineIdx >= sourceLines.length ||
-          !sourceLines[imgLineIdx].includes(missingFile)
-        ) {
-          imgLineIdx = sourceLines.findIndex((l) => l.includes(missingFile));
-        }
-
-        if (imgLineIdx >= 0) {
-          const actualLine = imgLineIdx + 1;
-          const srcLine = sourceLines[imgLineIdx];
-          const fixedLine = srcLine.replace(missingFile, relativePath);
-
-          return {
-            ...err,
-            line: actualLine,
-            message: `Image '${missingFile}' found in '${foundSubdir}/'`,
-            friendlyExplanation:
-              `File '${missingFile}' was not found in the project root directory, but it exists at '${relativePath}'. ` +
-              `Update the path in \\includegraphics to resolve this error.`,
-            suggestedFix: {
-              type: 'replace_line' as const,
-              codeSnippet: fixedLine,
-              label: `Update path to ${relativePath}`,
-              description: `Change '${missingFile}' to '${relativePath}' in \\includegraphics on line ${actualLine}.`,
-              line: actualLine,
-              find: srcLine,
-              replace: fixedLine,
-            },
-          };
-        }
-      }
+    // ── Pattern 3: an \includegraphics path that names no loadable file ─────
+    // "File `x' not found" is also what a missing \input says, so this only
+    // applies when x is the path of an \includegraphics in the main document.
+    // The answer comes from the same resolver as the live editor mark.
+    const notFound = err.message.match(/File [`']([^`']+)['`] not found/i);
+    if (notFound && projectDir) {
+      const imageError = explainMissingImage(notFound[1].trim(), err, sourceLines, projectDir, imageContext);
+      if (imageError) return imageError;
     }
 
     return enrichFromSource(err, sourceLines);

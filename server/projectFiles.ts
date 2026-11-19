@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
+import { checkImagePath, findIncludegraphics, graphicsPathsIn, imageFileList } from './imagePaths.js';
 
 // A .tex file pasted in from Overleaf arrives without the files that sat next
 // to it: the journal class and .bst, the .bib, the figures, \input chapters.
@@ -20,10 +21,6 @@ export interface MissingProjectFile {
   /** Line in main.tex that refers to it (0 when unknown) */
   line: number;
 }
-
-// What pdfLaTeX's graphicx tries, in order, for a name without extension;
-// .eps is converted on the fly by epstopdf.
-const GRAPHICS_EXTENSIONS = ['', '.pdf', '.png', '.jpg', '.jpeg', '.eps', '.jbig2', '.mps'];
 
 // Environments whose content is printed, not executed: the Springer Nature
 // template shows \includegraphics{<eps-file>} inside verbatim as an example.
@@ -61,10 +58,15 @@ export function executableLines(sourceLines: string[]): { text: string; line: nu
   return out;
 }
 
-/** Every file in the project as a lowercase forward-slash relative path. */
-function projectFileSet(projectDir: string): Set<string> {
-  const files = new Set<string>();
-  const walk = (dir: string, depth: number) => {
+/**
+ * Every file in the project: relative, forward slashes, original case. Skips
+ * names starting with "." and node_modules at any depth, as the file-list API
+ * does (projects.ts listProjectFiles), so the editor and the compile check
+ * images against the same files.
+ */
+export function listProjectFilePaths(projectDir: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string) => {
     let entries: fs.Dirent[] = [];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -72,20 +74,19 @@ function projectFileSet(projectDir: string): Set<string> {
       return;
     }
     for (const e of entries) {
-      if (e.isDirectory()) {
-        if (depth < 6 && !e.name.startsWith('.') && e.name !== 'node_modules') walk(path.join(dir, e.name), depth + 1);
-      } else {
-        files.add(path.relative(projectDir, path.join(dir, e.name)).replace(/\\/g, '/').toLowerCase());
-      }
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else files.push(path.relative(projectDir, full).replace(/\\/g, '/'));
     }
   };
-  walk(projectDir, 0);
+  walk(projectDir);
   return files;
 }
 
 // The compile puts the project root and every subfolder on TEXINPUTS, so
-// "fig.eps" resolves from figures/fig.eps too. Mirror that: exact relative
-// path, or the same path under any folder.
+// "intro.tex" resolves from chapters/intro.tex too. Mirror that: exact
+// relative path, or the same path under any folder.
 function existsInProject(files: Set<string>, candidate: string): boolean {
   const c = candidate.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
   if (files.has(c)) return true;
@@ -115,7 +116,8 @@ const LOG_EVIDENCE: Array<{ pattern: RegExp; kind: (file: string) => MissingFile
 export async function findMissingProjectFiles(
   sourceLines: string[],
   projectDir: string,
-  errors: Array<{ message: string; line: number }>
+  errors: Array<{ message: string; line: number }>,
+  projectFiles: string[] = listProjectFilePaths(projectDir)
 ): Promise<MissingProjectFile[]> {
   const found: MissingProjectFile[] = [];
   const seen = new Set<string>();
@@ -133,24 +135,15 @@ export async function findMissingProjectFiles(
     }
   }
 
-  const files = projectFileSet(projectDir);
+  const files = new Set(projectFiles.map((f) => f.toLowerCase()));
+  const images = imageFileList(projectFiles);
   const code = executableLines(sourceLines);
-
-  // \graphicspath{{figures/}{img/}} adds prefixes graphicx tries in order.
-  const graphicsPaths = [''];
-  for (const { text } of code) {
-    const gp = text.match(/\\graphicspath\s*\{((?:\s*\{[^}]*\})+)\s*\}/);
-    if (gp) for (const d of gp[1].matchAll(/\{([^}]*)\}/g)) graphicsPaths.push(d[1].trim());
-  }
+  const graphicsPaths = graphicsPathsIn(code.map((c) => c.text)) ?? [];
 
   const unresolvedInputs: Array<{ name: string; line: number }> = [];
   for (const { text, line } of code) {
-    for (const m of text.matchAll(/\\includegraphics\*?\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g)) {
-      const name = m[1].trim();
-      // A macro or argument (\figdir/plot, #1) cannot be resolved statically.
-      if (!name || /[\\#<>]/.test(name)) continue;
-      const hit = graphicsPaths.some((prefix) => GRAPHICS_EXTENSIONS.some((ext) => existsInProject(files, prefix + name + ext)));
-      if (!hit) add(name, 'figure', line);
+    for (const call of findIncludegraphics(text)) {
+      if (checkImagePath(call.name, images, graphicsPaths).status === 'missing') add(call.name.trim(), 'figure', line);
     }
     for (const m of text.matchAll(/\\(?:input|include|subfile)\s*\{([^}]+)\}/g)) {
       const name = m[1].trim();

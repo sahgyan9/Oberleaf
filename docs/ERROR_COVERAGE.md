@@ -5,10 +5,10 @@ Each row is a minimal document that makes the mistake, compiled with a real TeX 
 are recorded once per distribution (`tests/fixtures/logs/` for MiKTeX, `tests/fixtures/logs-texlive/`
 for TeX Live), and `npm test` checks every case against every set on each run.
 
-**MiKTeX** (MiKTeX-pdfTeX 4.27 (MiKTeX 26.5)), 52 cases:
-- Error found in the log: 52/52
-- Specific explanation (not the generic fallback): 52/52
-- One-click fix offered where one is expected: 27/27
+**MiKTeX** (MiKTeX-pdfTeX 4.27 (MiKTeX 26.5)), 56 cases:
+- Error found in the log: 56/56
+- Specific explanation (not the generic fallback): 56/56
+- One-click fix offered where one is expected: 29/29
 
 **TeX Live** (pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)), 52 cases:
 - Error found in the log: 52/52
@@ -65,6 +65,10 @@ corpus first, record it, watch the test fail, then add the rule.
 | Empty length argument | Overleaf | explained | explained |
 | Length beyond TeX's maximum | Overleaf | explained | explained |
 | Image file that does not exist | Overleaf | explained | explained |
+| Image path with a typo | Oberleaf | explained, fix | not recorded |
+| Image path without extension, same word earlier on the line | Oberleaf | explained, fix | not recorded |
+| Image path with a typo in an \input file | Oberleaf | explained | not recorded |
+| SVG image with pdfLaTeX | Oberleaf | explained | not recorded |
 | Too many unprocessed floats | Overleaf | explained | explained |
 | Figure inside a box or another float | Overleaf | explained | explained |
 | Package loaded twice with different options | Overleaf | explained | explained |

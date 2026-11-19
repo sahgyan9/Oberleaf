@@ -434,7 +434,52 @@ export const ERROR_CASES: ErrorCase[] = [
     title: 'Image file that does not exist',
     origin: 'Overleaf',
     tex: doc(String.raw`\usepackage{graphicx}`, String.raw`\includegraphics{nofile.png}`),
-    expect: { message: /nofile\.png/, line: 4, explanation: /could not be found/ },
+    expect: { message: /nofile\.png/, line: 4, explanation: /No file named nofile\.png in the project\. Upload it/ },
+  },
+  {
+    id: 'missing-image-near-miss',
+    title: 'Image path with a typo',
+    origin: 'Oberleaf',
+    tex: doc(String.raw`\usepackage{graphicx}`, String.raw`\includegraphics[width=2cm]{plott.png}`),
+    files: { 'figures/plot.png': PNG },
+    expect: {
+      message: /plott\.png/,
+      line: 4,
+      explanation: /figures\/plot\.png is the closest match/,
+      fix: { type: 'replace_line', contains: String.raw`\includegraphics[width=2cm]{figures/plot.png}` },
+    },
+  },
+  {
+    // The fix edits the path by its columns, never the first "plott" on the line.
+    id: 'missing-image-word-on-line',
+    title: 'Image path without extension, same word earlier on the line',
+    origin: 'Oberleaf',
+    tex: doc(String.raw`\usepackage{graphicx}`, String.raw`The plott: \includegraphics{plott}`),
+    files: { 'figures/plot.png': PNG },
+    expect: {
+      message: /plott/,
+      line: 4,
+      explanation: /closest match/,
+      fix: { type: 'replace_line', contains: String.raw`The plott: \includegraphics{figures/plot.png}` },
+    },
+  },
+  {
+    // Raised inside an \input file: explained from that file, no fix (the
+    // fix only edits the main document).
+    id: 'missing-image-in-chapter',
+    title: 'Image path with a typo in an \\input file',
+    origin: 'Oberleaf',
+    tex: doc(String.raw`\usepackage{graphicx}`, String.raw`\input{chapters/intro}`),
+    files: { 'chapters/intro.tex': 'Chapter text.\n\\includegraphics[width=2cm]{plott}\n', 'figures/plot.png': PNG },
+    expect: { message: /plott/, line: 2, file: /intro\.tex/, explanation: /No file named plott in the project\. figures\/plot\.png is the closest match/ },
+  },
+  {
+    id: 'image-svg',
+    title: 'SVG image with pdfLaTeX',
+    origin: 'Oberleaf',
+    tex: doc(String.raw`\usepackage{graphicx}`, String.raw`\includegraphics{diagram}`),
+    files: { 'diagram.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' },
+    expect: { message: /diagram/, line: 4, explanation: /cannot read diagram\.svg/ },
   },
   // No case for an image in a subfolder referenced without its folder: the
   // compiler puts every project subfolder on TEXINPUTS, so that compiles.
