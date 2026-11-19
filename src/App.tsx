@@ -41,6 +41,9 @@ import { useToast, ToastContainer } from './components/Toast/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useWindowWidth, pxToPanelPercent } from './hooks/useElementWidth';
 import { CommandPalette, type PaletteItem } from './components/CommandPalette/CommandPalette';
+import { ReportDialog } from './components/Report/ReportDialog';
+import { ReportingConsent } from './components/Report/ReportingConsent';
+import { fetchReportingStatus, setTelemetry, type ReportingStatus } from './utils/reporting';
 import { QuitConfirmModal, OberleafStoppedScreen, quitOberleaf } from './components/Quit/QuitOberleaf';
 import { ReferencePanel } from './components/Reference/ReferencePanel';
 import { countLatexWords } from './utils/wordCount';
@@ -245,6 +248,20 @@ export const App: React.FC = () => {
   const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isQuitOpen, setIsQuitOpen] = useState<boolean>(false);
+  // Problem reports and opt-in error signals (docs/ERROR_REPORTING.md)
+  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [reportingStatus, setReportingStatus] = useState<ReportingStatus | null>(null);
+  const [consentReady, setConsentReady] = useState<boolean>(false);
+  const refreshReportingStatus = useCallback(() => {
+    void fetchReportingStatus().then(setReportingStatus);
+  }, []);
+  useEffect(() => {
+    refreshReportingStatus();
+    // The one-time question waits a moment, so it does not land on top of the
+    // first screen the user is reading.
+    const t = setTimeout(() => setConsentReady(true), 4000);
+    return () => clearTimeout(t);
+  }, [refreshReportingStatus]);
   const [isAppStopped, setIsAppStopped] = useState<boolean>(false);
   const { theme, toggleTheme } = useTheme();
   const [isDoctorOpen, setIsDoctorOpen] = useState<boolean>(false);
@@ -2116,6 +2133,13 @@ export const App: React.FC = () => {
     }
     command('new-project', 'New project from a template', () => setIsNewProjectModalOpen(true), { keywords: 'create thesis paper cv import zip' });
     command('theme', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', () => toggleTheme(), { keywords: 'appearance mode night day' });
+    command('report', 'Report a problem', () => setIsReportOpen(true), { keywords: 'bug feedback issue error crash send log help' });
+    if (reportingStatus?.canSend) {
+      const on = reportingStatus.telemetry === 'on';
+      command('signals', on ? 'Error signals: turn off' : 'Error signals: turn on', () => {
+        void setTelemetry(on ? 'off' : 'on').then(refreshReportingStatus);
+      }, { keywords: 'telemetry privacy anonymous crash reports' });
+    }
     command('quit', 'Quit Oberleaf', () => setIsQuitOpen(true), { keywords: 'exit stop close shut down server background' });
 
     if (inEditor) {
@@ -2155,7 +2179,7 @@ export const App: React.FC = () => {
     // The handlers are recreated every render; the palette only needs the
     // set that existed when it opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPaletteOpen, currentView, files, projects, projectId, theme, fileTreeCollapsed]);
+  }, [isPaletteOpen, currentView, files, projects, projectId, theme, fileTreeCollapsed, reportingStatus, refreshReportingStatus]);
 
   // Ctrl+K opens the palette and Ctrl+Shift+M the reference panel. Capture
   // phase, because Monaco treats Ctrl+K as the first key of a chord and would
@@ -2576,6 +2600,7 @@ export const App: React.FC = () => {
                 compileWarnings={compileWarnings}
                 diagnosticFocus={diagnosticFocus}
                 resolveFile={(f) => (f ? findProjectFile(files, f) : undefined)}
+                onReportProblem={() => setIsReportOpen(true)}
                 onApplyFix={handleApplyFix}
                 onUndoFix={handleUndoFix}
                 fixReceipt={fixReceipt}
@@ -2940,6 +2965,17 @@ export const App: React.FC = () => {
 
       {/* Search and commands (Ctrl+K) */}
       <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} items={paletteItems} />
+      <ReportDialog
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        projectId={currentView === 'editor' ? projectId : undefined}
+        hasCompile={currentView === 'editor' && compileDuration !== null}
+        status={reportingStatus}
+        onStatusChange={refreshReportingStatus}
+      />
+      {consentReady && reportingStatus?.canSend && reportingStatus.telemetry === 'unset' && (
+        <ReportingConsent onDecided={refreshReportingStatus} />
+      )}
 
       {/* Symbols and LaTeX reference (Ctrl+Shift+M); stays open beside the editor */}
       <ReferencePanel

@@ -23,3 +23,6 @@ CV_*
 !tests/fixtures/logs-texlive/*.log
 # Whole-compile cases (scripts/compare-error-cases.ts) and imported problem reports
 !tests/fixtures/diagnostics/*.log
+!tests/fixtures/reports/**/*.log
+# Developer secrets (PostHog personal API key for scripts/fetch-reports.ts)
+.env

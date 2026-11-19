@@ -36,6 +36,21 @@ import {
   pathHoldsMainFile,
 } from './projects.js';
 import { ZipImportError } from './zipImport.js';
+import {
+  buildReport,
+  errorSignature,
+  githubIssueUrl,
+  loadReportingConfig,
+  readReportingSettings,
+  rememberClientError,
+  rememberCompile,
+  renderReport,
+  sendReport,
+  sendSignal,
+  signalsFromCompile,
+  writeReportingSettings,
+  type ReportRequest,
+} from './reporting.js';
 import { getTemplate, getTemplateCatalog, getTemplatePreviewPath, readTemplateFile } from './templates.js';
 import { lookupCitation, LookupError } from './citationLookup.js';
 import { installPackageForSty } from './packageInstall.js';
@@ -884,10 +899,82 @@ app.post('/api/projects/:id/compile', async (req, res) => {
     }
 
     touchProject(req.params.id);
+    // Kept for "Report a problem", and checked for failures that point at
+    // Oberleaf itself. Signals only leave the machine if the user opted in.
+    rememberCompile(req.params.id, projectDir, mainFile, result);
+    for (const signal of signalsFromCompile(result)) void sendSignal(signal);
     res.json(result);
+  } catch (error: any) {
+    void sendSignal({ kind: 'compile-crash', signature: errorSignature(String(error?.message ?? error)) });
+    sendApiError(res, error);
+  }
+});
+
+// 7.0. Problem reports and error signals (docs/ERROR_REPORTING.md). Under
+// /api/system/ so they are local-only: a collaborator on the share tunnel
+// cannot read the owner's logs or send reports in their name.
+app.get('/api/system/reporting', (_req, res) => {
+  const config = loadReportingConfig();
+  const settings = readReportingSettings();
+  res.json({ telemetry: settings.telemetry, canSend: !!config.posthogKey, githubRepo: config.githubRepo });
+});
+
+app.put('/api/system/reporting', (req, res) => {
+  const telemetry = req.body?.telemetry;
+  if (telemetry !== 'on' && telemetry !== 'off') return res.status(400).json({ error: "telemetry must be 'on' or 'off'" });
+  writeReportingSettings({ ...readReportingSettings(), telemetry });
+  res.json({ telemetry });
+});
+
+function reportRequestFrom(body: any): ReportRequest {
+  return {
+    projectId: typeof body?.projectId === 'string' ? body.projectId : undefined,
+    note: typeof body?.note === 'string' ? body.note : '',
+    contact: typeof body?.contact === 'string' ? body.contact : undefined,
+    includeSource: body?.includeSource === true,
+  };
+}
+
+// The main file, read only when the user ticked "include my document".
+const readMainSource = (projectDir: string, mainFile: string) => fs.readFileSync(path.join(projectDir, mainFile), 'utf8');
+
+app.post('/api/system/report/preview', async (req, res) => {
+  try {
+    const report = await buildReport(reportRequestFrom(req.body), readMainSource);
+    const config = loadReportingConfig();
+    res.json({ report, text: renderReport(report), githubUrl: githubIssueUrl(report, config.githubRepo), canSend: !!config.posthogKey });
   } catch (error: any) {
     sendApiError(res, error);
   }
+});
+
+app.post('/api/system/report/send', async (req, res) => {
+  try {
+    const report = await buildReport(reportRequestFrom(req.body), readMainSource);
+    const outcome = await sendReport(report);
+    if (!outcome.sent) {
+      return res.status(outcome.reason === 'not-configured' ? 409 : 502).json({
+        error:
+          outcome.reason === 'not-configured'
+            ? 'Sending is not set up in this copy of Oberleaf. Save the report or open a GitHub issue instead.'
+            : 'The report could not be sent. Check the internet connection, or save it and send the file.',
+      });
+    }
+    res.json({ id: report.id });
+  } catch (error: any) {
+    sendApiError(res, error);
+  }
+});
+
+// Crashes in the page. Always kept for the next report; sent as a signal only
+// when the user turned signals on.
+app.post('/api/system/report/client-error', (req, res) => {
+  const message = String(req.body?.message ?? '').slice(0, 500);
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const stack = typeof req.body?.stack === 'string' ? req.body.stack.slice(0, 2000) : undefined;
+  rememberClientError({ at: new Date().toISOString(), message, stack, where: String(req.body?.where ?? '').slice(0, 100) || undefined });
+  void sendSignal({ kind: 'client-crash', signature: errorSignature(message) });
+  res.json({ ok: true });
 });
 
 // 7.1. Clean Build Cache Endpoint
@@ -918,7 +1005,11 @@ app.post('/api/projects/:id/packages/install', async (req, res) => {
     // Resolves the file to its distribution package and verifies the result;
     // see server/packageInstall.ts for why exit codes are not trusted.
     const outcome = await installPackageForSty(cleanPkg, projectDir);
-    if (!outcome.success) return res.status(422).json({ error: outcome.message });
+    if (!outcome.success) {
+      // The package name is a public CTAN name, not anything about the user.
+      void sendSignal({ kind: 'package-install-failed', signature: `${cleanPkg}: ${errorSignature(outcome.message)}` });
+      return res.status(422).json({ error: outcome.message });
+    }
     return res.json(outcome);
   } catch (error: any) {
     sendApiError(res, error);
