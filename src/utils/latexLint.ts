@@ -34,17 +34,23 @@ export interface LintContext {
   projectFiles?: string[];
 }
 
-interface LineInfo {
+export interface LineInfo {
   raw: string;
-  /** Comments and verbatim blanked; math kept */
+  /** Comments, verbatim, \verb and URLs blanked; math kept */
   code: string;
   /** Like code, with math blanked as well */
   text: string;
   /** Only math kept */
   math: string;
+  /** The line starts inside a verbatim environment opened on an earlier line */
+  verbatim: boolean;
 }
 
-const VERBATIM_ENVS = new Set(['verbatim', 'verbatim*', 'lstlisting', 'minted', 'comment', 'Verbatim']);
+/** Environments whose body TeX reads as literal text, up to the exact \end{name} */
+export const VERBATIM_ENVS = new Set([
+  'verbatim', 'verbatim*', 'Verbatim', 'Verbatim*', 'BVerbatim', 'LVerbatim', 'spverbatim',
+  'lstlisting', 'minted', 'comment', 'filecontents', 'filecontents*',
+]);
 const MATH_ENVS = new Set([
   'equation', 'equation*', 'align', 'align*', 'gather', 'gather*', 'multline', 'multline*', 'flalign', 'flalign*',
   'alignat', 'alignat*', 'eqnarray', 'eqnarray*', 'displaymath', 'math',
@@ -52,7 +58,11 @@ const MATH_ENVS = new Set([
 
 const blank = (s: string) => s.replace(/[^\n]/g, ' ');
 
-function analyze(source: string): LineInfo[] {
+/**
+ * One entry per source line, each mask the same length as the line. Shared
+ * with the live structure check (latexStructure.ts).
+ */
+export function analyze(source: string): LineInfo[] {
   const lines = source.split('\n').map((l) => l.replace(/\r$/, ''));
   const out: LineInfo[] = [];
   // Set by analyzeLine when a verbatim environment opens and stays open
@@ -66,7 +76,7 @@ function analyze(source: string): LineInfo[] {
       const closeTag: string = verbatimEnd;
       const endAt = raw.indexOf(closeTag);
       if (endAt < 0) {
-        out.push({ raw, code: blank(raw), text: blank(raw), math: blank(raw) });
+        out.push({ raw, code: blank(raw), text: blank(raw), math: blank(raw), verbatim: true });
         continue;
       }
       // Blank up to and including the \end{...}; the rest of the line is normal
@@ -78,15 +88,16 @@ function analyze(source: string): LineInfo[] {
         code: blank(raw.slice(0, cut)) + rest.code,
         text: blank(raw.slice(0, cut)) + rest.text,
         math: blank(raw.slice(0, cut)) + rest.math,
+        verbatim: true,
       });
       continue;
     }
     const info = analyzeLine(raw);
-    out.push({ raw, ...info });
+    out.push({ raw, ...info, verbatim: false });
   }
   return out;
 
-  function analyzeLine(line: string): Omit<LineInfo, 'raw'> {
+  function analyzeLine(line: string): Omit<LineInfo, 'raw' | 'verbatim'> {
     const code = line.split('');
     const text = line.split('');
     const math = line.split('').map(() => ' ');
@@ -125,13 +136,29 @@ function analyze(source: string): LineInfo[] {
         const name = line.slice(i + 1).match(/^[A-Za-z@]+\*?|^./)?.[0] ?? '';
         const end = i + 1 + name.length;
 
-        if (name === 'verb' || name === 'verb*') {
-          const delim = line[end];
-          const close = delim ? line.indexOf(delim, end + 1) : -1;
+        // \verb|...| and \lstinline[opts]|...| or {...}: literal text
+        if (name === 'verb' || name === 'verb*' || name === 'lstinline') {
+          const opts = name === 'lstinline' ? line.slice(end).match(/^\[[^\]]*\]/)?.[0].length ?? 0 : 0;
+          const delim = line[end + opts];
+          const closer = name === 'lstinline' && delim === '{' ? '}' : delim;
+          const close = delim ? line.indexOf(closer, end + opts + 1) : -1;
           const stop = close < 0 ? line.length : close + 1;
           for (let k = i; k < stop; k++) code[k] = text[k] = math[k] = ' ';
           i = stop - 1;
           continue;
+        }
+
+        // The address in \url{...} and \href{...}{...} is read verbatim:
+        // % and # in it are not a comment or a parameter. The braces stay.
+        if (name === 'url' || name === 'href') {
+          const open = line.slice(end).match(/^\s*\{/);
+          const from = open ? end + open[0].length : -1;
+          const close = open ? line.indexOf('}', from) : -1;
+          if (close >= 0) {
+            for (let k = from; k < close; k++) code[k] = text[k] = math[k] = ' ';
+            i = close - 1;
+            continue;
+          }
         }
 
         if (name === 'begin' || name === 'end') {
